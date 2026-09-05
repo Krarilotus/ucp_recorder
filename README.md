@@ -2,7 +2,7 @@
 
 Work in progress: recording and playback of single-player Stronghold Crusader and Crusader Extreme Skirmishes using UCP3.
 
-Version 0.15.0 detects DirectPlay system messages, including player removal and host migration, as explicit gaps in multiplayer diagnostics. It includes 0.14.0's audio/UI RNG isolation for single-player recording and playback. Recordings, the native replay browser and loading a starting save have been exercised in game. **A complete replay with the latest RNG fixes, Extreme gameplay and settings restart still need live verification.** Multiplayer recording is not supported yet; normal multiplayer isolation has automated coverage but still needs a live comparison. See [multiplayer evidence](docs/multiplayer-diagnostics.md), the [presentation RNG audit](docs/presentation-rng.md) and [live findings and next tests](docs/live-validation.md).
+Version 0.16.0 schedules replay commands at the native dispatch boundary, preserves their recorded order across ring wrap, checks the complete batch before dispatch and cleans up queued commands on failure or cancellation. It includes the earlier audio/UI RNG fixes and multiplayer diagnostics. Recordings, the native replay browser and loading a starting save have been exercised in game. **A complete replay with the latest fixes, Extreme gameplay and settings restart still need live verification.** Multiplayer recording/playback remains unsupported. See the [dispatch evidence](docs/replay-dispatch.md), [multiplayer evidence](docs/multiplayer-diagnostics.md) and [live findings and next tests](docs/live-validation.md).
 
 Automarket 1.1.0 has an experimental replay adapter for its settings commits and native custom save section. Use protocol 1.0.0 and map-extensions 1.0.0, with **recorder after protocol in the extension order**. The normal weekly trades run in the simulation; they are not replayed as extra trades. Other custom protocols remain unsupported. See [Automarket replay notes](docs/automarket-replay.md).
 
@@ -34,4 +34,4 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.15.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
+The builder creates `dist/recorder-0.16.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.

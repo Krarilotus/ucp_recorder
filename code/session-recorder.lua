@@ -20,6 +20,7 @@ function Session:guard(callback)
     local stopSimulation=self.engine:singlePlayer() and (self.active or self.mode=='play')
     core.writeInteger(self.halt,stopSimulation and 1 or 0)
     if stopSimulation then self.engine:pause() end
+    if self.mode=='play' then pcall(self.engine.abortPlayback,self.engine) end
     print('Replay stopped: ' .. self.error)
     if self.manifest then
       pcall(store.write,store.path(self.manifest.id)..'/last-error.txt',self.error)
@@ -46,6 +47,7 @@ function Session:startRecording()
   self.mode='record'; self.status='armed'; self.active=false
   self.error=nil; self.observedTick=false
   self.finalRngData=nil
+  self.executedTick=nil; self.executedBatchSize=0
   self.engine:resetCommands()
   self.engine:setScope(true)
   core.writeInteger(self.halt,0)
@@ -117,6 +119,9 @@ end
 function Session:onExecutedCommand(command)
   if self.status~='recording' or not self.active then return end
   validation.sessionCommand(command,self.manifest)
+  self.executedBatchSize=command.time==self.executedTick and self.executedBatchSize+1 or 1
+  self.executedTick=command.time
+  assert(self.executedBatchSize<=100,'Recording exceeds the supported 100-command dispatch batch')
   assert(self.commandsFile:write(json:encode(command)..'\n'))
   assert(self.commandsFile:flush())
   self.manifest.commandCount=self.manifest.commandCount+1
@@ -126,10 +131,14 @@ function Session:feed()
   self:reconcileMode()
   if self.status~='playing' then return end
   local now=self.engine:tick()
-  while self.engine:canSchedule() do
+  local count=0
+  while true do
     local c=self:peekCommand()
-    if not c or c.time>now+64 then return end
+    if not c or c.time>now then return end
     assert(c.time>=now,'Replay command missed its simulation tick')
+    count=count+1
+    assert(count<=100,'Replay exceeds the native 100-command dispatch batch')
+    assert(self.engine:canSchedule(),'Native command ring has no room for the due replay batch')
     validation.sessionCommand(c,self.manifest)
     self.engine:scheduleCommand(c)
     self:consumeSavedCommand()
@@ -219,6 +228,7 @@ end
 
 function Session:reset()
   self.capturePending=nil
+  if self.mode=='play' then self.engine:abortPlayback() end
   self.engine:setScope(false)
   self.engine:resetCommands()
   core.writeInteger(self.halt,0)

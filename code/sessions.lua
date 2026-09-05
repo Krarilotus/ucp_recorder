@@ -1,6 +1,6 @@
 local platform = require('code/platform')
 local validation = require('code/validation')
-local M = {FORMAT = 1, ROOT = 'ucp/replays', PROFILE = 'recorder-sp-v7'}
+local M = {FORMAT = 1, ROOT = 'ucp/replays', PROFILE = 'recorder-sp-v8'}
 local activeSettings
 
 local function read(path)
@@ -142,10 +142,12 @@ function M.preflight(manifest)
     data[name]=read(path..'/'..file)
     assert(sha.sha256(data[name])==manifest[name..'Hash'],'Replay '..name..' stream is damaged')
   end
-  local count,previous=0,manifest.startTick
+  local count,previous,batchSize=0,manifest.startTick,0
   for line in data.commands:gmatch('[^\r\n]+') do
     local c=validation.sessionCommand(json:decode(line),manifest)
     assert(c.time>=previous and c.time<=manifest.lastTick,'Replay command tick is outside its ordered timeline')
+    batchSize=c.time==previous and batchSize+1 or 1
+    assert(batchSize<=100,'Replay exceeds the native 100-command dispatch batch')
     count=count+1; previous=c.time
   end
   assert(count==manifest.commandCount,'Replay command count differs')

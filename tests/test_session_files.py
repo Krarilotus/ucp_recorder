@@ -12,6 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_oversized_same_tick_batch_cannot_be_sealed_or_loaded(self):
+        self.lua.execute('''
+local m=recording(); local path=store.path(m.id)..'/stream-commands.json'
+local line=store.read(path):match('[^\\n]+')..'\\n'
+store.write(path,string.rep(line,101))
+assert(not pcall(store.finish,m) and m.status~='complete')
+store.write(path,string.rep(line,100)); store.finish(m); store.preflight(m)
+assert(m.commandCount==100)
+''')
+
     def test_missing_full_rng_evidence_prevents_completion(self):
         self.lua.execute('''
 local m=recording(); m.finalRngHash=nil

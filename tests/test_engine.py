@@ -26,6 +26,15 @@ core.writeByte=function(a,v) bytes[a]=v end
 core.writeString=function(a,s)
  for i=1,#s do bytes[a+i-1]=s:byte(i) end
 end
+function simulatedSchedule(base,category,player,time,source)
+ local slot=core.readInteger(base+engine.sites.writeIndexOffset)
+ local address=base+0x3c67c+slot*1272
+ memory[address]=time; memory[address+4]=player
+ bytes[address+8]=category; bytes[address+9]=1
+ core.writeBytes(address+10,core.readBytes(source,engine.expectedSize))
+ memory[base+engine.sites.writeIndexOffset]=(slot+1)%200
+ engine.copySeen=true
+end
 ''')
 
     def test_failed_save_restores_exact_filename_and_progress_callback(self):
@@ -58,7 +67,7 @@ local slot=engine.base+0x3c67c+9
 bytes[slot]=1
 assert(not pcall(function() engine:scheduleCommand(command()) end)); assert(scheduled==0)
 bytes[slot]=10
-engine.schedule=function() bytes[slot]=1 end
+engine.schedule=simulatedSchedule
 engine:scheduleCommand(command()); assert(engine:commandsPending())
 bytes[slot]=10; assert(engine:commandsPending()) -- native state alone is not execution proof
 local entry=engine.journal:before(0,command()); engine.journal:after(0,entry)
@@ -76,7 +85,7 @@ engine.schedule=function()
  assert(result.EAX==0)
 end
 assert(not pcall(function() engine:scheduleCommand(command()) end))
-assert(bytes[slot]==10 and not engine.expectedSize)
+assert(bytes[slot]==0 and not engine.expectedSize and not engine:commandsPending())
 ''')
 
     def test_stale_playback_does_not_block_multiplayer_queue(self):
@@ -178,10 +187,11 @@ for i=0,1260 do bytes[address+i]=42 end
 local c=command(10); c.commandCategory=122; c.size=272; c.data='83000000'..string.rep('00',268)
 for _,fail in ipairs({false,true}) do
  engine:resetCommands()
- engine.schedule=function()
+ engine.schedule=function(...)
   assert(bytes[address]==131 and bytes[address+1]==0 and bytes[address+1259]==0)
   assert(bytes[address+1260]==42)
   if fail then error('receive callback failed') end
+  simulatedSchedule(...)
  end
  local ok=pcall(function() engine:scheduleCommand(c) end)
  assert(ok~=fail and not engine.expectedSize)

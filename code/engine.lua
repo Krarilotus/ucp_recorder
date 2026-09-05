@@ -146,41 +146,99 @@ function M:canSchedule()
   if index<0 or index>=200 then return false end
   if self.journal.slots[index] then return false end
   local state=core.readByte(self.base+0x3c67c+index*1272+9)
-  return state==0 or state>=10
+  return state==0 or state==10
+end
+
+function M:validateQueued(slot,command)
+  local address=self.base+0x3c67c+slot*1272
+  assert(core.readByte(address+9)==1,'Replay ring entry is not pending')
+  assert(core.readInteger(address)==command.time,'Native command scheduling tick changed')
+  assert(core.readInteger(address+4)==command.player,'Native replay sender changed')
+  assert(core.readByte(address+8)==command.commandCategory,'Native replay category changed')
+  assert(require('code/utils').tableToHex(core.readBytes(address+10,command.size)):upper()==command.data:upper(),
+    'Native replay payload changed')
 end
 
 function M:scheduleCommand(command)
   require('code/validation').command(command)
+  assert(self:singlePlayer(),'Replay enqueue requires single-player')
+  assert(self.expectedSize==nil,'Nested replay enqueue is unsupported')
   assert(self:canSchedule(),'Native command ring is full')
   local bytes=require('code/utils').hexToTable(command.data)
   for i=#bytes+1,1260 do bytes[i]=0 end
   core.writeBytes(self.buffer,bytes)
   local slot=core.readInteger(self.base+self.sites.writeIndexOffset)
+  local address=self.base+0x3c67c+slot*1272
+  local oldSlot=core.readBytes(address,1272)
+  local scratch={}
+  for _,offset in ipairs({self.sites.writeIndexOffset,0x2d824,0x2d828,0x2d830,self.sites.writeIndexOffset+4}) do
+    scratch[offset]=core.readInteger(self.base+offset)
+  end
   self.expectedSize=command.size
-  self.copyError=nil
+  self.copyError=nil; self.copySeen=false
   -- protocol 1.0.0's receive callback reads this native packet buffer even when
   -- the scheduler was given a different pointer. Restore it after the copy.
   local received=self.base+0xcdc
   local oldReceived
   if command.commandCategory==122 then
     oldReceived=core.readBytes(received,1260)
-    core.writeBytes(received,bytes)
   end
-  temporarily(function()
+  local ok,reason=xpcall(function()
+    if oldReceived then core.writeBytes(received,bytes) end
     self.schedule(self.base,command.commandCategory,command.player,command.time,self.buffer)
-  end,function()
-    if oldReceived then core.writeBytes(received,oldReceived) end
-    self.expectedSize=nil
-  end)
-  if self.copyError then
-    core.writeByte(self.base+0x3c67c+slot*1272+9,10)
-    error(self.copyError)
+    assert(not self.copyError,self.copyError)
+    assert(self.copySeen,'Native scheduler did not copy the replay payload')
+    assert(core.readInteger(self.base+self.sites.writeIndexOffset)==(slot+1)%200,
+      'Native scheduler did not advance exactly one ring slot')
+    self:validateQueued(slot,command)
+  end,debug.traceback)
+  if oldReceived then core.writeBytes(received,oldReceived) end
+  self.expectedSize=nil; self.copySeen=nil
+  if not ok then
+    -- Roll back queue storage/scratch only, not arbitrary effects of a native
+    -- handler. The session guard halts playback on any failed enqueue.
+    core.writeBytes(address,oldSlot)
+    for offset,value in pairs(scratch) do core.writeInteger(self.base+offset,value) end
+    error(reason)
   end
   self.journal:queue(slot,command)
 end
 
+function M:selectPlayback(recorder)
+  assert(self:singlePlayer() and recorder.status=='playing','Replay dispatch is not active')
+  recorder:feed()
+  local entries=self.journal:select(self:tick())
+  -- Reject unknown pending entries before *any* handler in this batch runs.
+  for slot=0,199 do
+    local state=core.readByte(self.base+0x3c67c+slot*1272+9)
+    if state~=0 and state~=10 then
+      local source=assert(self.journal.slots[slot],'Untracked native command in replay ring')
+      self:validateQueued(slot,source.command)
+    end
+  end
+  for _,item in ipairs(entries) do
+    require('code/validation').sessionCommand(item.entry.command,recorder.manifest)
+    self:validateQueued(item.slot,item.entry.command)
+  end
+  for i=0,99 do
+    local item=entries[i+1]
+    core.writeInteger(self.base+self.sites.selectedOffset+i*8,item and item.slot or 0)
+    core.writeInteger(self.base+self.sites.selectedOffset+i*8+4,item and item.entry.command.player or 0)
+  end
+  core.writeInteger(self.base+self.sites.selectedCountOffset,#entries)
+  return #entries>0 and 1 or 0
+end
+
 function M:commandsPending()
   return self.journal:pending()
+end
+
+function M:abortPlayback()
+  if not self:singlePlayer() then return end
+  core.writeInteger(self.base+self.sites.selectedCountOffset,0)
+  for slot in pairs(self.journal.slots) do
+    core.writeByte(self.base+0x3c67c+slot*1272+9,10)
+  end
 end
 
 function M:beforeCommand(recorder)
@@ -221,14 +279,29 @@ function M:install(recorder)
     if recorder.mode=='play' and self:singlePlayer() and not self.loading then return 0 end
     return originalQueue(this,category)
   end,self.sites.queue.address,2,1,#self.sites.queue.bytes)
+  local originalSelect
+  originalSelect=core.hookCode(function(this)
+    if recorder.mode~='play' or not self:singlePlayer() or self.loading then return originalSelect(this) end
+    core.writeInteger(self.base+self.sites.selectedCountOffset,0)
+    if recorder.status~='playing' then return 0 end
+    local result=0
+    local ok=recorder:guard(function()
+      assert(this==self.base,'Unexpected replay command receiver')
+      result=self:selectPlayback(recorder)
+    end)
+    return ok and result or 0
+  end,self.sites.select.address,1,1,#self.sites.select.bytes)
   -- Replace exactly MOV EAX,[ESI+commandSize] before the timed payload copy.
   -- A corrupt record cannot cause a native read beyond its declared payload.
   core.writeCode(self.sites.copySize.address,{0x90,0x90,0x90,0x90,0x90,0x90})
   core.detourCode(function(registers)
     local size=core.readInteger(registers.ESI+0x2d830)
-    if self.expectedSize and registers.EDX==self.buffer and size~=self.expectedSize then
-      self.copyError='Native payload size differs from replay record'
-      size=0
+    if self.expectedSize then
+      self.copySeen=true
+      if registers.EDX~=self.buffer or size~=self.expectedSize then
+        self.copyError='Native payload size or source differs from replay record'
+        size=0
+      end
     end
     registers.EAX=size
     if self.trace then self.trace:observe('receivedCommand',registers.EDX,size) end

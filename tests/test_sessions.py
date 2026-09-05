@@ -83,6 +83,7 @@ engine={rng=0x1a279c0,
  rngState=function() return {11,22,3,4} end,
  saveSnapshot=function() snapshots=snapshots+1 end,
  pause=function() paused=true end,
+ abortPlayback=function() aborted=true end,
  canSchedule=function() return space end,
  commandsPending=function() return false end,
  scheduleCommand=function(_,c) scheduled=scheduled+1 end,
@@ -126,7 +127,7 @@ assert(savedManifest.status=='complete' and savedManifest.lastTick==512)
 local r=session(); r.status='playing'; r.mode='play'; r.playedCommands=0; r.manifest={player=1}; now=100; space=false
 r.nextCommand=command(110); r:feed()
 assert(scheduled==0 and r.nextCommand.time==110)
-space=true; r.loadCommand=function() return nil end; r:feed()
+space=true; now=110; r.loadCommand=function() return nil end; r:feed()
 assert(scheduled==1 and not r.nextCommand)
 ''')
 
@@ -136,6 +137,24 @@ local r=session(); r.status='playing'; r.mode='play'; r.active=true
 now=100; r.nextCommand=command(99)
 assert(not r:guard(function() r:feed() end))
 assert(r.status=='error' and paused and memory[r.halt]==1 and scheduled==0)
+''')
+
+    def test_feed_waits_for_due_tick_and_rejects_a_full_ring_before_consuming(self):
+        self.check('''
+local r=session(); r.mode='play'; r.status='playing'; r.active=true; r.playedCommands=0
+r.manifest={id='test',player=1}; r.nextCommand=command(110); r.loadCommand=function() return nil end
+now=100; r:feed(); assert(scheduled==0 and r.nextCommand.time==110)
+now=110; space=false
+assert(not r:guard(function() r:feed() end))
+assert(scheduled==0 and r.nextCommand.time==110 and aborted)
+''')
+
+    def test_recording_rejects_more_than_one_native_batch_at_the_same_tick(self):
+        self.check('''
+local r=session(); r:startRecording(); r:activateRecording()
+for i=1,100 do r:onExecutedCommand(command(10)) end
+assert(not r:guard(function() r:onExecutedCommand(command(10)) end))
+assert(r.manifest.status=='failed')
 ''')
 
     def test_checkpoint_mismatch_halts_playback(self):

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.16.0
+
+- Feed replay commands at the native command-selection boundary when they are due. Remove the receive-loop prefetch hook and its 64-tick lookahead; scheduling no longer depends on how often networking is polled.
+- During SP playback, select the entire due batch by recorded execution sequence, preserving native handler execution and player identity. The native physical-ring scan can otherwise reverse same-tick commands when the replay queue wraps.
+- Validate all owned entries and reject untracked pending entries before publishing a batch. Check native enqueue completion, copied payload length/source, ring advancement, state, sender, category, tick and payload contents.
+- Restore the original ring entry, write cursor and saved scheduling scratch on failed enqueue. Invalidate replay-owned queued entries and the selected batch when playback fails or is cancelled, preventing later accidental execution. This is queue recovery, not rollback of arbitrary native/extension effects.
+- Reject more than 100 commands at one execution tick during recording and file preflight. Reproducing multiple native batches at an unchanged tick needs explicit batch-phase evidence; this version fails rather than silently moving commands to another tick.
+- Use SP simulation profile `recorder-sp-v8`; old captures require their original recorder version. Idle play, recording, native loading and multiplayer still use the original selector. Multiplayer diagnostic format remains 5 and MP replay is not enabled.
+
+Validation: 128 automated tests, including 1,600-command session completion with 1, 3 and 20 simulated ticks per frame, failed admission, cancellation and multiplayer isolation. Original-executable checks pass for Crusader and Extreme. A new isolated native harness reproduces physical-ring reordering, then runs the Lua engine with each original scheduler/dispatcher for 600 correctly ordered commands per variant and verifies queue rollback after a native size mismatch. Native gameplay handlers and the real UCP bridge still require live testing; the harness uses explicit stand-ins. See [dispatch evidence and limits](docs/replay-dispatch.md).
+
 ## 0.15.0
 
 - Observe the native DirectPlay system-message branch in Crusader and Extreme before host/roster/timing mutations. Player removal and host migration bypass timed command dispatch and can no longer silently leave an open diagnostic trace looking complete.

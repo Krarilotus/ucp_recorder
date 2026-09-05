@@ -5,6 +5,7 @@ function M.new() return setmetatable({slots={},nextSequence=1,executed=0},{__ind
 
 function M:queue(slot,command)
   validation.command(command)
+  validation.integer(slot,0,199,'command ring slot')
   assert(not self.slots[slot],'Replay command slot reused before execution')
   local copy={}; for k,v in pairs(command) do copy[k]=v end
   self.slots[slot]={command=copy,sequence=self.nextSequence}
@@ -19,6 +20,22 @@ function M:before(slot,actual)
   end
   assert(actual.data:upper()==entry.command.data:upper(),'Native replay command payload differs')
   return entry
+end
+
+-- Ring indices wrap; they are not the recorded execution order. Build a whole
+-- due batch before publishing any entries to the native dispatcher.
+function M:select(now)
+  local entries={}
+  for slot,entry in pairs(self.slots) do
+    assert(entry.command.time>=now,'Replay command missed its simulation tick')
+    if entry.command.time==now then entries[#entries+1]={slot=slot,entry=entry} end
+  end
+  table.sort(entries,function(a,b) return a.entry.sequence<b.entry.sequence end)
+  assert(#entries<=100,'Replay exceeds the native 100-command dispatch batch')
+  for i,item in ipairs(entries) do
+    assert(item.entry.sequence==self.executed+i,'Replay due batch has a missing or reordered command')
+  end
+  return entries
 end
 
 function M:after(slot,entry)
