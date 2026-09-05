@@ -60,6 +60,9 @@ def package():
     files = [source / name for name in ('definition.yml', 'options.yml', 'init.lua', 'README.md', 'CHANGELOG.md')]
     files += sorted((source / 'code').rglob('*.lua'))
     files += sorted((source / 'docs').rglob('*.md'))
+    comparator = source / 'tools/compare_multiplayer.py'
+    if comparator.exists():
+        files.append(comparator)
     with zipfile.ZipFile(asset, 'w', zipfile.ZIP_DEFLATED) as archive:
         for path in files:
             assert path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(source)
