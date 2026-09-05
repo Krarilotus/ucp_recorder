@@ -1,4 +1,4 @@
-# Multiplayer diagnostics (0.9.0)
+# Multiplayer diagnostics (0.10.0)
 
 This is the first multiplayer-specific implementation stage. It observes execution on each peer without changing the simulation scope, RNG seeds, pause flag, command ownership or dispatch decisions. Multiplayer recording/playback remains disabled. The existing single-player replay checks and isolation gates remain in effect.
 
@@ -13,12 +13,14 @@ Exit codes: 0 means the compared command/RNG/resource evidence matched; 1 means 
 
 ## What is observed
 
-The existing checked receive-copy and pre/post-dispatch sites observe timed commands from all senders. The actor comes from the native resolved-player field, rather than assigning every command to the local spectator. Each returned handler produces one row with the execution and scheduled ticks, category, payload, raw sender handle, native slot, resolved actor, post-command RNG and all eight players' resources. The comparator ignores peer-local player identity, raw handles and ring slots, comparing the resolved actions and resulting evidence instead.
+The existing checked receive-copy and pre/post-dispatch sites observe timed commands from all senders. The actor comes from the native resolved-player field, rather than assigning every command to the local spectator. Every 64 simulation ticks, a read-only observer also records RNG/resource state immediately before native RNG advancement. It runs on the original simulation path without using the single-player halt flag. Repeated observations of a paused boundary are deduplicated. Each returned handler produces one row with the execution and scheduled ticks, category, payload, raw sender handle, native slot, resolved actor, post-command RNG and all eight players' resources. The comparator ignores peer-local player identity, raw handles and ring slots, comparing the resolved actions and resulting evidence instead.
 
 A missing payload receipt produces an untracked row and an incomplete completion status. Interrupted handlers, write errors, missing footers and malformed records cannot become a successful comparison. Logging errors close the trace and disable further diagnostic writes for that session; they do not halt multiplayer or replace its command category. Trace files are flushed synchronously, so this opt-in instrumentation has I/O and execution overhead that still needs live measurement.
 
 ## Boundaries
 
-This is command-boundary evidence, not a full replay or a full world-state checksum. It does not yet capture untimed commands, periodic no-command simulation boundaries, resynchronization/save-transfer packets or private extension state. It does not make a multiplayer save playable offline, replace networking, or change human/AI identity rules. Equal traces therefore do not prove a complete multiplayer match is deterministic. Different post-command RNG/resource evidence locates a mismatch; further analysis is needed to establish its cause.
+This is command-boundary and periodic simulation evidence, not a full replay or a full world-state checksum. It does not yet capture untimed commands, resynchronization/save-transfer packets or private extension state. It does not make a multiplayer save playable offline, replace networking, or change human/AI identity rules. Equal traces therefore do not prove a complete multiplayer match is deterministic. Different post-command RNG/resource evidence locates a mismatch; further analysis is needed to establish its cause.
 
 Automated tests use native callback fixtures to verify original registers/dispatch survive logging failures, remote actors are recorded, single-player does not start a multiplayer trace, and incomplete evidence is rejected. The comparator has matching/differing/corrupt trace tests. No live multiplayer match was launched for this stage.
+
+Format 2 gives every command/checkpoint an ordered evidence sequence and records both event and command totals. The comparator detects skipped checkpoint boundaries, including matching files with the same missing interval. It accepts older format-1 pairs as command-only evidence; mixing formats is rejected. A short interval before the first recorded event is outside the trace window.

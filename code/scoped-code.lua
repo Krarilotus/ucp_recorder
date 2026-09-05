@@ -44,6 +44,11 @@ function M.build(site,enabled,mode,seed,origin)
   end
   rel({0xe9},site.address+#site.bytes)
   labels.original=#out; emit(0x9d)
+  if site.patch=='tick' and site.originalCallback then
+    emit(0x9c,0x60)
+    rel({0xe8},site.originalCallback)
+    emit(0x61,0x9d)
+  end
   if site.kind=='call' then rel({0xe8},site.target)
   elseif site.kind=='branch' then
     rel({0x0f,site.condition},site.target)

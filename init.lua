@@ -48,7 +48,15 @@ function module:enable(config)
 
   local tickCallback=core.allocateCode({0x90,0x90,0x90,0x90,0x90,0xC3})
   observe(tickCallback,5,function() recorder:onTick() end)
-  fixes.installTick(sites.tick,engine.scope,engine.base+0x618,recorder.halt,tickCallback)
+  local multiplayerTick
+  if engine.trace then
+    multiplayerTick=core.allocateCode({0x90,0x90,0x90,0x90,0x90,0xC3})
+    core.detourCode(function(registers)
+      engine.trace:observe('onTick')
+      return registers
+    end,multiplayerTick,5)
+  end
+  fixes.installTick(sites.tick,engine.scope,engine.base+0x618,recorder.halt,tickCallback,multiplayerTick)
 end
 
 function module:disable()

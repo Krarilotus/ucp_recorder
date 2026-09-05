@@ -72,6 +72,17 @@ memory[engine.base+0x618]=0; receive(); before(); after()
 assert(#traceRows==0 and not engine.trace.file)
 ''')
 
+    def test_tick_evidence_does_not_need_commands_and_deduplicates_paused_boundary(self):
+        self.check('''
+memory[0x1fe7da8]=64
+engine.trace:observe('onTick'); engine.trace:observe('onTick')
+assert(#traceRows==2 and traceRows[2].kind=='checkpoint' and traceRows[2].time==64)
+memory[0x1fe7da8]=65; engine.trace:observe('onTick'); assert(#traceRows==2)
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+engine.trace:observe('stop','test ended')
+assert(traceRows[4].commands==0 and traceRows[4].events==2 and traceRows[4].status=='complete')
+''')
+
 
 class CompareTraceTests(unittest.TestCase):
     def setUp(self):
@@ -128,3 +139,18 @@ class CompareTraceTests(unittest.TestCase):
             else:
                 b[1]['sequence'] = 2
             self.assertEqual(self.compare(a, b)['status'], 'incomplete', change)
+
+    def test_periodic_evidence_compares_without_any_commands(self):
+        a = [dict(kind='header', format=2, variant='SHC', executable='a', firstTick=64),
+             dict(kind='checkpoint', sequence=1, time=64, rng=[1, 2, 3, 4], resources=[0]*200),
+             dict(kind='end', status='complete', events=1, commands=0)]
+        b = json.loads(json.dumps(a))
+        self.assertEqual(self.compare(a, b)['status'], 'matched')
+        b[1]['rng'][3] = 5
+        self.assertEqual(self.compare(a, b)['firstDifference']['field'], 'rng')
+
+    def test_missing_checkpoint_cannot_be_hidden_in_a_matching_pair(self):
+        a = self.trace()
+        a[0].update(format=2, firstTick=0)
+        a[-1].update(events=1)
+        self.assertEqual(self.compare(a, a)['status'], 'incomplete')

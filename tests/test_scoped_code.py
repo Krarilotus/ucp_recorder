@@ -35,6 +35,9 @@ class ScopedCodeTests(unittest.TestCase):
         if site['patch']=='tick':
             put(site['halt'],halt)
             machine.mem_write(site['callback'],b'\xff\x05'+struct.pack('<I',counter)+b'\xb8\x01\0\0\0\xc3')
+            if site['originalCallback']:
+                machine.mem_write(site['originalCallback'],b'\xff\x05'+struct.pack('<I',counter)
+                    + b'\xb8\x11\0\0\0\xb9\x22\0\0\0\xba\x33\0\0\0\xc3')
         if gated:
             gate=bytes(self.emitter.build(site,scope,mode_pointer,123,0x4000000).values())
             machine.mem_write(0x4000000,gate)
@@ -89,3 +92,18 @@ class ScopedCodeTests(unittest.TestCase):
             stopped=self.run_code(tick,1,0,0xa83,True,halt=1)
             self.assertEqual(stopped[-3],tick['skipTick'])
             self.assertEqual(stopped[7],0x4108000); self.assertEqual(stopped[8],0xa83)
+
+    def test_optional_tick_diagnostics_preserve_native_multiplayer_execution(self):
+        engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
+        for variant,engine in engines.items():
+            tick=engine['tick']; tick['patch']='tick'; tick['kind']='raw'
+            tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=tick['address']+0x25
+            tick['originalCallback']=0x4f0100
+            for flags in (0x202,0x242,0xa83):
+                original=self.run_code(tick,0,0,flags,False)
+                for enabled,mode in ((0,0),(0,1),(1,1),(1,2)):
+                    with self.subTest(variant=variant,flags=flags,scope=enabled,mode=mode):
+                        observed=self.run_code(tick,enabled,mode,flags,True,halt=1)
+                        self.assertEqual(observed[:-2],original[:-2])
+                        self.assertEqual(observed[-1],original[-1])
+                        self.assertEqual(observed[-2],1)

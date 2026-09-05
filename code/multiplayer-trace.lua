@@ -26,10 +26,24 @@ function M:open()
     assert(i<9999,'Cannot allocate multiplayer trace folder')
   end
   self.file=assert(io.open(self.path..'/commands.jsonl','w'))
-  self.count=0
-  self:write({kind='header',format=1,variant=native.profile.name,executable=native.profile.sha256,
+  self.count=0; self.events=0
+  self:write({kind='header',format=2,variant=native.profile.name,executable=native.profile.sha256,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
   print('Multiplayer diagnostics: '..self.path)
+end
+
+function M:record(event)
+  self.events=self.events+1
+  event.sequence=self.events
+  self:write(event)
+end
+
+function M:onTick()
+  local now=self.engine:tick()
+  if now%64~=0 or now==self.lastTick then return end
+  self:open()
+  self.lastTick=now
+  self:record({kind='checkpoint',time=now,rng=self.engine:rngState(),resources=self.engine:resourceState()})
 end
 
 function M:receivedCommand(address,size)
@@ -61,23 +75,24 @@ function M:afterCommand()
   self.executing=nil
   self.received[event.slot]=nil
   self.count=self.count+1
-  event.sequence=self.count
   event.rng=self.engine:rngState()
   event.resources=self.engine:resourceState()
-  self:write(event)
+  self:record(event)
 end
 
 function M:stop(reason)
   local f=self.file
   if f then
     local ok,err=pcall(function()
-      self:write({kind='end',status=(self.incomplete or self.executing) and 'incomplete' or 'complete',commands=self.count,reason=reason})
+      self:write({kind='end',status=(self.incomplete or self.executing) and 'incomplete' or 'complete',
+        commands=self.count,events=self.events,reason=reason})
     end)
     self.file=nil
     local closed,closeError=f:close()
     assert(ok and closed,err or closeError)
   end
   self.received={}; self.executing=nil; self.failed=false; self.incomplete=false; self.path=nil
+  self.lastTick=nil
 end
 
 function M:observe(event,...)

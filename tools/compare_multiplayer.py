@@ -20,27 +20,44 @@ def rows(stream):
         yield value
 
 
-def commands(records):
-    count = 0
+def evidence(records, format_version, first_tick=0):
+    count, command_count = 0, 0
+    integer(first_tick, 0, 2147483647)
+    previous_tick = first_tick
+    next_checkpoint = (first_tick + 63) // 64 * 64
     for record in records:
         if record.get('kind') == 'end':
-            if record.get('status') != 'complete' or record.get('commands') != count or not count:
-                raise ValueError('Trace is incomplete or has no commands')
+            if (record.get('status') != 'complete' or record.get('commands') != command_count or not count
+                    or (format_version == 2 and record.get('events') != count)):
+                raise ValueError('Trace is incomplete or has no evidence')
             if next(records, None) is not None:
                 raise ValueError('Data follows trace completion')
             return
-        if record.get('kind') != 'command':
+        allowed = ('command', 'checkpoint') if format_version == 2 else ('command',)
+        if record.get('kind') not in allowed:
             raise ValueError('Trace contains an untracked/unknown command')
         count += 1
         if record.get('sequence') != count:
-            raise ValueError('Trace command sequence is incomplete')
-        for key, lo, hi in [('time', 0, 2147483647), ('scheduledTime', 1, 2147483647),
-                            ('player', 1, 8), ('category', 0, 127), ('size', 0, 1260)]:
-            integer(record.get(key), lo, hi)
-        data = record.get('data')
-        if not isinstance(data, str) or len(data) != record['size'] * 2 or any(c not in '0123456789abcdefABCDEF' for c in data):
-            raise ValueError('Invalid trace payload')
-        record['data'] = data.upper()
+            raise ValueError('Trace evidence sequence is incomplete')
+        integer(record.get('time'), previous_tick, 2147483647)
+        previous_tick = record['time']
+        if record['kind'] == 'command':
+            command_count += 1
+            if format_version == 2 and record['time'] > next_checkpoint:
+                raise ValueError('Missing periodic checkpoint evidence')
+        fields = [('scheduledTime', 1, 2147483647),
+                  ('player', 1, 8), ('category', 0, 127), ('size', 0, 1260)]
+        if record['kind'] == 'command':
+            for key, lo, hi in fields:
+                integer(record.get(key), lo, hi)
+            data = record.get('data')
+            if not isinstance(data, str) or len(data) != record['size'] * 2 or any(c not in '0123456789abcdefABCDEF' for c in data):
+                raise ValueError('Invalid trace payload')
+            record['data'] = data.upper()
+        elif record['time'] != next_checkpoint:
+            raise ValueError('Missing, repeated or invalid checkpoint boundary')
+        else:
+            next_checkpoint += 64
         for key, length in [('rng', 4), ('resources', 200)]:
             values = record.get(key)
             if not isinstance(values, list) or len(values) != length:
@@ -59,18 +76,22 @@ def compare(left, right):
             ar, br = rows(a), rows(b)
             ah, bh = next(ar), next(br)
             for header in (ah, bh):
-                if header.get('kind') != 'header' or header.get('format') != 1:
+                if header.get('kind') != 'header' or header.get('format') not in (1, 2):
                     raise ValueError('Unsupported trace format')
-            if any(ah.get(key) != bh.get(key) for key in ('variant', 'executable')):
-                raise ValueError('Traces require the same game executable/variant')
-            for av, bv in itertools.zip_longest(commands(ar), commands(br)):
+            if any(ah.get(key) != bh.get(key) for key in ('variant', 'executable', 'format')):
+                raise ValueError('Traces require the same game executable, variant and format')
+            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0)),
+                                               evidence(br, bh['format'], bh.get('firstTick', 0))):
                 count += 1
                 if difference:
                     continue  # Still validate both complete streams before reporting.
                 if av is None or bv is None:
-                    difference = dict(sequence=count, field='command count')
+                    difference = dict(sequence=count, field='event count')
                     continue
-                for key in ('time', 'scheduledTime', 'player', 'category', 'size', 'data', 'rng', 'resources'):
+                fields = ('kind', 'time')
+                if av['kind'] == bv['kind'] == 'command':
+                    fields += ('scheduledTime', 'player', 'category', 'size', 'data')
+                for key in fields + ('rng', 'resources'):
                     if av[key] == bv[key]:
                         continue
                     difference = dict(sequence=count, time=av['time'], field=key)
@@ -84,7 +105,7 @@ def compare(left, right):
                     break
     except (OSError, ValueError, KeyError, StopIteration) as error:
         return dict(status='incomplete', reason=str(error) or 'Empty trace', firstDifference=difference)
-    return dict(status='different' if difference else 'matched', commands=count, firstDifference=difference)
+    return dict(status='different' if difference else 'matched', events=count, firstDifference=difference)
 
 
 if __name__ == '__main__':

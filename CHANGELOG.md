@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0
+
+- Add periodic multiplayer RNG/resource evidence before native simulation advancement, including periods with no player commands.
+- Keep the optional observer independent of the single-player replay halt/patch scope; preserve native registers, flags, stack and tick continuation.
+- Deduplicate paused boundaries and compare format-2 command/checkpoint streams, rejecting missing periodic evidence. The comparator still accepts paired format-1 traces.
+
+Validation: 91 automated tests, including x86 emulation for both variants with a stale halt flag and register-clobbering diagnostic callbacks. Live multiplayer timing and trace comparisons remain pending; multiplayer replay is not enabled.
+
 ## 0.9.0
 
 - Add opt-in multiplayer command diagnostics, disabled by default. Observe the resolved actor, payload, scheduled/executed tick and post-command RNG/resource state without injecting, suppressing or pausing multiplayer commands.
