@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+- Capture timed commands when their native handlers return, including inputs delivered directly to the received-command scheduler. Record their actual execution tick and resolved actor.
+- Verify playback command ownership, order, actor, tick, category and payload before dispatch, and count execution only after the handler returns. Suppress a mismatching dispatch and subsequent commands in the stopped batch.
+- Keep pending replay commands owned until execution is observed, even if native code changes their slot state.
+- Preserve the protocol dispatch hook and original multiplayer dispatch behaviour.
+- Use simulation profile `recorder-sp-v3`; older experimental captures require their original version.
+
+Validation: 68 automated tests and original executable checks for Crusader and Extreme. Full live replay and custom extension protocol support remain pending.
+
 ## 0.5.0
 
 - Gate randomness, dust, pause and fixed-seed changes by both an active recorder scope and the native single-player mode. Multiplayer and idle paths execute the original instruction sequences.

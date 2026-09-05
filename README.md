@@ -2,7 +2,7 @@
 
 Work in progress: recording and playback of single-player Stronghold Crusader and Crusader Extreme Skirmishes using UCP3.
 
-Version 0.5.0 confines recorder simulation changes to requested single-player sessions and hides its controls in multiplayer. It includes a native replay browser, settings restart, starting saves and settings snapshots. **The save/load playback path, browser rendering and real restart still need in-game verification.** Multiplayer recording is not supported yet; normal multiplayer isolation has automated coverage but still needs a live comparison.
+Version 0.6.0 verifies native command execution and confines recorder simulation changes to requested single-player sessions and hides its controls in multiplayer. It includes a native replay browser, settings restart, starting saves and settings snapshots. **The save/load playback path, browser rendering and real restart still need in-game verification.** Multiplayer recording is not supported yet; normal multiplayer isolation has automated coverage but still needs a live comparison.
 
 ## Testing this build
 
@@ -30,4 +30,4 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.5.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
+The builder creates `dist/recorder-0.6.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.

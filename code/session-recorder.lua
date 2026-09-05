@@ -43,6 +43,7 @@ function Session:startRecording()
   self:openFiles('w')
   self.mode='record'; self.status='armed'; self.active=false
   self.error=nil; self.observedTick=false
+  self.engine:resetCommands()
   self.engine:setScope(true)
   core.writeInteger(self.halt,0)
 end
@@ -100,13 +101,11 @@ function Session:startPlayback(id)
   print('Playing '..id)
 end
 
-function Session:onCommand(category,time,address,size)
-  self:reconcileMode()
-  if self.status~='recording' or not self.active or time<=0 then return end
-  validation.integer(size,0,1260,'native command size')
-  validation.sessionCommand({commandCategory=category,time=time,player=self.engine:player(),
-    size=size,data=require('code/utils').tableToHex(core.readBytes(address,size))},self.manifest)
-  self:saveCommand(category,time,address,size,self.engine:player())
+function Session:onExecutedCommand(command)
+  if self.status~='recording' or not self.active then return end
+  validation.sessionCommand(command,self.manifest)
+  assert(self.commandsFile:write(json:encode(command)..'\n'))
+  assert(self.commandsFile:flush())
   self.manifest.commandCount=self.manifest.commandCount+1
 end
 
@@ -156,6 +155,7 @@ function Session:onTick()
     if now>=self.manifest.lastTick then
       assert(self.playedCommands==self.manifest.commandCount,'Replay ended before all commands were scheduled')
       assert(not self.engine:commandsPending(),'Replay ended with commands still waiting to execute')
+      assert(self.engine.journal.executed==self.manifest.commandCount,'Replay native execution count differs')
       local actual=self.engine:rngState()
       for i=1,4 do assert(actual[i]==self.manifest.finalRng[i],'Final RNG state differs at tick '..now) end
       self.status='finished'; core.writeInteger(self.halt,1); self.engine:pause()
@@ -167,6 +167,7 @@ end
 
 function Session:reset()
   self.engine:setScope(false)
+  self.engine:resetCommands()
   core.writeInteger(self.halt,0)
   local manifest=self.mode=='record' and self.manifest
   local complete=manifest and self.active and self.observedTick and self.status=='recording'

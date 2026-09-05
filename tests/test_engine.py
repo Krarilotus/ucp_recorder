@@ -50,7 +50,9 @@ assert(not pcall(function() engine:scheduleCommand(command()) end)); assert(sche
 bytes[slot]=10
 engine.schedule=function() bytes[slot]=1 end
 engine:scheduleCommand(command()); assert(engine:commandsPending())
-bytes[slot]=10; assert(not engine:commandsPending())
+bytes[slot]=10; assert(engine:commandsPending()) -- native state alone is not execution proof
+local entry=engine.journal:before(0,command()); engine.journal:after(0,entry)
+assert(not engine:commandsPending())
 ''')
 
     def test_native_size_mismatch_clears_slot_and_guard(self):
@@ -86,4 +88,67 @@ memory[engine.base+0x618]=1; memory[engine.sites.paused]=0
 engine:pause(); assert(memory[engine.sites.paused]==0)
 assert(not pcall(function() engine:setScope(true) end))
 engine:setScope(false); assert(memory[engine.scope]==0)
+''')
+
+    def command_hooks(self, mode):
+        self.check('''
+core.hookCode=function() return function() return 0 end end
+recorder={active=true,status='recording',mode='record',manifest={player=1,variant='SHC'},commands={}}
+function recorder:guard(f)
+ local ok,reason=pcall(f); if not ok then self.status='error'; self.error=reason end
+ return ok
+end
+function recorder:onExecutedCommand(c) self.commands[#self.commands+1]=c end
+engine:install(recorder)
+address=engine.base+0x3c67c
+memory[engine.base+0x2d824]=0; memory[address]=10; bytes[address+8]=28
+memory[engine.base+engine.sites.actorOffset]=1
+memory[0x1fe7da8]=10
+memory[engine.base+0x2d830]=1; bytes[engine.buffer]=1; bytes[address+10]=1
+function before()
+ return callbacks[engine.sites.execute.address]({ESI=engine.base,ECX=0,EDX=999})
+end
+function after() callbacks[engine.sites.executed.address]({ESI=engine.base}) end
+''')
+        if mode == 'play':
+            self.check("recorder.mode='play'; recorder.status='playing'; engine.journal:queue(0,command(10))")
+
+    def test_capture_observes_execution_not_just_receipt(self):
+        self.command_hooks('record')
+        self.check('''
+callbacks[engine.sites.copySize.address]({ESI=engine.base,EDX=engine.buffer})
+assert(#recorder.commands==0)
+memory[0x1fe7da8]=12 -- late delivery: record the actual execution boundary
+assert(before().EDX==28 and #recorder.commands==0)
+after()
+assert(#recorder.commands==1 and recorder.commands[1].time==12 and recorder.commands[1].data=='01')
+assert(not engine.received[0])
+''')
+
+    def test_valid_playback_counts_only_returned_handlers(self):
+        self.command_hooks('play')
+        self.check('''
+assert(before().EDX==28 and engine.journal.executed==0 and engine:commandsPending())
+after(); assert(engine.journal.executed==1 and not engine:commandsPending())
+''')
+
+    def test_bad_execution_becomes_noop_without_consuming_expected_command(self):
+        for corrupt in ("memory[engine.base+engine.sites.actorOffset]=2", "bytes[address+10]=2",
+                        "memory[0x1fe7da8]=11", "memory[address]=9", "bytes[address+8]=39"):
+            with self.subTest(corrupt=corrupt):
+                self.setUp()
+                self.command_hooks('play')
+                self.check(corrupt)
+                self.check('''
+assert(before().EDX==0 and recorder.status=='error')
+after(); assert(engine:commandsPending() and engine.journal.executed==0)
+assert(before().EDX==0) -- later commands in this native batch are suppressed too
+''')
+
+    def test_unowned_command_is_rejected_and_multiplayer_dispatch_is_unchanged(self):
+        self.command_hooks('play')
+        self.check('''
+engine:resetCommands(); assert(before().EDX==0)
+memory[engine.base+0x618]=1; bytes[address+8]=200
+assert(before().EDX==-56) -- original signed-byte conversion, no replay policy in MP
 ''')

@@ -35,9 +35,6 @@ function module:enable(config)
     recorder:activateRecording()
     ui.resetButtons()
   end)
-  observe(native.addr(0x487c50),6,function(registers)
-    if recorder.active and recorder.mode=='record' then recorder:onTransmitCommand(registers) end
-  end)
   observe(native.addr(0x490690),8,function() recorder:feed() end)
   observe(native.addr(0x46b358),6,function(registers)
     if registers.EBP==61 and not engine.loading then recorder:reset(); ui.resetButtons() end

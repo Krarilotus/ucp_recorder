@@ -1,0 +1,11 @@
+# Native command execution (0.6.0)
+
+The old transmitter hook observed local submissions, rather than the order of commands that actually affected the match. Capture now observes timed received payloads and records a command only after its native handler returns. This includes direct calls to the received-command scheduler. Untimed commands and custom extension protocols remain outside the supported format.
+
+Ghidra/OpenSHC `GameSynchronyState::processWaitingCommands` resolves the current actor, selects the category, calls its handler, then marks the slot processed. The category load is at Crusader 0x48937f / Extreme 0x48948f; the post-call instruction is at 0x489390 / 0x4894a0. The eight-byte category load is replaced explicitly, including its signed-byte conversion. The six-byte post-call load is relocated by the detour. These sites contain no relative branches or calls. Exact original bytes are checked before installation.
+
+Payload lengths are captured at the scheduler copy boundary (0x480375 / 0x480545). Capture checks that the ring still contains that payload and scheduling tick, then records the actual execution tick and resolved actor. Playback associates each occupied slot with an immutable expected command and sequence number. A changed actor, payload, category, execution tick, scheduling tick, missing owner or changed order fails before dispatch. Native category zero suppresses that dispatch and the remainder of a stopped batch. The post-call observer retires ownership; a processed state byte alone never proves success.
+
+The category hook sits before protocol's seven-byte dispatch hook and does not overwrite it. Multiplayer, idle sessions and native snapshot loading follow the original path. This establishes command execution evidence, not multiplayer replay support: single-player identity, native snapshots, immediate commands, save/autosave, extension state and world-state verification still need their own handling.
+
+Tests inject wrong actors, modified payloads, delayed execution, changed scheduling ticks, unsupported categories, reordered commands, stale ownership and slot reuse. Both executable profiles are checked against original binaries. No live game is launched by these tests.

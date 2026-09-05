@@ -21,6 +21,8 @@ package.loaded['code/sessions']={
 Session=require('code/session-recorder')
 now=0; snapshots=0; space=true
 engine={rng=0x1a279c0,
+ resetCommands=function(self) self.journal={executed=0} end,
+ journal={executed=0},
  setScope=function(_,active) scoped=active end,
  singlePlayer=function() return true end,
  tick=function() return now end,
@@ -46,11 +48,11 @@ end
     def test_arming_does_not_record_lobby_commands(self):
         self.check('''
 local r=session(); r:startRecording()
-r:onCommand(28,10,0,4)
+r:onExecutedCommand(command(10))
 assert(not r.active and snapshots==0 and r.manifest.commandCount==0)
 r:activateRecording()
 assert(r.active and snapshots==1 and r.manifest.status=='recording')
-r:onCommand(28,10,0,4)
+r:onExecutedCommand(command(10))
 assert(r.manifest.commandCount==1)
 ''')
 
@@ -131,7 +133,7 @@ now=65; assert(not r:guard(function() r:onTick() end)); assert(r.status=='error'
 local r=session(); r:startRecording(); r:activateRecording()
 local closed=0
 r.commandsFile={write=function() return nil,'disk full' end,close=function() closed=closed+1; return true end}
-assert(not r:guard(function() r:onCommand(28,10,0,4) end))
+assert(not r:guard(function() r:onExecutedCommand(command(10)) end))
 assert(r.manifest.status=='failed' and not r.commandsFile and closed==1)
 r:reset(); assert(savedManifest.status=='failed')
 ''')
