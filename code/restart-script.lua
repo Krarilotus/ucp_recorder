@@ -2,6 +2,20 @@
 -- It waits for the current game to exit so two games do not compete for the renderer.
 return [=[
 $ErrorActionPreference = 'Stop'
+function Get-ReplayHash {
+    param([string]$Path)
+    # Get-FileHash is a script module and may be absent from an inherited
+    # PowerShell 7 module path when this Windows PowerShell 5 helper starts.
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $stream = $null
+    try {
+        $stream = [IO.File]::OpenRead($Path)
+        return [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '')
+    } finally {
+        if ($null -ne $stream) { $stream.Dispose() }
+        $algorithm.Dispose()
+    }
+}
 $requestPath = Join-Path (Get-Location).Path 'ucp/replays/restart-request.json'
 try {
     $request = Get-Content -LiteralPath $requestPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -14,14 +28,14 @@ try {
     if ($manifest.id -ne $request.id -or $manifest.status -ne 'complete') { throw 'Replay is incomplete' }
     $executable = [IO.Path]::GetFullPath($request.executable)
     if ([IO.Path]::GetDirectoryName($executable) -ne $gameRoot) { throw 'Game directory differs' }
-    if ((Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash -ne $manifest.executable) { throw 'Game executable differs' }
+    if ((Get-ReplayHash $executable) -ne $manifest.executable) { throw 'Game executable differs' }
     $gameProcess = Get-Process -Id $request.processId -ErrorAction SilentlyContinue
     if ($null -ne $gameProcess) {
         if ($gameProcess.Path -ne $executable) { throw 'Process identity differs' }
         $gameProcess.WaitForExit()
     }
-    if ((Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash -ne $manifest.executable) { throw 'Game executable changed while waiting' }
-    if ((Get-FileHash -LiteralPath $settingsPath -Algorithm SHA256).Hash -ne $manifest.settingsHash) { throw 'Recorded settings are damaged' }
+    if ((Get-ReplayHash $executable) -ne $manifest.executable) { throw 'Game executable changed while waiting' }
+    if ((Get-ReplayHash $settingsPath) -ne $manifest.settingsHash) { throw 'Recorded settings are damaged' }
     $env:UCP_RECORDER_REPLAY = $request.id
     # A Windows file path cannot contain a quote. This one ends in .yml, not a backslash.
     $arguments = '--ucp-config-file="' + $settingsPath + '"'

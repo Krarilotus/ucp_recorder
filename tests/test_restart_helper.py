@@ -39,6 +39,7 @@ class RestartHelperTests(unittest.TestCase):
         (self.root/'helper.ps1').write_text(script, encoding='utf-8-sig')
         (self.root/'runner.ps1').write_text('''
 $ErrorActionPreference = 'Stop'
+function Get-FileHash { throw 'Optional PowerShell script module is unavailable' }
 function Get-Process {
     param($Id,$ErrorAction)
     $process = [pscustomobject]@{ Path = (Join-Path (Get-Location).Path 'Crusader test.exe') }
