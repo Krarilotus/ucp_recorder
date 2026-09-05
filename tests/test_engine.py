@@ -125,6 +125,14 @@ assert(#recorder.commands==1 and recorder.commands[1].time==12 and recorder.comm
 assert(not engine.received[0])
 ''')
 
+    def test_invalid_captured_size_cannot_reach_native_copy(self):
+        self.command_hooks('record')
+        self.check('''
+memory[engine.base+0x2d830]=1261
+local result=callbacks[engine.sites.copySize.address]({ESI=engine.base,EDX=engine.buffer})
+assert(result.EAX==0 and recorder.status=='error' and not engine.received[0])
+''')
+
     def test_valid_playback_counts_only_returned_handlers(self):
         self.command_hooks('play')
         self.check('''

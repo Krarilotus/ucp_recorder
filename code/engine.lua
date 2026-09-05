@@ -204,7 +204,7 @@ function M:install(recorder)
     end
     registers.EAX=size
     if recorder.active and recorder.status=='recording' and self:singlePlayer() then
-      recorder:guard(function()
+      local ok=recorder:guard(function()
         require('code/validation').integer(size,0,1260,'native payload size')
         local slot=core.readInteger(self.base+0x2d824)
         require('code/validation').integer(slot,0,199,'native ring slot')
@@ -212,6 +212,7 @@ function M:install(recorder)
         self.received[slot]={command={commandCategory=core.readByte(address+8),time=core.readInteger(address),
           size=size,data=require('code/utils').tableToHex(core.readBytes(registers.EDX,size))}}
       end)
+      if not ok then registers.EAX=0 end -- do not copy an invalid native length after stopping
     end
     return registers
   end,self.sites.copySize.address,6)

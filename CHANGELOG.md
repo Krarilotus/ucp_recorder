@@ -7,7 +7,7 @@
 - Preserve Map Extensions 1.0.0's save wrapper so the starting save follows its custom-state serialization path. Require recorder to load after protocol before modifying dispatch code.
 - Include the Automarket adapter and protocol registration in replay compatibility checks. Weekly automatic trades continue through the simulation without duplicate replay injection.
 
-Validation: 73 automated tests, Lua syntax checks and original-executable checks for both variants. The adapter, custom save restoration and actual automated trades still require live testing; this is not a multiplayer replay release.
+Validation: 74 automated tests, Lua syntax checks and original-executable checks for both variants. The adapter, custom save restoration and actual automated trades still require live testing; this is not a multiplayer replay release.
 
 ## 0.6.0
 
