@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0
+
+- Compare SHA-256 of the complete 40,016-byte RNG structure after restoring the starting save, at periodic checkpoints and at the ending boundary. Detect different stored random arrays even when current RNG values and indices match.
+- Retain the last observed RNG bytes for completion, so leaving the match cannot change the state being certified. Hash at checkpoints/completion, while copying the current RNG bytes at each recorded tick.
+- Add full RNG hashes to periodic multiplayer diagnostics and compare resolved UCP configuration, framework and extension order/versions before comparing peers. Missing or incompatible evidence is rejected.
+- Use single-player profile `recorder-sp-v5` and multiplayer trace format 3. Older recordings need their original module version; the comparator still accepts paired older trace formats with their original evidence limits.
+
+Validation: 98 automated tests, including altered RNG array bytes with unchanged current values/indices, final-state preservation, missing evidence and observer failure isolation. Full-world state and live multiplayer/replay validation remain outstanding; multiplayer replay is not enabled.
+
 ## 0.10.0
 
 - Add periodic multiplayer RNG/resource evidence before native simulation advancement, including periods with no player commands.

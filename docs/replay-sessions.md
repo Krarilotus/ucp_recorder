@@ -24,6 +24,15 @@ The local single-player identity stays intact. New commands queued by a spectato
 
 ## Configuration compatibility
 
+Version 0.11.0 uses simulation profile `recorder-sp-v5`. It additionally compares
+SHA-256 of all `0x9c50` bytes of the native RNG structure: current values, seed,
+stored arrays and indices. Checks run after restoration, every 64 ticks and at
+the ending boundary. A mismatch writes a `rng-state` diagnostic with its phase,
+tick and expected/actual hashes. Hash evidence is validated during preflight.
+The recorder retains the last observed RNG bytes at each tick and hashes that
+retained state when finishing, rather than reading possibly reset state after
+quitting. Older experimental recordings require their original recorder version.
+
 Settings are captured when the module enables, not reread when the user begins a recording. Playback requires the captured configuration bytes and the resolved configuration/extension-version environment to match. A restart with the saved configuration is necessary when these differ. This stage does not relaunch automatically.
 
 Version equality does not prove that unpacked extensions have identical source files, or that map assets and external resources are unchanged. No extension download, installation or version switching is performed. Replays are local test artifacts; native save/payload handling has not been audited as a parser for hostile downloaded files.

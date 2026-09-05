@@ -12,6 +12,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_missing_full_rng_evidence_prevents_completion(self):
+        self.lua.execute('''
+local m=recording(); m.finalRngHash=nil
+assert(not pcall(store.finish,m))
+m=recording()
+local path=store.path(m.id)..'/stream-rng-sync.json'
+local lines={}
+for line in store.read(path):gmatch('[^\\n]+') do
+ local row=json:decode(line); row.rngHash=nil; lines[#lines+1]=json:encode(row)
+end
+store.write(path,table.concat(lines,'\\n')..'\\n')
+assert(not pcall(store.finish,m))
+''')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -58,11 +72,11 @@ function recording()
  local m=store.new(profile)
  m.player=1; m.startTick=0; m.lastTick=64; m.finalRng={11,22,3,4}
  m.startResources=resourceState(); m.finalResources=resourceState()
- m.snapshotHash=string.rep('b',64); m.rngHash=string.rep('c',64)
+ m.snapshotHash=string.rep('b',64); m.rngHash=string.rep('c',64); m.finalRngHash=string.rep('d',64)
  local path=store.path(m.id)
  local function command(t) return {commandCategory=28,player=1,time=t,size=1,data='01'} end
  store.write(path..'/stream-commands.json',json:encode(command(10))..'\\n'..json:encode(command(65))..'\\n')
- store.write(path..'/stream-rng-sync.json',json:encode({time=0,rng={1,2,3,4},resources=resourceState()})..'\\n'..json:encode({time=64,rng=m.finalRng,resources=resourceState()})..'\\n')
+ store.write(path..'/stream-rng-sync.json',json:encode({time=0,rng={1,2,3,4},resources=resourceState(),rngHash=m.rngHash})..'\\n'..json:encode({time=64,rng=m.finalRng,resources=resourceState(),rngHash=m.finalRngHash})..'\\n')
  store.write(path..'/stream-infself.json',json:encode({gameType=0,mapSeed=123,matchSeed=123,RNGvalue1=1,RNGvalue2=2,RNGindex1=4,RNGindex2=3})..'\\n')
  return m
 end

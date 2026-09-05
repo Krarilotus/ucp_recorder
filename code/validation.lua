@@ -70,11 +70,14 @@ function M.manifest(value)
   M.rng(value.finalRng)
   M.resources(value.startResources)
   M.resources(value.finalResources)
-  for _,key in ipairs({'settingsHash','environmentHash','snapshotHash','rngHash','commandsHash','checkpointsHash','infoHash'}) do
-    assert(type(value[key])=='string' and #value[key]==64 and not value[key]:find('[^%x]'),
-      'Invalid replay '..key)
+  for _,key in ipairs({'settingsHash','environmentHash','snapshotHash','rngHash','finalRngHash','commandsHash','checkpointsHash','infoHash'}) do
+    M.hash(value[key],key)
   end
   return value
+end
+
+function M.hash(value,label)
+  assert(type(value)=='string' and #value==64 and not value:find('[^%x]'),'Invalid replay '..label)
 end
 
 function M.resources(values)

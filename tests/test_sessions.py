@@ -1,3 +1,4 @@
+import hashlib
 import unittest
 import test_recorder as fixture
 
@@ -5,11 +6,41 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_full_rng_array_mismatch_halts_at_checkpoint_and_ending_boundary(self):
+        self.lua.globals().hash_string = lambda value: hashlib.sha256(value.encode()).hexdigest()
+        self.check('''
+sha.sha256=hash_string
+local original=engine:rngData()
+local expected=sha.sha256(original)
+-- Change an unconsumed byte while rngState() still returns the same four values.
+engine.rngData=function() return original:sub(1,1000)..'y'..original:sub(1002) end
+for _,tick in ipairs({64,65}) do
+ local r=session(); r.mode='play'; r.status='playing'; r.active=true; r.playedCommands=0
+ r.manifest={id='test',lastTick=tick,commandCount=0,finalRng={11,22,3,4},
+   finalResources=resourceState(),finalRngHash=expected}
+ r.rngFile={read=function() return {time=64,rng={11,22,3,4},resources=resourceState(),rngHash=expected} end}
+ now=tick; assert(not r:guard(function() r:onTick() end))
+ assert(r.firstDesync.kind=='rng-state' and r.firstDesync.time==tick and paused)
+ assert(r.firstDesync.phase==(tick==64 and 'checkpoint' or 'ending state'))
+end
+''')
+
+    def test_completion_hash_uses_last_observed_state_and_releases_buffer(self):
+        self.lua.globals().hash_string = lambda value: hashlib.sha256(value.encode()).hexdigest()
+        self.check('''
+sha.sha256=hash_string
+local r=session(); r:startRecording(); r:activateRecording(); now=65; r:onTick()
+local expected=sha.sha256(engine:rngData())
+engine.rngData=function() error('Must not read game state after leaving match') end
+r:reset()
+assert(savedManifest.finalRngHash==expected and not r.finalRngData)
+''')
+
     def setUp(self):
         fixture.RecorderTests.setUp(self)
         self.check('''
 json.encode=function(_,value) lastEncoded=value; return 'json' end
-sha={sha256=function(value) return 'hash' end}
+sha={sha256=function(value) return string.rep('a',64) end}
 savedManifest=nil
 package.loaded['code/sessions']={
   new=function() return {id='test',variant='SHC',commandCount=0,lastTick=0} end,
@@ -21,6 +52,7 @@ package.loaded['code/sessions']={
 Session=require('code/session-recorder')
 now=0; snapshots=0; space=true
 engine={rng=0x1a279c0,
+ rngData=function() return string.rep('x',0x9c50) end,
  resourceState=function() return resourceState() end,
  resetCommands=function(self) self.journal={executed=0} end,
  journal={executed=0},
@@ -107,9 +139,9 @@ assert(not r:guard(function() r:onTick() end)); assert(r.status=='error')
     def test_final_checkpoint_boundary_finishes_without_next_checkpoint(self):
         self.check('''
 local r=session(); r.status='playing'; r.mode='play'; r.active=true; r.playedCommands=0
-r.manifest={id='test',lastTick=64,commandCount=0,finalRng={11,22,3,4},finalResources=resourceState()}
+r.manifest={id='test',lastTick=64,commandCount=0,finalRng={11,22,3,4},finalResources=resourceState(),finalRngHash=string.rep('a',64)}
 local reads=0
-r.rngFile={read=function() reads=reads+1; assert(reads==1); return {time=64,rng={11,22,3,4},resources=resourceState()} end}
+r.rngFile={read=function() reads=reads+1; assert(reads==1); return {time=64,rng={11,22,3,4},resources=resourceState(),rngHash=string.rep('a',64)} end}
 now=64; r:onTick(); r:onTick()
 assert(r.status=='finished' and paused and reads==1)
 ''')

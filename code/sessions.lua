@@ -1,6 +1,6 @@
 local platform = require('code/platform')
 local validation = require('code/validation')
-local M = {FORMAT = 1, ROOT = 'ucp/replays', PROFILE = 'recorder-sp-v4'}
+local M = {FORMAT = 1, ROOT = 'ucp/replays', PROFILE = 'recorder-sp-v5'}
 local activeSettings
 
 local function read(path)
@@ -155,6 +155,7 @@ function M.preflight(manifest)
     assert(type(checkpoint)=='table' and checkpoint.time==tick and tick<=manifest.lastTick,'Invalid replay checkpoint timeline')
     validation.rng(checkpoint.rng)
     validation.resources(checkpoint.resources)
+    validation.hash(checkpoint.rngHash,'checkpoint RNG hash')
     tick=tick+64
   end
   assert(tick>manifest.lastTick,'Replay verification data ended early')

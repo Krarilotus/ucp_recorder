@@ -1,4 +1,4 @@
-# Multiplayer diagnostics (0.10.0)
+# Multiplayer diagnostics (0.11.0)
 
 This is the first multiplayer-specific implementation stage. It observes execution on each peer without changing the simulation scope, RNG seeds, pause flag, command ownership or dispatch decisions. Multiplayer recording/playback remains disabled. The existing single-player replay checks and isolation gates remain in effect.
 
@@ -24,3 +24,13 @@ This is command-boundary and periodic simulation evidence, not a full replay or 
 Automated tests use native callback fixtures to verify original registers/dispatch survive logging failures, remote actors are recorded, single-player does not start a multiplayer trace, and incomplete evidence is rejected. The comparator has matching/differing/corrupt trace tests. No live multiplayer match was launched for this stage.
 
 Format 2 gives every command/checkpoint an ordered evidence sequence and records both event and command totals. The comparator detects skipped checkpoint boundaries, including matching files with the same missing interval. It accepts older format-1 pairs as command-only evidence; mixing formats is rejected. A short interval before the first recorded event is outside the trace window.
+
+Format 3 additionally records SHA-256 of the complete 40,016-byte RNG structure at
+each periodic checkpoint, detecting differences in stored random arrays before
+they appear in the current values/indices. Command rows retain their smaller
+post-handler RNG summary. The header includes the resolved UCP settings,
+framework and extension order/version environment hash; different environments
+are reported as incompatible. This does not fingerprint edited extension files
+or external assets. Older format-1/2 pairs can still be compared with their
+original evidence limits. Full RNG hashing adds periodic CPU work; live overhead
+and two-peer comparisons still need measurement.

@@ -10,6 +10,11 @@ def integer(value, lo, hi):
         raise ValueError('Invalid integer in trace')
 
 
+def hash_value(value):
+    if not isinstance(value, str) or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
+        raise ValueError('Missing or invalid SHA256 evidence')
+
+
 def rows(stream):
     while line := stream.readline(65537):
         if len(line) > 65536:
@@ -28,12 +33,12 @@ def evidence(records, format_version, first_tick=0):
     for record in records:
         if record.get('kind') == 'end':
             if (record.get('status') != 'complete' or record.get('commands') != command_count or not count
-                    or (format_version == 2 and record.get('events') != count)):
+                    or (format_version >= 2 and record.get('events') != count)):
                 raise ValueError('Trace is incomplete or has no evidence')
             if next(records, None) is not None:
                 raise ValueError('Data follows trace completion')
             return
-        allowed = ('command', 'checkpoint') if format_version == 2 else ('command',)
+        allowed = ('command', 'checkpoint') if format_version >= 2 else ('command',)
         if record.get('kind') not in allowed:
             raise ValueError('Trace contains an untracked/unknown command')
         count += 1
@@ -43,7 +48,7 @@ def evidence(records, format_version, first_tick=0):
         previous_tick = record['time']
         if record['kind'] == 'command':
             command_count += 1
-            if format_version == 2 and record['time'] > next_checkpoint:
+            if format_version >= 2 and record['time'] > next_checkpoint:
                 raise ValueError('Missing periodic checkpoint evidence')
         fields = [('scheduledTime', 1, 2147483647),
                   ('player', 1, 8), ('category', 0, 127), ('size', 0, 1260)]
@@ -58,6 +63,8 @@ def evidence(records, format_version, first_tick=0):
             raise ValueError('Missing, repeated or invalid checkpoint boundary')
         else:
             next_checkpoint += 64
+            if format_version >= 3:
+                hash_value(record.get('rngHash'))
         for key, length in [('rng', 4), ('resources', 200)]:
             values = record.get(key)
             if not isinstance(values, list) or len(values) != length:
@@ -76,10 +83,14 @@ def compare(left, right):
             ar, br = rows(a), rows(b)
             ah, bh = next(ar), next(br)
             for header in (ah, bh):
-                if header.get('kind') != 'header' or header.get('format') not in (1, 2):
+                if header.get('kind') != 'header' or header.get('format') not in (1, 2, 3):
                     raise ValueError('Unsupported trace format')
+                if header['format'] >= 3:
+                    hash_value(header.get('environmentHash'))
             if any(ah.get(key) != bh.get(key) for key in ('variant', 'executable', 'format')):
                 raise ValueError('Traces require the same game executable, variant and format')
+            if ah['format'] >= 3 and ah['environmentHash'] != bh['environmentHash']:
+                raise ValueError('Traces require the same resolved UCP settings, extension order/versions and framework')
             for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0)),
                                                evidence(br, bh['format'], bh.get('firstTick', 0))):
                 count += 1
@@ -91,6 +102,8 @@ def compare(left, right):
                 fields = ('kind', 'time')
                 if av['kind'] == bv['kind'] == 'command':
                     fields += ('scheduledTime', 'player', 'category', 'size', 'data')
+                elif av['kind'] == bv['kind'] == 'checkpoint' and ah['format'] >= 3:
+                    fields += ('rngHash',)
                 for key in fields + ('rng', 'resources'):
                     if av[key] == bv[key]:
                         continue

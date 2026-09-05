@@ -68,6 +68,12 @@ function M:rngState()
     core.readInteger(self.rng+0x9c48),core.readInteger(self.rng+0x9c4c)}
 end
 
+function M:rngData()
+  local data=core.readString(self.rng,0x9c50)
+  assert(type(data)=='string' and #data==0x9c50,'Incomplete native RNG state')
+  return data
+end
+
 function M:resourceState()
   local values={}
   for player=1,8 do

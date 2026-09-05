@@ -16,6 +16,9 @@ class MultiplayerTraceTests(unittest.TestCase):
         self.command_hooks('record')
         self.check('''
 package.loaded['code/platform']={mkdir=function() return true end}
+require('code/sessions').settings=function() return {environmentHash=string.rep('a',64)} end
+sha={sha256=function() return string.rep('b',64) end}
+engine.rngData=function() return string.rep('x',0x9c50) end
 traceRows={}; json.encode=function(_,v) traceRows[#traceRows+1]=v; return 'json' end
 realNative.profile.name='SHC'; realNative.profile.sha256=string.rep('a',64)
 engine.trace=require('code/multiplayer-trace').new(engine)
@@ -77,10 +80,22 @@ assert(#traceRows==0 and not engine.trace.file)
 memory[0x1fe7da8]=64
 engine.trace:observe('onTick'); engine.trace:observe('onTick')
 assert(#traceRows==2 and traceRows[2].kind=='checkpoint' and traceRows[2].time==64)
+assert(traceRows[1].format==3 and traceRows[1].environmentHash==string.rep('a',64))
+assert(traceRows[2].rngHash==string.rep('b',64))
 memory[0x1fe7da8]=65; engine.trace:observe('onTick'); assert(#traceRows==2)
 memory[0x1fe7da8]=128; engine.trace:observe('onTick')
 engine.trace:observe('stop','test ended')
 assert(traceRows[4].commands==0 and traceRows[4].events==2 and traceRows[4].status=='complete')
+''')
+
+    def test_full_rng_capture_failure_disables_observer_without_blocking_dispatch(self):
+        self.check('''
+memory[0x1fe7da8]=64
+engine.rngData=function() error('RNG read failed') end
+engine.trace:observe('onTick')
+assert(engine.trace.failed and not engine.trace.file)
+assert(receive().EAX==1 and before().EDX==28)
+assert(recorder.mode=='none' and not recorder.error)
 ''')
 
 
@@ -154,3 +169,29 @@ class CompareTraceTests(unittest.TestCase):
         a[0].update(format=2, firstTick=0)
         a[-1].update(events=1)
         self.assertEqual(self.compare(a, a)['status'], 'incomplete')
+
+    def full_trace(self):
+        return [dict(kind='header', format=3, variant='SHC', executable='a', firstTick=64,
+                     environmentHash='a'*64),
+                dict(kind='checkpoint', sequence=1, time=64, rng=[1, 2, 3, 4],
+                     resources=[0]*200, rngHash='b'*64),
+                dict(kind='end', status='complete', events=1, commands=0)]
+
+    def test_full_rng_difference_is_found_with_matching_values_and_indices(self):
+        a, b = self.full_trace(), self.full_trace()
+        self.assertEqual(self.compare(a, b)['status'], 'matched')
+        b[1]['rngHash'] = 'c'*64
+        self.assertEqual(self.compare(a, b)['firstDifference']['field'], 'rngHash')
+
+    def test_different_environment_or_missing_full_rng_cannot_match(self):
+        for change in ('environment', 'header hash', 'state hash', 'invalid hash'):
+            a, b = self.full_trace(), self.full_trace()
+            if change == 'environment':
+                b[0]['environmentHash'] = 'c'*64
+            elif change == 'header hash':
+                del b[0]['environmentHash']
+            elif change == 'state hash':
+                del b[1]['rngHash']
+            else:
+                b[1]['rngHash'] = 'z'*64
+            self.assertEqual(self.compare(a, b)['status'], 'incomplete', change)

@@ -27,7 +27,10 @@ function M:open()
   end
   self.file=assert(io.open(self.path..'/commands.jsonl','w'))
   self.count=0; self.events=0
-  self:write({kind='header',format=2,variant=native.profile.name,executable=native.profile.sha256,
+  local environmentHash=store.settings().environmentHash
+  validation.hash(environmentHash,'diagnostic environment hash')
+  self:write({kind='header',format=3,variant=native.profile.name,executable=native.profile.sha256,
+    environmentHash=environmentHash,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
   print('Multiplayer diagnostics: '..self.path)
 end
@@ -43,7 +46,8 @@ function M:onTick()
   if now%64~=0 or now==self.lastTick then return end
   self:open()
   self.lastTick=now
-  self:record({kind='checkpoint',time=now,rng=self.engine:rngState(),resources=self.engine:resourceState()})
+  self:record({kind='checkpoint',time=now,rng=self.engine:rngState(),resources=self.engine:resourceState(),
+    rngHash=sha.sha256(self.engine:rngData())})
 end
 
 function M:receivedCommand(address,size)

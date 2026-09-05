@@ -5,6 +5,16 @@ import test_recorder as fixture
 class EngineTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_full_rng_read_keeps_zero_bytes_and_rejects_short_reads(self):
+        self.check('''
+local data=string.rep('x',0x9c4f)..string.char(0)
+core.readString=function(address,size)
+ assert(address==engine.rng and size==0x9c50); return data
+end
+assert(engine:rngData()==data)
+data=data:sub(1,-2); assert(not pcall(function() engine:rngData() end))
+''')
+
     def setUp(self):
         fixture.RecorderTests.setUp(self)
         self.check('''
