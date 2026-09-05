@@ -32,7 +32,10 @@ local placeRecordButton = function(recorder)
 		core.writeInteger(newItem1Address + 8, 560) -- yPos
 		core.writeInteger(newItem1Address + 12, 80) -- width
 		core.writeInteger(newItem1Address + 16, 80) -- height
-		core.writeInteger(newItem1Address + 20, utils.createLuaFunctionWrapper(recordButtonCallback)) --
+		core.writeInteger(newItem1Address + 20, utils.createLuaFunctionWrapper(function(registers)
+      recorder:guard(recordButtonCallback)
+      return registers
+    end))
 		core.writeInteger(newItem1Address + 24, 2) -- callbackParam
 		core.writeInteger(newItem1Address + 28, native.addr(0x0042AE90)) -- renderFunc
 		core.writeInteger(newItem1Address + 32, 0x4000023A) -- unkown | buttonGraphic 23A off 239 on
@@ -65,7 +68,10 @@ local placePlaybackButton = function(recorder)
 		core.writeInteger(newItem2Address + 8, 560) -- yPos
 		core.writeInteger(newItem2Address + 12, 80) -- width
 		core.writeInteger(newItem2Address + 16, 80) -- height
-		core.writeInteger(newItem2Address + 20, utils.createLuaFunctionWrapper(playbackButtonCallback)) --
+		core.writeInteger(newItem2Address + 20, utils.createLuaFunctionWrapper(function(registers)
+      recorder:guard(playbackButtonCallback)
+      return registers
+    end))
 		core.writeInteger(newItem2Address + 24, 2) -- callbackParam
 		core.writeInteger(newItem2Address + 28, native.addr(0x0042AE90)) -- renderFunc
 		core.writeInteger(newItem2Address + 32, 0x4000023A) -- unkown | buttonGraphic 23A off 239 on

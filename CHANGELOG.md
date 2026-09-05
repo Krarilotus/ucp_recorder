@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0
+
+- Store each recording in its own folder with a starting save, full RNG state, UCP configuration, resolved settings and extension versions.
+- Begin recording after Skirmish initialization, keeping lobby commands and randomness out of the replay.
+- Validate file hashes, command order, player slots and checkpoint timelines before loading a replay.
+- Respect the native command queue's capacity, check inferred payload sizes, and block spectator commands during playback.
+- Verify RNG checkpoints and the ending RNG state; stop with a diagnostic on divergence or pending commands.
+- Publish completed recordings only after closing and validating their streams. Cancelled or failed captures remain distinguishable.
+- Restore temporary save/load dialog state and filenames after errors; never overwrite an earlier recording.
+
+Validation: 34 portable regression tests and native-site checks against Crusader and Extreme. The new starting-save capture and playback path has **not yet passed an end-to-end in-game test**. This is a review/test build, single-player only. Save/load and network commands are unsupported during capture; encountering one marks the capture failed. Replay browsing and settings relaunch follow separately.
+
 ## 0.2.0
 
 - Port the existing native hooks and Skirmish controls to the checked Extreme executable.

@@ -15,6 +15,7 @@ class RecorderTests(unittest.TestCase):
         self.lua.globals().source_root = ROOT.as_posix()
         self.lua.execute(r'''
 package.path = source_root .. '/?.lua;' .. package.path
+printed={}; print=function(...) printed[#printed+1]={...} end
 memory, bytes, callbacks, files, handles, scheduled = {}, {}, {}, {}, {}, 0
 local nextAddress = 0x10000000
 core = {
@@ -130,12 +131,20 @@ assert(memory[r.commandRecorderState]==0 and memory[r.rngRecorderState]==0)
 
     def test_real_init_callbacks_return_register_changes(self):
         self.check('''
-package.loaded['code/native']={verify=function() end,addr=function(a) return a end}
+package.loaded['code/native']={profile={name='SHC'},verify=function() end,addr=function(a) return a end}
+local sites=require('code/engine-sites').SHC
+for _,site in pairs(sites) do
+ if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
+end
+core.hookCode=function() return function() return 0 end end
+core.writeString=function() end
+core.callTo=function() return {} end
+package.loaded['code/sessions']={captureSettings=function() end}
 local module=dofile(source_root..'/init.lua')
 module:enable({rngLogMethod='trace',useFixedSeed=true,fixedSeed=123})
 assert(callbacks[0x46a74a]({EAX=456}).EAX==123)
-memory[0x191d768+0x618]=99
-assert(callbacks[0x47eaf0]({ECX=0x191d768,EDX=685}).EDX==99)
+-- Session playback keeps the native single-player identity path intact.
+assert(callbacks[0x47eaf0]==nil)
 ''')
 
     def test_native_verification_fails_before_installing_hooks(self):

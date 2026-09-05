@@ -1,41 +1,32 @@
-# UCP Recorder 
+# UCP Recorder
 
-**WORK IN PROGRESS**
+Work in progress: recording and playback of single-player Stronghold Crusader and Crusader Extreme Skirmishes using UCP3.
 
-## Getting Started
-Used as a module for UCP3. Skirmish lobbies provide UI for record-mode and playback-mode.  
-At this time, only works in **SHC - Singleplayer-Only**
+Version 0.3.0 adds individual replay sessions, starting saves and settings snapshots. **The new save/load playback path still needs end-to-end in-game verification.** Multiplayer is not supported yet.
 
-#### Step 1
-Install UCP3 Developer mode with the ucp-recorder module turned on.
+## Testing this build
 
-#### Step 2
-Create Skirmish lobby and choose map & NPCs.
+Use a separate game installation with UCP3 developer mode and this module enabled. If your game needs Graphics API Replacer, keep it and its dependencies enabled in the test configuration.
 
-#### Step 3
-Mark the record-checkbox.
-![record-checkbox](/img/step3.png)
+1. Open a single-player Skirmish lobby and configure the match.
+2. Enable the right-hand recorder checkbox near the bottom. This arms a new recording; clicking it again cancels.
+3. Start the match. The module captures the starting save and begins recording.
+4. Leave through **Quit Mission** to finalize the recording. Do not terminate the process to finish a replay.
+5. Return to a Skirmish lobby with the same active UCP settings. The left-hand playback checkbox loads the latest completed session for the current game variant. The saved starting state replaces manual map/AI setup.
 
-#### Step 4
-Start the match and play.  
-Player actions will be recorded as shown in the terminal.
+These remain temporary checkbox controls. A labelled replay browser follows in the next stage. Do not delete older recordings to make a new one: every session has a separate folder under `ucp/replays/`.
 
-#### Step 5
-Exit the match using Escape + "Quit Mission" dialog.  
-The recording will be automatically saved inside the game folder.
+On failure, inspect `ucp3.log` and the session's `last-error.txt` or `desync.json`. A failed or cancelled capture cannot be played. Saving/loading during a recording is currently unsupported and fails the capture explicitly.
 
-#### Step 6
-To view the recording, make sure the Skirmish lobby map and NPCs are configured the same as before.  
-Lastly, mark the playback-checkbox and start the match.
-![playback-checkbox](/img/step6.png)  
-Any potential errors or desyncs will be printed in the terminal.
+See [session format and limitations](docs/replay-sessions.md), [native port notes](docs/native-port.md) and [changelog](CHANGELOG.md).
 
-#### Warning
-Currently you need to delete existing recording files in your Game folder whenever you want to make a new recording.
+## Development
 
-## Features
+```sh
+python -m pip install lupa==2.6
+python -m unittest discover -s tests -v
+python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
+python tools/build.py
+```
 
-- [x] SHC singleplayer skirmish recording 
-- [ ] SHC-E recordings
-- [ ] Multiplayer recordings
-- [ ] Loading recording files via UI
+The builder creates `dist/recorder-0.3.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.

@@ -1,0 +1,155 @@
+import unittest
+import test_recorder as fixture
+
+
+class SessionTests(unittest.TestCase):
+    check = fixture.RecorderTests.check
+
+    def setUp(self):
+        fixture.RecorderTests.setUp(self)
+        self.check('''
+json.encode=function(_,value) lastEncoded=value; return 'json' end
+sha={sha256=function(value) return 'hash' end}
+savedManifest=nil
+package.loaded['code/sessions']={
+  new=function() return {id='test',variant='SHC',commandCount=0,lastTick=0} end,
+  path=function(id) return 'ucp/replays/'..id end,
+  save=function(value) savedManifest=value end,
+  finish=function(value) value.status='complete'; savedManifest=value end,
+  write=function() end, read=function() return 'data' end,
+}
+Session=require('code/session-recorder')
+now=0; snapshots=0; space=true
+engine={rng=0x1a279c0,
+ singlePlayer=function() return true end,
+ tick=function() return now end,
+ player=function() return 1 end,
+ rngState=function() return {11,22,3,4} end,
+ saveSnapshot=function() snapshots=snapshots+1 end,
+ pause=function() paused=true end,
+ canSchedule=function() return space end,
+ commandsPending=function() return false end,
+ scheduleCommand=function(_,c) scheduled=scheduled+1 end,
+}
+core.readString=function() return string.rep('x',0x9c50) end
+function session()
+ local r=Session:new(engine)
+ r.openFiles=function(self)
+   local f={write=function(self) return self end,flush=function() return true end,close=function() return true end}
+   self.commandsFile=f; self.rngFile=f; self.infoFile=f
+ end
+ return r
+end
+''')
+
+    def test_arming_does_not_record_lobby_commands(self):
+        self.check('''
+local r=session(); r:startRecording()
+r:onCommand(28,10,0,4)
+assert(not r.active and snapshots==0 and r.manifest.commandCount==0)
+r:activateRecording()
+assert(r.active and snapshots==1 and r.manifest.status=='recording')
+r:onCommand(28,10,0,4)
+assert(r.manifest.commandCount==1)
+''')
+
+    def test_cancelled_lobby_is_not_a_completed_replay(self):
+        self.check('''
+local r=session(); r:startRecording(); r:reset()
+assert(savedManifest.status=='cancelled' and r.mode=='none')
+''')
+
+    def test_recording_stop_preserves_completion_tick(self):
+        self.check('''
+local r=session(); r:startRecording(); r:activateRecording(); now=512; r:onTick(); now=513; r:reset()
+assert(savedManifest.status=='complete' and savedManifest.lastTick==512)
+''')
+
+    def test_full_ring_does_not_consume_prefetched_command(self):
+        self.check('''
+local r=session(); r.status='playing'; r.mode='play'; r.playedCommands=0; r.manifest={player=1}; now=100; space=false
+r.nextCommand=command(110); r:feed()
+assert(scheduled==0 and r.nextCommand.time==110)
+space=true; r.loadCommand=function() return nil end; r:feed()
+assert(scheduled==1 and not r.nextCommand)
+''')
+
+    def test_late_command_stops_with_diagnostic(self):
+        self.check('''
+local r=session(); r.status='playing'; r.mode='play'; r.active=true
+now=100; r.nextCommand=command(99)
+assert(not r:guard(function() r:feed() end))
+assert(r.status=='error' and paused and memory[r.halt]==1 and scheduled==0)
+''')
+
+    def test_checkpoint_mismatch_halts_playback(self):
+        self.check('''
+local r=session(); r.status='playing'; r.mode='play'; r.active=true
+r.manifest={id='test',lastTick=512,commandCount=0}
+r.rngFile={read=function() return {time=64,rng={11,22,3,999}} end}
+now=64
+assert(not r:guard(function() r:onTick() end))
+assert(r.firstDesync.time==64 and r.status=='error' and memory[r.halt]==1)
+''')
+
+    def test_end_of_replay_requires_all_commands(self):
+        self.check('''
+local r=session(); r.status='playing'; r.mode='play'; r.active=true
+r.manifest={id='test',lastTick=65,commandCount=3}; r.playedCommands=2
+now=65
+assert(not r:guard(function() r:onTick() end)); assert(r.status=='error')
+''')
+
+    def test_final_checkpoint_boundary_finishes_without_next_checkpoint(self):
+        self.check('''
+local r=session(); r.status='playing'; r.mode='play'; r.active=true; r.playedCommands=0
+r.manifest={id='test',lastTick=64,commandCount=0,finalRng={11,22,3,4}}
+local reads=0
+r.rngFile={read=function() reads=reads+1; assert(reads==1); return {time=64,rng={11,22,3,4}} end}
+now=64; r:onTick(); r:onTick()
+assert(r.status=='finished' and paused and reads==1)
+''')
+
+    def test_queued_commands_are_not_reported_as_executed(self):
+        self.check('''
+local r=session(); r.status='playing'; r.mode='play'; r.active=true; r.playedCommands=2
+r.manifest={id='test',lastTick=65,commandCount=2,finalRng={11,22,3,4}}
+engine.commandsPending=function() return true end
+now=65; assert(not r:guard(function() r:onTick() end)); assert(r.status=='error')
+''')
+
+    def test_final_rng_is_checked_between_periodic_checkpoints(self):
+        self.check('''
+local r=session(); r.status='playing'; r.mode='play'; r.active=true; r.playedCommands=0
+r.manifest={id='test',lastTick=65,commandCount=0,finalRng={11,22,3,5}}
+now=65; assert(not r:guard(function() r:onTick() end)); assert(r.status=='error')
+''')
+
+    def test_write_failure_closes_streams_and_marks_failed(self):
+        self.check('''
+local r=session(); r:startRecording(); r:activateRecording()
+local closed=0
+r.commandsFile={write=function() return nil,'disk full' end,close=function() closed=closed+1; return true end}
+assert(not r:guard(function() r:onCommand(28,10,0,4) end))
+assert(r.manifest.status=='failed' and not r.commandsFile and closed==1)
+r:reset(); assert(savedManifest.status=='failed')
+''')
+
+    def test_close_failure_prevents_completion(self):
+        self.check('''
+local r=session(); r:startRecording(); r:activateRecording(); now=10; r:onTick()
+r.commandsFile.close=function() return nil,'disk full' end
+assert(not r:guard(function() r:reset() end)); assert(savedManifest.status=='failed')
+''')
+
+    def test_save_and_network_commands_are_not_replayed(self):
+        self.check('''
+local validation=require('code/validation')
+for _,category in ipairs({2,39,46,89,95,109,121,122}) do
+ local c=command(); c.commandCategory=category
+ assert(not pcall(validation.sessionCommand,c,{player=1,variant='SHC'}))
+end
+local c=command(); c.commandCategory=119
+assert(not pcall(validation.sessionCommand,c,{player=1,variant='SHC'}))
+assert(pcall(validation.sessionCommand,c,{player=1,variant='Extreme'}))
+''')

@@ -40,11 +40,16 @@ function Recorder:reset()
   for _, address in ipairs({self.commandRecorderState, self.rngRecorderState, self.infoRecorderState}) do
     core.writeInteger(address, self.RECORDER_STATES.NONE)
   end
+  local closeError
   for _, key in ipairs({"commandsFile", "rngFile", "infoFile"}) do
     local file = self[key]
     self[key] = nil
-    if file then file:close() end
+    if file then
+      local ok, closed, reason = pcall(file.close, file)
+      if not ok or not closed then closeError = closeError or reason or closed or 'Cannot close replay file' end
+    end
   end
+  assert(not closeError, tostring(closeError))
 end
 
 -- Open the complete set before committing session state. A failed open must
@@ -124,8 +129,8 @@ function Recorder:saveCommand(commandCategory, time, address, size, player)
     size = size,
     player = player,
   })
-  self.commandsFile:write(data .. "\n")
-  self.commandsFile:flush()
+  assert(self.commandsFile:write(data .. "\n"))
+  assert(self.commandsFile:flush())
 end
 
 function Recorder:loadCommand()
@@ -145,8 +150,8 @@ function Recorder:saveRNG(time, index1, rng1, index2, rng2, extra)
     rng2 = rng2,
     extra = extra,
   })
-  self.rngFile:write(data .. "\n")
-  self.rngFile:flush()
+  assert(self.rngFile:write(data .. "\n"))
+  assert(self.rngFile:flush())
 end
 
 function Recorder:loadRNG()
@@ -167,8 +172,8 @@ function Recorder:saveInfo(gameType, mapSeed, matchSeed, RNGvalue1, RNGvalue2, R
 	RNGindex1 = RNGindex1,
 	RNGindex2 = RNGindex2,
   })
-  self.infoFile:write(data .. "\n")
-  self.infoFile:flush()
+  assert(self.infoFile:write(data .. "\n"))
+  assert(self.infoFile:flush())
 end
 
 function Recorder:loadInfo()

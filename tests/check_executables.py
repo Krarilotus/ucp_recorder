@@ -43,6 +43,11 @@ def check(folder):
         menu = native.addr(0x59ab30)
         assert reader(menu, 1) == b'\x68'
         assert struct.unpack('<I', reader(menu+1, 4))[0] == native.addr(0x5e9848)
+        sites=lua.execute((root/'code/engine-sites.lua').read_text())[name]
+        for site_name,site in sites.items():
+            if hasattr(site, 'items'):
+                expected=bytes(site['bytes'].values())
+                assert reader(site['address'],len(expected))==expected, f'{name}: {site_name}'
         print(f'PASS: {name} native patch sites, RNG fields, player layout and menu reference')
 
 

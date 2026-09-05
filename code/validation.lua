@@ -33,4 +33,41 @@ function M.info(info)
   return info
 end
 
+-- Single-player simulation commands from OpenSHC's GameCommandType. Protocol,
+-- lobby, save/load and unknown extension commands must never run from a replay.
+local gameplay = {}
+for _,id in ipairs({14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
+  31,34,35,36,38,41,42,43,44,45,68,69,70,71,78,113,119}) do gameplay[id]=true end
+
+function M.sessionCommand(command, manifest)
+  M.command(command)
+  assert(gameplay[command.commandCategory],
+    'Unsupported replay command category '..command.commandCategory..' (save/load and network commands are excluded)')
+  assert(command.commandCategory~=119 or manifest.variant=='Extreme','Tactical powers require Extreme')
+  assert(command.player==manifest.player,'Replay command uses a different player slot')
+  return command
+end
+
+function M.rng(values)
+  assert(type(values)=='table' and #values==4,'Invalid replay RNG checkpoint')
+  M.integer(values[1],-32768,65535,'RNG value 1')
+  M.integer(values[2],-32768,65535,'RNG value 2')
+  M.integer(values[3],0,19999,'RNG index 2')
+  M.integer(values[4],0,19999,'RNG index 1')
+end
+
+function M.manifest(value)
+  assert(type(value)=='table','Invalid replay manifest')
+  M.integer(value.player,1,8,'player slot')
+  M.integer(value.startTick,0,2147483647,'starting tick')
+  M.integer(value.lastTick,value.startTick,2147483647,'ending tick')
+  M.integer(value.commandCount,0,2147483647,'command count')
+  M.rng(value.finalRng)
+  for _,key in ipairs({'settingsHash','environmentHash','snapshotHash','rngHash','commandsHash','checkpointsHash','infoHash'}) do
+    assert(type(value[key])=='string' and #value[key]==64 and not value[key]:find('[^%x]'),
+      'Invalid replay '..key)
+  end
+  return value
+end
+
 return M
