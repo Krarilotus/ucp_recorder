@@ -57,14 +57,19 @@ function Start-Process {
         ConvertTo-Json | Set-Content -LiteralPath 'launch.json' -Encoding UTF8
 }
 & './helper.ps1'
+exit $LASTEXITCODE
 ''', encoding='utf-8-sig')
 
     def run_helper(self):
         powershell = Path(os.environ['SystemRoot'])/'System32/WindowsPowerShell/v1.0/powershell.exe'
-        return subprocess.run([str(powershell), '-NoProfile', '-NonInteractive',
+        result = subprocess.run([str(powershell), '-NoProfile', '-NonInteractive',
                                '-ExecutionPolicy', 'Bypass', '-File', str(self.root/'runner.ps1')],
                               cwd=self.root, capture_output=True, text=True, timeout=20,
                               creationflags=subprocess.CREATE_NO_WINDOW)
+        error = self.folder/'restart-error.txt'
+        if error.exists():
+            result.stderr += error.read_text(encoding='utf-8', errors='replace')
+        return result
 
     def test_waits_then_requests_recorded_settings_without_overwriting_default(self):
         normal = self.root/'ucp-config.yml'
