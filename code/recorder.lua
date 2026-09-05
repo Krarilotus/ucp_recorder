@@ -4,45 +4,23 @@ Replay implementation
 
 local utils = require("code/utils")
 
+local validation = require("code/validation")
 local Recorder = {}
 
 -- Recorder class
 function Recorder:new(params)
-  local o = { -- TODO delete?
-    --finishedPlayback = false,
-    --finishedRecording = false,
-  }
-  
-  setmetatable(o, self)
-  self.__index = self
-  
-  if params.name then 
-    o:setName(params.name)
-  end
-	
-	self.rngLogMethod = params.rngLogMethod
-	
-	self.RECORDER_STATES = {NONE = 0, RECORD = 1, PLAYBACK = 2}
-	
-	self.mode = "none"
-	
-	-- https://stackoverflow.com/questions/2613734/maximum-packet-size-for-a-tcp-connection | size of GameCommand struct
-	self.MAX_PACKET_SIZE = 65535 -- 1272
-	self.commandDataAddress = core.allocate(self.MAX_PACKET_SIZE, true)
-	
-	self.nextUpCommandTimeAddress = core.allocate(4)
-	
-	self.commandRecorderState = core.allocate(4)
-	core.writeInteger(self.commandRecorderState, 0)
-	
-	self.rngRecorderState = core.allocate(4)
-	core.writeInteger(self.rngRecorderState, 0)
+  local o = setmetatable({}, {__index = self})
+  o:setName(params.name or "test_recording1")
+  o.rngLogMethod = params.rngLogMethod or "trace"
+  o.RECORDER_STATES = {NONE = 0, RECORD = 1, PLAYBACK = 2}
+  o.mode = "none"
+  o.MAX_PACKET_SIZE = validation.MAX_PAYLOAD
+  o.commandDataAddress = core.allocate(o.MAX_PACKET_SIZE, true)
+  o.nextUpCommandTimeAddress = core.allocate(4, true)
+  o.commandRecorderState = core.allocate(4, true)
+  o.rngRecorderState = core.allocate(4, true)
+  o.infoRecorderState = core.allocate(4, true)
 
-	self.infoRecorderState = core.allocate(4)
-	core.writeInteger(self.infoRecorderState, 0)
-	
-	self.cachedRNG = nil
-  
   return o
 end
 
@@ -53,72 +31,83 @@ function Recorder:setName(name)
   self.infoFileName = self.name .. "-infself.json"
 end
 
-function Recorder:reset() 
+function Recorder:reset()
   self.mode = "none"
+  self.nextCommand, self.cachedRNG, self.info, self.mapSeed = nil, nil, nil, nil
+  self.lastCommandTime = nil
   core.writeInteger(self.nextUpCommandTimeAddress, 0)
-  -- Set SEC_CurrentPlayerSlotID back to 1
-	print("reset recorder state")
-	core.writeInteger(0x01a275dc, 1) -- TODO test if this is needed for multiplayer
+  for _, address in ipairs({self.commandRecorderState, self.rngRecorderState, self.infoRecorderState}) do
+    core.writeInteger(address, self.RECORDER_STATES.NONE)
+  end
+  for _, key in ipairs({"commandsFile", "rngFile", "infoFile"}) do
+    local file = self[key]
+    self[key] = nil
+    if file then file:close() end
+  end
+end
 
-  core.writeInteger(self.commandRecorderState, self.RECORDER_STATES.NONE)
-  core.writeInteger(self.rngRecorderState, self.RECORDER_STATES.NONE)
-  core.writeInteger(self.infoRecorderState, self.RECORDER_STATES.NONE)
-  
-  self.commandsFile:close()
-  self.rngFile:close()
-  self.infoFile:close()
+-- Open the complete set before committing session state. A failed open must
+-- leave the current player and the recorder unchanged.
+function Recorder:openFiles(mode)
+  assert(self.mode == "none", "A replay session is already active")
+  local opened, created = {}, {}
+  local ok, message = pcall(function()
+    if mode == "w" then
+      for _, key in ipairs({"commands", "rng", "info"}) do
+        local path = self[key .. "FileName"]
+        local existing = io.open(path, "r")
+        if existing then existing:close(); error("Cannot overwrite recording: " .. path) end
+      end
+    end
+    for _, key in ipairs({"commands", "rng", "info"}) do
+      local path = self[key .. "FileName"]
+      local file, reason = io.open(path, mode)
+      assert(file, "Cannot open recording " .. path .. ": " .. tostring(reason))
+      opened[key .. "File"] = file
+      if mode == "w" then created[#created + 1] = path end
+    end
+    if mode == "r" then
+      local line = opened.infoFile:read()
+      local info = validation.info(line and json:decode(line))
+      opened.infoFile:seek("set", 0)
+      -- Read all commands before any native mutation, including late corruption.
+      while true do
+        local commandLine = opened.commandsFile:read()
+        if not commandLine then break end
+        validation.command(json:decode(commandLine))
+      end
+      opened.commandsFile:seek("set", 0)
+    end
+  end)
+  if not ok then
+    for _, file in pairs(opened) do file:close() end
+    for _, path in ipairs(created) do os.remove(path) end
+    error(message)
+  end
+  self.nextCommand, self.cachedRNG, self.lastCommandTime = nil, nil, nil
+  self.firstDesync = nil
+  for key, file in pairs(opened) do self[key] = file end
 end
 
 function Recorder:startRecording()
+  self:openFiles("w")
   self.mode = "record"
-  if io.open(self.commandsFileName, "r") then
-    error("Cannot overwrite existing recording: " .. self.commandsFileName)
-  end
-  if io.open(self.rngFileName, "r") then
-    error("Cannot overwrite existing recording: " .. self.rngFileName)
-  end
-  if io.open(self.infoFileName, "r") then
-    error("Cannot overwrite existing recording: " .. self.infoFileName)
-  end
-  self.commandsFile = io.open(self.commandsFileName, "w")
-  self.rngFile = io.open(self.rngFileName, "w")
-  self.infoFile = io.open(self.infoFileName, "w")
-  
   core.writeInteger(self.commandRecorderState, self.RECORDER_STATES.RECORD)
   core.writeInteger(self.rngRecorderState, self.RECORDER_STATES.RECORD)
   core.writeInteger(self.infoRecorderState, self.RECORDER_STATES.RECORD)
 end
 
-function Recorder:stopRecording()
-  self:reset()
-end
+function Recorder:stopRecording() self:reset() end
 
 function Recorder:startPlayback()
-	self.mode = "play"
-  -- Makes sure no valid commands during playback from player input
-  core.writeInteger(0x191de0c, -1) -- TODO move this somewhere in lobby setup
-
-  if not io.open(self.commandsFileName, "r") then
-    error("Cannot find recording: " .. self.commandsFileName)
-  end
-  if not io.open(self.rngFileName, "r") then
-    error("Cannot find recording: " .. self.rngFileName)
-  end
-  if not io.open(self.infoFileName, "r") then
-    error("Cannot find recording: " .. self.infoFileName)
-  end
-  self.commandsFile = io.open(self.commandsFileName, "r")
-  self.rngFile = io.open(self.rngFileName, "r")
-  self.infoFile = io.open(self.infoFileName, "r")
-  
+  self:openFiles("r")
+  self.mode = "play"
   core.writeInteger(self.commandRecorderState, self.RECORDER_STATES.PLAYBACK)
   core.writeInteger(self.rngRecorderState, self.RECORDER_STATES.PLAYBACK)
   core.writeInteger(self.infoRecorderState, self.RECORDER_STATES.PLAYBACK)
 end
 
-function Recorder:stopPlayback()
-  self:reset()
-end
+function Recorder:stopPlayback() self:reset() end
 
 function Recorder:discardFiles()
 	os.remove(self.commandsFileName)
@@ -139,7 +128,7 @@ function Recorder:saveCommand(commandCategory, time, address, size, player)
 end
 
 function Recorder:loadCommand()
-  local data = self.commandsFile:read() -- reads a line 
+  local data = self.commandsFile:read() -- reads a line
   if data == nil then
     return nil
   end
@@ -156,7 +145,7 @@ function Recorder:saveRNG(time, index1, rng1, index2, rng2, extra)
     extra = extra,
   })
   self.rngFile:write(data .. "\n")
-  self.rngFile:flush()  
+  self.rngFile:flush()
 end
 
 function Recorder:loadRNG()
@@ -178,7 +167,7 @@ function Recorder:saveInfo(gameType, mapSeed, matchSeed, RNGvalue1, RNGvalue2, R
 	RNGindex2 = RNGindex2,
   })
   self.infoFile:write(data .. "\n")
-  self.infoFile:flush()    
+  self.infoFile:flush()
 end
 
 function Recorder:loadInfo()
@@ -190,33 +179,31 @@ function Recorder:loadInfo()
   return self.info
 end
 
-function Recorder:ScheduleCommandWrapper(commandCategory, player, time, address) 
+function Recorder:ScheduleCommandWrapper(commandCategory, player, time, address)
   self._scheduleCommand(0x191d768, commandCategory, player, time, address)
-end 
+end
 
-function Recorder:scheduleCommand(command) -- TODO test
-  if command.size > self.MAX_PACKET_SIZE then
-    print("Not enough memory for data")
-    error("EXCEEDED MAX PACKET SIZE");
-  end
-  
-  core.writeBytes(self.commandDataAddress, utils.hexToTable(command.data))
-  
+function Recorder:scheduleCommand(command)
+  validation.command(command)
+  local bytes = utils.hexToTable(command.data)
+  -- The native scheduler derives its own length. Never let a short record expose
+  -- stale bytes from the previous command's allocation.
+  for i = #bytes + 1, self.MAX_PACKET_SIZE do bytes[i] = 0 end
+  core.writeBytes(self.commandDataAddress, bytes)
   self:ScheduleCommandWrapper(command.commandCategory, command.player, command.time, self.commandDataAddress)
-  
 end
 
 function Recorder:peekCommand()
-  
+
   if self.nextCommand == nil then
     self.nextCommand = self:loadCommand()
   end
-  
+
   if self.nextCommand == nil then
     -- We have reached the end of file: EOF
     core.writeInteger(self.commandRecorderState, self.RECORDER_STATES.NONE)
   end
-  
+
   return self.nextCommand
 end
 
@@ -225,18 +212,18 @@ function Recorder:peekCommandTime()
   if c == nil then
     return nil
   end
-  return c.time 
+  return c.time
 end
 
 function Recorder:consumeSavedCommand()
   local c = self.nextCommand
-  
+
   if c == nil then
-    c = self:peekCommand()  
+    c = self:peekCommand()
   end
-  
+
   self.nextCommand = nil
-  
+
   return c
 end
 
@@ -249,36 +236,36 @@ function Recorder:onStartSkirmish(registers) -- SINGLEPLAYER ONLY (TODO make thi
 		local gameRNG2 = core.readSmallInteger(0x01a279c2)
 		local mapSeed = self.mapSeed
 		local matchSeed = core.readInteger(0x01a279c4)
-		
+
 		self:saveInfo(0, mapSeed, matchSeed, gameRNG1, gameRNG2, gameRNG1index, gameRNG2index)
-		
+
 		print("Saved skirmish information:")
 		print(string.format("Gametype=%d, mapSeed=%d, matchSeed=%d, gameRNG1=%d, gameRNG2=%d, gameRNG1index=%d, gameRNG2index=%d", 0, mapSeed, matchSeed, gameRNG1, gameRNG2, gameRNG1index, gameRNG2index))
-		
+
 	elseif core.readInteger(self.commandRecorderState) == self.RECORDER_STATES.PLAYBACK then
 		local skirmishInfo = self:loadInfo()
 		local populateRNG1040 = core.exposeCode(0x0046a760, 1, 1)
-	
+
 		-- Set SEC_CurrentPlayerSlotID to 0 (Disallows actions during playback) TODO move this
 		print("recorder in Playback state")
 		--core.writeInteger(0x01a275dc, 0)
-		
+
 		-- Load mapSeed and fill RNG table
 		core.writeInteger(0x01a279c4, skirmishInfo.mapSeed)
 		populateRNG1040(0x01a279c0);
-		
+
 		-- Load matchSeed (populateRNG1040() is called later in LaunchGame() after the map is setup)
 		core.writeInteger(0x01a279c4, skirmishInfo.matchSeed)
-		
+
 		-- Load starting RNG values
 		core.writeInteger(0x01a3160c, skirmishInfo.RNGindex1)
 		core.writeInteger(0x01a31608, skirmishInfo.RNGindex2)
 		core.writeSmallInteger(0x01a279c0, skirmishInfo.RNGvalue1)
 		core.writeSmallInteger(0x01a279c2, skirmishInfo.RNGvalue2)
-	
+
 		print("Loaded skirmish information:")
 		print(string.format("Gametype=%d, mapSeed=%d, matchSeed=%d, gameRNG1=%d, gameRNG2=%d, gameRNG1index=%d, gameRNG2index=%d", skirmishInfo.gameType, skirmishInfo.mapSeed, skirmishInfo.matchSeed, skirmishInfo.RNGvalue1, skirmishInfo.RNGvalue2, skirmishInfo.RNGindex1, skirmishInfo.RNGindex2))
-		
+
   end
   return registers
 end
@@ -287,7 +274,7 @@ end
 function Recorder:onBeforeSetMatchSeed(registers) -- SINGLEPLAYER ONLY (TODO make this work for multiplayer too)
   self.mapSeed = core.readInteger(0x01a279c4)
 	local setTimeBasedSeed = core.exposeCode(0x0046a740, 1, 1)
-	
+
   -- original code
   setTimeBasedSeed(0x01a279c0)
   return registers
@@ -296,7 +283,7 @@ end
 -- 0x0042bf4c SHC
 function Recorder:onCustomSkirmishGame(registers) -- SINGLEPLAYER ONLY (TODO test if playerIDs work fine in multiplayer)
   -- Make singleplayer skirmishes use real playerID for commands, not -1
-  local DAT_QueuedCommandPlayer = 0x191de0c 
+  local DAT_QueuedCommandPlayer = 0x191de0c
   core.writeInteger(DAT_QueuedCommandPlayer, 01) -- In Singleplayer multiplayerID is always 01
   return registers
 end
@@ -310,11 +297,11 @@ function Recorder:scheduleNextCommand(registers)
     core.writeInteger(self.commandRecorderState, self.RECORDER_STATES.NONE)
     return
   end
-  
+
   print(string.format("Matchtime now: %d", core.readInteger(0x01fe7da8)))
   print(string.format("Scheduling the command: Command<type=%d,time=%d,address=%X,size=%d,multiplayerID=%d>", c.commandCategory, c.time, self.commandDataAddress, c.size, c.player))
   self:scheduleCommand(c)
-  
+
   print("Peeking at the next command")
   local c = self:peekCommand()
   if c == nil then
@@ -323,14 +310,14 @@ function Recorder:scheduleNextCommand(registers)
     core.writeInteger(self.commandRecorderState, self.RECORDER_STATES.NONE)
     return
   end
-  
+
   print(string.format("Setting next trigger time: %d", c.time))
   core.writeInteger(self.nextUpCommandTimeAddress, c.time)
 end
 
 function Recorder:onReceiveAllTransmittedCommandsASM(scheduleNextCommandAddress)
 	-- Schedules saved commands if commandRecorderState is in PLAYBACK mode
-	return { 
+	return {
   core.AssemblyLambda([[
     startOfFunction:
       mov eax, [commandRecorderState]
@@ -341,7 +328,7 @@ function Recorder:onReceiveAllTransmittedCommandsASM(scheduleNextCommandAddress)
       mov eax, dword [SEC_MatchTime]
       cmp eax, 0
       jle endOfFunction
-    
+
     checkTime:
       add eax, 64
       mov edx, dword [nextUpCommandTimeAddress]
@@ -350,14 +337,14 @@ function Recorder:onReceiveAllTransmittedCommandsASM(scheduleNextCommandAddress)
       jmp endOfFunction
 
     takeCommand:
-      call scheduleNextCommandAddress  
+      call scheduleNextCommandAddress
       jmp startOfFunction
-      
+
     endOfFunction:
   ]], {
-    commandRecorderState = self.commandRecorderState, 
-    SEC_MatchTime = 0x01fe7da8, 
-    nextUpCommandTimeAddress = self.nextUpCommandTimeAddress, 
+    commandRecorderState = self.commandRecorderState,
+    SEC_MatchTime = 0x01fe7da8,
+    nextUpCommandTimeAddress = self.nextUpCommandTimeAddress,
     scheduleNextCommandAddress = scheduleNextCommandAddress,
   })
 }
@@ -379,7 +366,7 @@ function Recorder:onTransmitCommand(registers)
   -- local idTo = core.readInteger(registers.ESP + 20)
   local player = core.readInteger(0x0191de0c)
   print(string.format("Transmitted Command<type=%d,time=%d,address=%X,size=%d,multiplayerID=%d>", commandCategory, time, address, size, player))
-  
+
   self:onCommand(commandCategory, time, address, size, player)
 end
 
@@ -390,13 +377,13 @@ function Recorder:onScheduleCommand(registers)
   local time = core.readInteger(registers.ESP + 12 + 0x10)
   local address = core.readInteger(registers.ESP + 16 + 0x10)
   local size = core.readInteger(0x0194af98)
-  print(string.format("Received Command<type=%d,time=%d,address=%X,size=%d,multiplayerID=%d>", commandCategory, time, address, size, player))  
-  
+  print(string.format("Received Command<type=%d,time=%d,address=%X,size=%d,multiplayerID=%d>", commandCategory, time, address, size, player))
+
   self:onCommand(commandCategory, time, address, size, player)
 end
 
 function Recorder:fakeMultiplayerIdentities(registers)
-  if originalInMultiplayer then
+  if self.originalInMultiplayer then
     registers.EDX = 1 -- multiplayer
   else
     registers.EDX = core.readInteger(registers.ECX + 0x618) -- original game mode
@@ -405,136 +392,41 @@ function Recorder:fakeMultiplayerIdentities(registers)
 end
 
 function Recorder:syncCheck(registers, traceF)
-  local gameTime = core.readInteger(0x01fe7da8)
-  local gameRNG1 = core.readSmallInteger(0x01a279c0)
-  local gameRNG2 = core.readSmallInteger(0x01a279c2)
-  local gameRNG1index = core.readInteger(0x01a3160c)
-  local gameRNG2index = core.readInteger(0x01a31608)
-  
-  if self.mode == "record" then
-    
-    if core.readInteger(self.rngRecorderState) ~= self.RECORDER_STATES.RECORD then
-      return
-    end
-
-    -- print("Recording sync data: " .. string.format("%0.16X\t%0.16X\t%0.16X", gameTime, gameRNG1, gameRNG2))
-    if self.rngLogMethod == "trace" then
-      local returnAddress = core.readInteger(registers.ESP)
-      local returnAddress1 = nil
-      local returnAddress2 = nil
-      if traceF == 1 then
-        returnAddress1 = returnAddress
-      end
-      if traceF == 2 then
-        returnAddress2 = returnAddress
-      end
-      self:saveRNG(gameTime, gameRNG1index, gameRNG1, gameRNG2index, gameRNG2, {ra1 = returnAddress1, ra2 = returnAddress2})
-    else
-      self:saveRNG(gameTime, gameRNG1index, gameRNG1, gameRNG2index, gameRNG2)
-    end
-
-  elseif self.mode == "play" then
-    
-    if core.readInteger(self.rngRecorderState) ~= self.RECORDER_STATES.PLAYBACK then
-      return
-    end
-  
-    if self.cachedRNG == nil then
-      self.cachedRNG = self:loadRNG()
-    end
-    
-    if self.cachedRNG == nil then
-      print("No more sync data left")
-      core.writeInteger(self.rngRecorderState, self.RECORDER_STATES.NONE)
-      return
-    end
-
-    if gameTime > self.cachedRNG.time then
-      while (self.cachedRNG ~= nil) and (gameTime > self.cachedRNG.time) do
-        print("Game is ahead of rng info, skipping...")
-        self.cachedRNG = self:loadRNG()
-      end
-    end
-    
-    if self.cachedRNG == nil then
-      print("No more sync data left")
-      core.writeInteger(self.rngRecorderState, self.RECORDER_STATES.NONE)
-      return
-    end
-    
-    if self.cachedRNG.time > gameTime then
-      return
-    end
-    
-    local data = self.cachedRNG
+  local actual = {
+    time = core.readInteger(0x01fe7da8),
+    rng1 = core.readSmallInteger(0x01a279c0),
+    rng2 = core.readSmallInteger(0x01a279c2),
+    index1 = core.readInteger(0x01a3160c),
+    index2 = core.readInteger(0x01a31608),
+    extra = {},
+  }
+  if traceF then actual.extra["ra" .. traceF] = core.readInteger(registers.ESP) end
+  if self.mode == "record" and core.readInteger(self.rngRecorderState) == 1 then
+    self:saveRNG(actual.time, actual.index1, actual.rng1, actual.index2, actual.rng2, actual.extra)
+  elseif self.mode == "play" and core.readInteger(self.rngRecorderState) == 2 then
+    local expected = self.cachedRNG or self:loadRNG()
     self.cachedRNG = nil
-    
-    if data.time ~= gameTime then
-      print("time mismatch between data: " .. tonumber(data.time) .. " and game: " .. tonumber(gameTime))
-      return
+    if not expected then
+      core.writeInteger(self.rngRecorderState, 0)
+      return registers
     end
-    
-    -- print(string.format("SYNC data at (time, rng1, rng2): %d, %d, %d", data.time, data.rng1, data.rng2))
-    
-    local anyDesync = false
-    
-    if traceRNG1 then
-      if data.rng1 ~= gameRNG1 then
-        anyDesync = true
-        print(string.format("DESYNC in RNG1: data = time %d, rng1 %d, rng2 %d; game = time %d, %d, %d", data.time, data.rng1, data.rng2, gameTime, gameRNG1, gameRNG2))
-      end    
+    local reason
+    for _, key in ipairs({"time", "rng1", "rng2", "index1", "index2"}) do
+      if actual[key] ~= expected[key] then reason = key; break end
     end
-    
-    if traceRNG2 then
-      if data.rng2 ~= gameRNG2 then
-        anyDesync = true
-        print(string.format("DESYNC in RNG2: data = time %d, rng1 %d, rng2 %d; game = time %d, %d, %d", data.time, data.rng1, data.rng2, gameTime, gameRNG1, gameRNG2))
+    if not reason and traceF and self.rngLogMethod == "trace" then
+      if not expected.extra or expected.extra["ra" .. traceF] ~= actual.extra["ra" .. traceF] then
+        reason = "RNG call site"
       end
     end
-    
-    local returnAddress = 0
-
-    if self.rngLogMethod == "trace" then
-      returnAddress = core.readInteger(registers.ESP)
-      local returnAddress1 = data.extra.ra1
-      local returnAddress2 = data.extra.ra2
-      
-      -- print(returnAddress, returnAddress1, returnAddress2)
-      
-      if traceF == 1 then
-        if returnAddress1 ~= nil then 
-          if (returnAddress1 ~= returnAddress) then
-            anyDesync = true
-            print(string.format("DESYNC returnAddress1: data = time %d, ret %X; game = time %d, ret %X", data.time, returnAddress1, gameTime, returnAddress))
-          end
-        else
-          anyDesync = true
-          print(string.format("DESYNC returnAddress, expected 2 but got 1: data = time %d, ret2 %X; game = time %d, ret1 %X", data.time, returnAddress2, gameTime, returnAddress))
-        end
-      end
-      
-      
-      if traceF == 2 then
-        if returnAddress2 ~= nil then
-          if (returnAddress2 ~= returnAddress) then
-            anyDesync = true
-            print(string.format("DESYNC returnAddress2: data = time %d, ret %X; game = time %d, ret %X", data.time, returnAddress2, gameTime, returnAddress))
-          end
-        else
-          anyDesync = true
-          print(string.format("DESYNC returnAddress, expected 1 but got 2: data = time %d, ret1 %X; game = time %d, ret2 %X", data.time, returnAddress1, gameTime, returnAddress))
-        end
-      end
+    if reason and not self.firstDesync then
+      self.firstDesync = {reason = reason, expected = expected, actual = actual}
+      print("REPLAY DESYNC at tick " .. actual.time .. ": " .. reason)
+      core.writeInteger(self.rngRecorderState, 0)
+      core.writeInteger(self.commandRecorderState, 0)
     end
-    
-    if not anyDesync then
-      --print(string.format("SYNCED: data = time %d, rng1 %d, rng2 %d; game = time %d, %d, %d", data.time, data.rng1, data.rng2, gameTime, gameRNG1, gameRNG2))
-    else
-      --print("<entering debug mode>")
-      --debug.debug() -- TODO decide
-    end
-
   end
+  return registers
 end
 
 return Recorder

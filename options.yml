@@ -1,11 +1,11 @@
 meta:
-  version: 0.0.1
+  version: 1.0.0
 options:
 - url: recorder.rngLogMethod
   header: "Type of logging method"
   text: "Type of logging method for recorded gameplay"
   hasHeader: true
-  display: 
+  display:
   contents:
     type: string
     value: "trace"
@@ -13,7 +13,7 @@ options:
   header: "Use fixed seed"
   text: "Using fixed seeds guarantees deterministic gameplay"
   hasHeader: true
-  display: 
+  display:
   contents:
     type: boolean
     value: true
@@ -21,7 +21,7 @@ options:
   header: "Fixed Seed"
   text: "A seed can be entered in case fixed seeds are used"
   hasHeader: true
-  display: 
+  display:
   contents:
     type: integer
     value: 1
