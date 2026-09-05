@@ -85,6 +85,19 @@ function M:resourceState()
   return values
 end
 
+function M:networkState()
+  local state={mode=core.readInteger(self.base+0x618),localPlayer=self:player(),
+    syncStatus=core.readInteger(self.base+0xb98),handles={},roster={}}
+  for slot=1,8 do
+    local handle=core.readInteger(self.base+0x6a8+slot*4)
+    local ai=core.readInteger(self.base+0x714+slot*4)
+    state.handles[slot]=handle
+    state.roster[slot]={slot=slot,kind=handle~=-1 and 'human' or (ai~=0 and 'ai' or 'empty'),
+      ai=ai,variation=core.readInteger(self.base+0x738+slot*4)}
+  end
+  return state
+end
+
 function M:saveSnapshot(path)
   assert(#path<500 and self:singlePlayer(), 'Snapshot requires a single-player game')
   local resource=self.sites.resources

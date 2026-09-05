@@ -29,10 +29,44 @@ function M:open()
   self.count=0; self.events=0
   local environmentHash=store.settings().environmentHash
   validation.hash(environmentHash,'diagnostic environment hash')
-  self:write({kind='header',format=3,variant=native.profile.name,executable=native.profile.sha256,
+  self.network=self.engine:networkState()
+  self:write({kind='header',format=4,variant=native.profile.name,executable=native.profile.sha256,
     environmentHash=environmentHash,
+    network=self.network,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
+  if self.network.syncStatus~=0 then self:gap('capture began during native synchronization') end
   print('Multiplayer diagnostics: '..self.path)
+end
+
+function M:gap(reason,details)
+  self.incomplete=true
+  self:record({kind='gap',time=self.engine:tick(),reason=reason,details=details})
+end
+
+function M:checkNetwork()
+  local state=self.engine:networkState()
+  local old=self.network
+  local changed=state.mode~=old.mode or state.localPlayer~=old.localPlayer
+  for slot=1,8 do
+    local a,b=state.roster[slot],old.roster[slot]
+    changed=changed or state.handles[slot]~=old.handles[slot] or a.ai~=b.ai or a.variation~=b.variation
+  end
+  if changed then self:gap('player roster or identity changed',state) end
+  if state.syncStatus~=old.syncStatus then self:gap('native synchronization phase changed',state) end
+  self.network=state
+end
+
+function M:immediateCommand(source)
+  -- Lobby commands before the first observed simulation boundary are outside
+  -- this diagnostic window. Once open, do not silently omit immediate dispatch.
+  if not self.file then return end
+  self:checkNetwork()
+  local slot=validation.integer(core.readInteger(self.engine.base+0x2d824),0,199,'immediate ring slot')
+  local address=self.engine.base+0x3c67c+slot*1272
+  self:gap('immediate command is outside timed replay coverage',{
+    source=source,category=core.readByte(address+8),scheduledTime=core.readInteger(address),
+    player=core.readInteger(self.engine.base+self.engine.sites.actorOffset),
+    size=core.readInteger(self.engine.base+0x2d830)})
 end
 
 function M:record(event)
@@ -43,6 +77,7 @@ end
 
 function M:onTick()
   local now=self.engine:tick()
+  if self.file then self:checkNetwork() end
   if now%64~=0 or now==self.lastTick then return end
   self:open()
   self.lastTick=now
@@ -50,10 +85,16 @@ function M:onTick()
     rngHash=sha.sha256(self.engine:rngData())})
 end
 
-function M:receivedCommand(address,size)
+function M:receivedCommand(address,size,origin)
   validation.integer(size,0,1260,'multiplayer trace payload length')
   local slot=validation.integer(core.readInteger(self.engine.base+0x2d824),0,199,'trace ring slot')
-  self.received[slot]={size=size,data=utils.tableToHex(core.readBytes(address,size))}
+  self.received[slot]={size=size,data=utils.tableToHex(core.readBytes(address,size)),origin=origin or 'received'}
+end
+
+function M:locallyQueuedCommand()
+  local slot=validation.integer(core.readInteger(self.engine.base+0x2d824),0,199,'local ring slot')
+  local size=core.readInteger(self.engine.base+0x2d830)
+  self:receivedCommand(self.engine.base+0x3c67c+slot*1272+10,size,'local')
 end
 
 function M:beforeCommand()
@@ -61,11 +102,13 @@ function M:beforeCommand()
   local slot=validation.integer(core.readInteger(self.engine.base+0x2d824),0,199,'trace ring slot')
   local address=self.engine.base+0x3c67c+slot*1272
   self:open()
+  self:checkNetwork()
   local source=self.received[slot]
   local event={kind=source and 'command' or 'untracked',time=self.engine:tick(),slot=slot,
     scheduledTime=core.readInteger(address),handle=core.readInteger(address+4),
     player=core.readInteger(self.engine.base+self.engine.sites.actorOffset),category=core.readByte(address+8)}
   if source then
+    event.origin=source.origin
     event.size=source.size
     event.data=utils.tableToHex(core.readBytes(address+10,source.size))
     event.changedSinceReceive=event.data~=source.data
@@ -97,6 +140,7 @@ function M:stop(reason)
   end
   self.received={}; self.executing=nil; self.failed=false; self.incomplete=false; self.path=nil
   self.lastTick=nil
+  self.network=nil
 end
 
 function M:observe(event,...)

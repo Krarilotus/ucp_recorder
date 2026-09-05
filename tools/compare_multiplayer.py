@@ -15,6 +15,35 @@ def hash_value(value):
         raise ValueError('Missing or invalid SHA256 evidence')
 
 
+def network_state(header):
+    state = header.get('network')
+    if not isinstance(state, dict) or state.get('mode') not in (1, 2) or state.get('syncStatus') != 0:
+        raise ValueError('Missing network context or capture began during synchronization')
+    roster, handles = state.get('roster'), state.get('handles')
+    if not isinstance(roster, list) or len(roster) != 8 or not isinstance(handles, list) or len(handles) != 8:
+        raise ValueError('Missing eight-slot player roster')
+    integer(state.get('localPlayer'), 1, 8)
+    if header.get('localPlayer') != state['localPlayer']:
+        raise ValueError('Inconsistent local player identity')
+    used = set()
+    for index, (player, handle) in enumerate(zip(roster, handles), 1):
+        integer(handle, -2147483648, 2147483647)
+        if not isinstance(player, dict) or player.get('slot') != index:
+            raise ValueError('Invalid roster slot')
+        integer(player.get('ai'), -2147483648, 2147483647)
+        integer(player.get('variation'), -2147483648, 2147483647)
+        kind = 'human' if handle != -1 else ('ai' if player['ai'] != 0 else 'empty')
+        if player.get('kind') != kind:
+            raise ValueError('Roster disagrees with native human/AI classification')
+        if kind == 'human':
+            if handle == 0 or handle in used:
+                raise ValueError('Ambiguous or system-message player handle')
+            used.add(handle)
+    if roster[state['localPlayer'] - 1]['kind'] != 'human':
+        raise ValueError('Local player is not an active human slot')
+    return state
+
+
 def rows(stream):
     while line := stream.readline(65537):
         if len(line) > 65536:
@@ -25,12 +54,14 @@ def rows(stream):
         yield value
 
 
-def evidence(records, format_version, first_tick=0):
+def evidence(records, format_version, first_tick=0, network=None):
     count, command_count = 0, 0
     integer(first_tick, 0, 2147483647)
     previous_tick = first_tick
     next_checkpoint = (first_tick + 63) // 64 * 64
     for record in records:
+        if record.get('kind') == 'gap':
+            raise ValueError(f'Uncovered network event at tick {record.get("time")}: {record.get("reason")}')
         if record.get('kind') == 'end':
             if (record.get('status') != 'complete' or record.get('commands') != command_count or not count
                     or (format_version >= 2 and record.get('events') != count)):
@@ -59,6 +90,10 @@ def evidence(records, format_version, first_tick=0):
             if not isinstance(data, str) or len(data) != record['size'] * 2 or any(c not in '0123456789abcdefABCDEF' for c in data):
                 raise ValueError('Invalid trace payload')
             record['data'] = data.upper()
+            if network is not None:
+                player = record['player'] - 1
+                if network['roster'][player]['kind'] != 'human' or record.get('handle') != network['handles'][player]:
+                    raise ValueError('Command handle does not match its recorded logical player')
         elif record['time'] != next_checkpoint:
             raise ValueError('Missing, repeated or invalid checkpoint boundary')
         else:
@@ -83,7 +118,7 @@ def compare(left, right):
             ar, br = rows(a), rows(b)
             ah, bh = next(ar), next(br)
             for header in (ah, bh):
-                if header.get('kind') != 'header' or header.get('format') not in (1, 2, 3):
+                if header.get('kind') != 'header' or header.get('format') not in (1, 2, 3, 4):
                     raise ValueError('Unsupported trace format')
                 if header['format'] >= 3:
                     hash_value(header.get('environmentHash'))
@@ -91,8 +126,12 @@ def compare(left, right):
                 raise ValueError('Traces require the same game executable, variant and format')
             if ah['format'] >= 3 and ah['environmentHash'] != bh['environmentHash']:
                 raise ValueError('Traces require the same resolved UCP settings, extension order/versions and framework')
-            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0)),
-                                               evidence(br, bh['format'], bh.get('firstTick', 0))):
+            an = network_state(ah) if ah['format'] >= 4 else None
+            bn = network_state(bh) if bh['format'] >= 4 else None
+            if an and (an['roster'] != bn['roster'] or an['mode'] != bn['mode']):
+                raise ValueError('Traces require the same logical player roster and game mode')
+            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0), an),
+                                               evidence(br, bh['format'], bh.get('firstTick', 0), bn)):
                 count += 1
                 if difference:
                     continue  # Still validate both complete streams before reporting.

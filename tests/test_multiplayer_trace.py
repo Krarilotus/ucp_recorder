@@ -24,6 +24,8 @@ realNative.profile.name='SHC'; realNative.profile.sha256=string.rep('a',64)
 engine.trace=require('code/multiplayer-trace').new(engine)
 memory[engine.base+0x618]=1
 memory[engine.base+engine.sites.actorOffset]=3
+for slot=1,8 do memory[engine.base+0x6a8+slot*4]=100+slot end
+memory[address+4]=103
 recorder.active=false; recorder.mode='none'
 engine.resourceState=function() return resourceState() end
 core.writeInteger=function() error('diagnostics attempted native state write') end
@@ -80,7 +82,7 @@ assert(#traceRows==0 and not engine.trace.file)
 memory[0x1fe7da8]=64
 engine.trace:observe('onTick'); engine.trace:observe('onTick')
 assert(#traceRows==2 and traceRows[2].kind=='checkpoint' and traceRows[2].time==64)
-assert(traceRows[1].format==3 and traceRows[1].environmentHash==string.rep('a',64))
+assert(traceRows[1].format==4 and traceRows[1].environmentHash==string.rep('a',64))
 assert(traceRows[2].rngHash==string.rep('b',64))
 memory[0x1fe7da8]=65; engine.trace:observe('onTick'); assert(#traceRows==2)
 memory[0x1fe7da8]=128; engine.trace:observe('onTick')
@@ -96,6 +98,66 @@ engine.trace:observe('onTick')
 assert(engine.trace.failed and not engine.trace.file)
 assert(receive().EAX==1 and before().EDX==28)
 assert(recorder.mode=='none' and not recorder.error)
+''')
+
+    def test_roster_and_resync_transitions_between_checkpoints_are_not_omitted(self):
+        self.check('''
+memory[engine.base+0x6a8+8*4]=-1; memory[engine.base+0x714+8*4]=4
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+assert(traceRows[1].network.roster[8].kind=='ai')
+memory[0x1fe7da8]=65; memory[engine.base+0x6ac]=999
+engine.trace:observe('onTick')
+assert(traceRows[3].kind=='gap' and traceRows[3].reason=='player roster or identity changed')
+memory[0x1fe7da8]=66; memory[engine.base+0xb98]=2
+engine.trace:observe('onTick'); engine.trace:observe('stop','test ended')
+assert(traceRows[4].reason=='native synchronization phase changed' and traceRows[5].status=='incomplete')
+''')
+
+    def test_native_immediate_observers_preserve_registers_and_expose_bypass(self):
+        self.check('''
+local sites=require('code/network-sites').SHC
+local readBytes=core.readBytes
+core.readBytes=function(address,size)
+ for _,site in pairs(sites) do if address==site.address then assert(size==#site.bytes); return site.bytes end end
+ return readBytes(address,size)
+end
+require('code/network-observer').install(engine.trace)
+local regs={EAX=1,EBX=2,ECX=3,EDX=4,ESI=5,EDI=6,ESP=7,EBP=8,EFLAGS=0xa83}
+assert(callbacks[sites.remoteImmediate.address](regs)==regs and #traceRows==0)
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+for name,site in pairs(sites) do
+ if name~='localTimed' then
+  assert(callbacks[site.address](regs)==regs)
+  assert(traceRows[#traceRows].kind=='gap' and traceRows[#traceRows].details.source==name)
+ end
+end
+engine.trace.file.write=function() return nil,'disk full' end
+assert(callbacks[sites.remoteImmediate.address](regs)==regs and engine.trace.failed)
+assert(regs.EAX==1 and regs.EBX==2 and regs.ECX==3 and regs.EDX==4 and regs.ESI==5)
+assert(regs.EDI==6 and regs.ESP==7 and regs.EBP==8 and regs.EFLAGS==0xa83)
+''')
+
+    def test_network_hook_conflict_cannot_partially_install_observers(self):
+        self.check('''
+local installed=0; core.detourCode=function() installed=installed+1 end
+core.readBytes=function() return {} end
+assert(not pcall(require('code/network-observer').install,engine.trace))
+assert(installed==0)
+''')
+
+    def test_locally_queued_payload_does_not_require_receive_copy(self):
+        self.check('''
+engine.trace:observe('locallyQueuedCommand')
+assert(before().EDX==28); after(); engine.trace:observe('stop','test ended')
+assert(traceRows[2].kind=='command' and traceRows[2].origin=='local')
+assert(traceRows[2].data=='01' and traceRows[3].status=='complete')
+''')
+
+    def test_invalid_local_payload_only_disables_diagnostics(self):
+        self.check('''
+memory[engine.base+0x2d830]=1261
+engine.trace:observe('locallyQueuedCommand')
+assert(engine.trace.failed and before().EDX==28 and not recorder.error)
 ''')
 
 
@@ -195,3 +257,43 @@ class CompareTraceTests(unittest.TestCase):
             else:
                 b[1]['rngHash'] = 'z'*64
             self.assertEqual(self.compare(a, b)['status'], 'incomplete', change)
+
+    def network_trace(self):
+        a = self.full_trace()
+        a[0].update(format=4, localPlayer=1, network=dict(mode=1, localPlayer=1, syncStatus=0,
+            handles=list(range(101,109)), roster=[dict(slot=i,kind='human',ai=0,variation=0) for i in range(1,9)]))
+        return a
+
+    def test_network_context_requires_unambiguous_roster_and_idle_sync(self):
+        for change in ('missing', 'duplicate', 'system handle', 'classification', 'resync', 'local slot'):
+            a, b = self.network_trace(), self.network_trace()
+            n = b[0]['network']
+            if change == 'missing': del b[0]['network']
+            elif change == 'duplicate': n['handles'][2] = n['handles'][1]
+            elif change == 'system handle': n['handles'][2] = 0
+            elif change == 'classification': n['roster'][2]['kind'] = 'ai'
+            elif change == 'resync': n['syncStatus'] = 2
+            else: n['localPlayer'] = 3
+            self.assertEqual(self.compare(a,b)['status'],'incomplete',change)
+
+    def test_logical_roster_compares_across_transport_handle_renumbering(self):
+        a, b = self.network_trace(), self.network_trace()
+        for trace in (a,b):
+            event=self.trace()[1]
+            event.update(sequence=2,time=65,scheduledTime=65,handle=103)
+            trace.insert(2,event); trace[-1].update(events=2,commands=1)
+        b[0]['network']['handles'] = list(range(201,209)); b[2]['handle']=203
+        b[0]['localPlayer']=3; b[0]['network']['localPlayer']=3
+        self.assertEqual(self.compare(a,b)['status'],'matched')
+        b[2]['handle']=202
+        self.assertEqual(self.compare(a,b)['status'],'incomplete')
+
+    def test_network_gaps_and_different_ai_rosters_cannot_report_match(self):
+        a, b = self.network_trace(), self.network_trace()
+        b[0]['network']['handles'][7]=-1; b[0]['network']['roster'][7].update(kind='ai',ai=4)
+        self.assertEqual(self.compare(a,b)['status'],'incomplete')
+        a.insert(2,dict(kind='gap',sequence=2,time=65,reason='immediate command'))
+        a[-1].update(events=2,status='incomplete')
+        result=self.compare(a,a)
+        self.assertEqual(result['status'],'incomplete')
+        self.assertIn('immediate command',result['reason'])

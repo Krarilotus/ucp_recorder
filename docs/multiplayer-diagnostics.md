@@ -1,6 +1,6 @@
-# Multiplayer diagnostics (0.11.0)
+# Multiplayer diagnostics (0.13.0)
 
-This is the first multiplayer-specific implementation stage. It observes execution on each peer without changing the simulation scope, RNG seeds, pause flag, command ownership or dispatch decisions. Multiplayer recording/playback remains disabled. The existing single-player replay checks and isolation gates remain in effect.
+This stage observes execution and identity on each peer without changing the simulation scope, RNG seeds, pause flag, command ownership or dispatch decisions. Multiplayer recording/playback remains disabled. The existing single-player replay checks and isolation gates remain in effect.
 
 ## Collect and compare
 
@@ -13,13 +13,13 @@ Exit codes: 0 means the compared command/RNG/resource evidence matched; 1 means 
 
 ## What is observed
 
-The existing checked receive-copy and pre/post-dispatch sites observe timed commands from all senders. The actor comes from the native resolved-player field, rather than assigning every command to the local spectator. Every 64 simulation ticks, a read-only observer also records RNG/resource state immediately before native RNG advancement. It runs on the original simulation path without using the single-player halt flag. Repeated observations of a paused boundary are deduplicated. Each returned handler produces one row with the execution and scheduled ticks, category, payload, raw sender handle, native slot, resolved actor, post-command RNG and all eight players' resources. The comparator ignores peer-local player identity, raw handles and ring slots, comparing the resolved actions and resulting evidence instead.
+The existing checked receive-copy and pre/post-dispatch sites observe timed commands from all senders. The actor comes from the native resolved-player field, rather than assigning every command to the local spectator. Every 64 simulation ticks, a read-only observer also records RNG/resource state immediately before native RNG advancement. It runs on the original simulation path without using the single-player halt flag. Repeated observations of a paused boundary are deduplicated. Each returned handler produces one row with the execution and scheduled ticks, category, payload, raw sender handle, native slot, resolved actor, post-command RNG and all eight players' resources. The comparator compares logical actors across peers, ignoring peer-local ring slots and transport-handle numbering differences. In format 4, each peer's handle-to-actor mapping must agree with its own captured roster.
 
 A missing payload receipt produces an untracked row and an incomplete completion status. Interrupted handlers, write errors, missing footers and malformed records cannot become a successful comparison. Logging errors close the trace and disable further diagnostic writes for that session; they do not halt multiplayer or replace its command category. Trace files are flushed synchronously, so this opt-in instrumentation has I/O and execution overhead that still needs live measurement.
 
 ## Boundaries
 
-This is command-boundary and periodic simulation evidence, not a full replay or a full world-state checksum. It does not yet capture untimed commands, resynchronization/save-transfer packets or private extension state. It does not make a multiplayer save playable offline, replace networking, or change human/AI identity rules. Equal traces therefore do not prove a complete multiplayer match is deterministic. Different post-command RNG/resource evidence locates a mismatch; further analysis is needed to establish its cause.
+This is command-boundary and periodic simulation evidence, not a full replay or a full world-state checksum. Immediate commands are detected but their full effects/payloads are not replayed; resynchronization/save transfers and private extension state remain unsupported. It does not make a multiplayer save playable offline, replace networking, or change human/AI identity rules. Equal traces therefore do not prove a complete multiplayer match is deterministic. Different post-command RNG/resource evidence locates a mismatch; further analysis is needed to establish its cause.
 
 Automated tests use native callback fixtures to verify original registers/dispatch survive logging failures, remote actors are recorded, single-player does not start a multiplayer trace, and incomplete evidence is rejected. The comparator has matching/differing/corrupt trace tests. No live multiplayer match was launched for this stage.
 
@@ -34,3 +34,42 @@ are reported as incompatible. This does not fingerprint edited extension files
 or external assets. Older format-1/2 pairs can still be compared with their
 original evidence limits. Full RNG hashing adds periodic CPU work; live overhead
 and two-peer comparisons still need measurement.
+
+## Format 4: ownership and uncovered network events
+
+Locally queued timed payloads are captured before transmission at `0x489216`
+(Extreme `0x489326`). They enter the command ring directly and never traverse
+the receive-copy hook. Each command row identifies its local/received origin;
+the comparator ignores that peer-relative origin and compares actual execution.
+
+The header records mode, local slot, synchronization status, eight transport
+handles and a logical roster (human/AI/empty, AI ID and variation). Native
+classification treats handle -1 plus a nonzero AI ID as AI. Duplicate human
+handles, system-message handle zero, missing roster data and an active resync
+phase are rejected by the comparator. Human handle numbering may differ between
+the two files, but each command must map to its actor in that file's own roster.
+
+While a trace is open, identity and synchronization state are checked at every
+simulation boundary and before timed dispatch. Changes produce `gap` rows and
+an incomplete footer. Separate read-only detours cover immediate dispatch from
+both received commands (`0x480417`, Extreme `0x4805E7`) and locally queued
+commands (`0x4892BE`, Extreme `0x4893CE`). These hooks retain the original MOVSX
+instructions and do not suppress execution. Any such dispatch in the trace
+window produces a gap with its category, actor, declared size and source.
+Harmless immediate commands can therefore also make this conservative stage
+incomplete; there is no unaudited whitelist.
+
+Lobby events before the trace opens are outside its window. DirectPlay system
+messages are not yet individually logged: persistent roster/sync changes can be
+noticed at later boundaries, but a transient change between observations can
+escape that sampling. Host migration, a synchronized starting snapshot, offline
+roster restoration, resync payload reconstruction and native-versus-extension
+state coverage remain implementation work. See the [native network-flow
+contribution](https://github.com/sourcehold/OpenSHC/pull/220) for the evidence.
+
+The source investigation also confirms that the wire timestamp uses three bytes,
+while command-ring ticks use four. A replay file must not silently equate these
+formats. The reviewed RedirectPlay source forwards reliable flags but omits the
+ReceiveData size output; its exact correspondence to the shipped DLL remains
+unverified. Neither replacing transport nor recording raw packets alone closes
+the replay ownership and resync gaps.

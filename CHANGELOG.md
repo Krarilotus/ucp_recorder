@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.0
+
+- Capture locally queued multiplayer payloads before native transmission; these do not pass through the received-command copy hook and were previously reported as untracked.
+- Record the native eight-slot human/AI roster and transport identity in multiplayer diagnostic format 4. Compare logical rosters across peers, while checking each command's handle against its recorded actor.
+- Observe both local and received immediate-command execution paths when multiplayer diagnostics are enabled. Mark them as coverage gaps instead of silently omitting them from a supposedly complete trace.
+- Detect roster/identity changes and native synchronization phase changes between periodic checkpoints. Traces starting during resync, ambiguous/system handles, uncovered events and incompatible rosters cannot report a successful comparison.
+- Preserve normal dispatch instructions/registers and isolate diagnostic errors. The three new native hooks are installed only when the optional diagnostics setting is enabled.
+- Document the remaining network requirements, including system-message transitions, chunked resync, 24-bit wire timestamps and private extension state. Single-player profile remains `recorder-sp-v6`; older paired trace formats retain their original evidence limits.
+
+Validation: 112 automated tests, both original executable profiles and ZIP packaging pass. New tests cover local queue capture, roster differences, handle renumbering/ownership, between-checkpoint resync, immediate dispatch, hook conflicts and write-failure pass-through. No live multiplayer validation was performed; this improves diagnostics and does not enable multiplayer recording/playback.
+
 ## 0.12.0
 
 - Fix the lobby crash caused by Lua filename hooks clobbering registers used by native callers. Use native filename overrides only while loading the replay's starting save.

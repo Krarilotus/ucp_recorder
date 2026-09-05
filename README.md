@@ -2,7 +2,7 @@
 
 Work in progress: recording and playback of single-player Stronghold Crusader and Crusader Extreme Skirmishes using UCP3.
 
-Version 0.12.0 repairs crashes and file/UI integration failures found in live Crusader tests, and guards seven previously missed music calls that advance the match RNG. Recordings, the native replay browser and loading a starting save have been exercised in game. **A complete replay with the final music fix, Extreme gameplay and settings restart still need live verification.** Multiplayer recording is not supported yet; normal multiplayer isolation has automated coverage but still needs a live comparison. See [live findings and next tests](docs/live-validation.md).
+Version 0.13.0 adds multiplayer roster evidence and detects immediate-command/resync gaps in diagnostic traces. It includes 0.12.0's repairs for live Crusader crashes, file/UI integration and music RNG calls. Recordings, the native replay browser and loading a starting save have been exercised in game. **A complete replay with the final music fix, Extreme gameplay and settings restart still need live verification.** Multiplayer recording is not supported yet; normal multiplayer isolation has automated coverage but still needs a live comparison. See [live findings and next tests](docs/live-validation.md).
 
 Automarket 1.1.0 has an experimental replay adapter for its settings commits and native custom save section. Use protocol 1.0.0 and map-extensions 1.0.0, with **recorder after protocol in the extension order**. The normal weekly trades run in the simulation; they are not replayed as extra trades. Other custom protocols remain unsupported. See [Automarket replay notes](docs/automarket-replay.md).
 
@@ -34,4 +34,4 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.12.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
+The builder creates `dist/recorder-0.13.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.

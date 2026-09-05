@@ -20,6 +20,7 @@ function module:enable(config)
   local recorder=Session:new(engine)
   self.recorder=recorder
   engine:install(recorder)
+  if engine.trace then require('code/network-observer').install(engine.trace) end
   local ui=require('code/ui')
   ui.createButtons(recorder,uiSites)
 
