@@ -12,6 +12,9 @@ destination.parent.mkdir(exist_ok=True)
 files = [root/p for p in ('definition.yml', 'options.yml', 'init.lua', 'README.md', 'CHANGELOG.md')]
 files.extend(sorted((root/'code').rglob('*.lua')))
 files.extend(sorted((root/'docs').rglob('*.md')))
+comparator = root/'tools/compare_multiplayer.py'
+if comparator.exists():
+    files.append(comparator)
 with zipfile.ZipFile(destination, 'w', zipfile.ZIP_DEFLATED) as archive:
     for path in files:
         archive.write(path, path.relative_to(root).as_posix())

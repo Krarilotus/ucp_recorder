@@ -11,7 +11,7 @@ options:
     value: "trace"
 - url: recorder.useFixedSeed
   header: "Use fixed seed"
-  text: "Using fixed seeds guarantees deterministic gameplay"
+  text: "Use the configured starting seed for single-player recorder sessions"
   hasHeader: true
   display:
   contents:
@@ -25,3 +25,11 @@ options:
   contents:
     type: integer
     value: 1
+- url: recorder.multiplayerDiagnostics
+  header: "Multiplayer diagnostics"
+  text: "Log executed multiplayer commands and resource/RNG evidence for comparison. This does not enable multiplayer replay."
+  hasHeader: true
+  display:
+  contents:
+    type: boolean
+    value: false

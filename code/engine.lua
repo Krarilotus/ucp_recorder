@@ -43,6 +43,7 @@ function M.new(sites)
 end
 
 function M:resetCommands()
+  if self.trace then self.trace:observe('stop','game/session transition') end
   self.journal=require('code/command-journal').new()
   self.received={}
   self.executing=nil
@@ -213,6 +214,7 @@ function M:install(recorder)
       size=0
     end
     registers.EAX=size
+    if self.trace then self.trace:observe('receivedCommand',registers.EDX,size) end
     if recorder.active and recorder.status=='recording' and self:singlePlayer() then
       local ok=recorder:guard(function()
         require('code/validation').integer(size,0,1260,'native payload size')
@@ -232,6 +234,7 @@ function M:install(recorder)
   core.detourCode(function(registers)
     local category=core.readByte(registers.ESI+registers.ECX+0x3c684)
     registers.EDX=category<128 and category or category-256 -- original MOVSX
+    if self.trace then self.trace:observe('beforeCommand') end
     if self:singlePlayer() and not self.loading and recorder.active then
       local ok=recorder:guard(function()
         assert(recorder.status=='playing' or recorder.status=='recording','Replay session is stopped')
@@ -242,6 +245,7 @@ function M:install(recorder)
     return registers
   end,self.sites.execute.address,8)
   core.detourCode(function(registers)
+    if self.trace then self.trace:observe('afterCommand') end
     if self:singlePlayer() and not self.loading and recorder.active then
       recorder:guard(function() self:afterCommand(recorder) end)
     end

@@ -1,0 +1,97 @@
+"""Compare two peers' command traces. Exit 0=matched, 1=different, 2=incomplete."""
+import argparse
+import itertools
+import json
+from pathlib import Path
+
+
+def integer(value, lo, hi):
+    if type(value) is not int or not lo <= value <= hi:
+        raise ValueError('Invalid integer in trace')
+
+
+def rows(stream):
+    while line := stream.readline(65537):
+        if len(line) > 65536:
+            raise ValueError('Oversized trace line')
+        value = json.loads(line)
+        if not isinstance(value, dict):
+            raise ValueError('Invalid trace record')
+        yield value
+
+
+def commands(records):
+    count = 0
+    for record in records:
+        if record.get('kind') == 'end':
+            if record.get('status') != 'complete' or record.get('commands') != count or not count:
+                raise ValueError('Trace is incomplete or has no commands')
+            if next(records, None) is not None:
+                raise ValueError('Data follows trace completion')
+            return
+        if record.get('kind') != 'command':
+            raise ValueError('Trace contains an untracked/unknown command')
+        count += 1
+        if record.get('sequence') != count:
+            raise ValueError('Trace command sequence is incomplete')
+        for key, lo, hi in [('time', 0, 2147483647), ('scheduledTime', 1, 2147483647),
+                            ('player', 1, 8), ('category', 0, 127), ('size', 0, 1260)]:
+            integer(record.get(key), lo, hi)
+        data = record.get('data')
+        if not isinstance(data, str) or len(data) != record['size'] * 2 or any(c not in '0123456789abcdefABCDEF' for c in data):
+            raise ValueError('Invalid trace payload')
+        record['data'] = data.upper()
+        for key, length in [('rng', 4), ('resources', 200)]:
+            values = record.get(key)
+            if not isinstance(values, list) or len(values) != length:
+                raise ValueError(f'Missing {key} evidence')
+            for value in values:
+                integer(value, -2147483648, 2147483647)
+        yield record
+    raise ValueError('Trace has no completion record')
+
+
+def compare(left, right):
+    difference = None
+    count = 0
+    try:
+        with Path(left).open(encoding='utf-8') as a, Path(right).open(encoding='utf-8') as b:
+            ar, br = rows(a), rows(b)
+            ah, bh = next(ar), next(br)
+            for header in (ah, bh):
+                if header.get('kind') != 'header' or header.get('format') != 1:
+                    raise ValueError('Unsupported trace format')
+            if any(ah.get(key) != bh.get(key) for key in ('variant', 'executable')):
+                raise ValueError('Traces require the same game executable/variant')
+            for av, bv in itertools.zip_longest(commands(ar), commands(br)):
+                count += 1
+                if difference:
+                    continue  # Still validate both complete streams before reporting.
+                if av is None or bv is None:
+                    difference = dict(sequence=count, field='command count')
+                    continue
+                for key in ('time', 'scheduledTime', 'player', 'category', 'size', 'data', 'rng', 'resources'):
+                    if av[key] == bv[key]:
+                        continue
+                    difference = dict(sequence=count, time=av['time'], field=key)
+                    if key in ('rng', 'resources'):
+                        index = next(i for i, (x, y) in enumerate(zip(av[key], bv[key])) if x != y)
+                        difference.update(index=index, left=av[key][index], right=bv[key][index])
+                        if key == 'resources':
+                            difference.update(player=index // 25 + 1, resource=index % 25)
+                    else:
+                        difference.update(left=av[key], right=bv[key])
+                    break
+    except (OSError, ValueError, KeyError, StopIteration) as error:
+        return dict(status='incomplete', reason=str(error) or 'Empty trace', firstDifference=difference)
+    return dict(status='different' if difference else 'matched', commands=count, firstDifference=difference)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('left', type=Path)
+    parser.add_argument('right', type=Path)
+    args = parser.parse_args()
+    result = compare(args.left, args.right)
+    print(json.dumps(result, indent=2))
+    raise SystemExit({'matched': 0, 'different': 1, 'incomplete': 2}[result['status']])

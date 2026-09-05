@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0
+
+- Add opt-in multiplayer command diagnostics, disabled by default. Observe the resolved actor, payload, scheduled/executed tick and post-command RNG/resource state without injecting, suppressing or pausing multiplayer commands.
+- Isolate logging failures from native dispatch, and mark untracked or interrupted captures incomplete.
+- Include a standalone trace comparator that reports the first difference between two peers and rejects incomplete evidence.
+- Clarify that a fixed starting seed alone does not guarantee deterministic gameplay.
+
+Validation: 87 automated tests, including native callback pass-through on logging failure and peer trace comparison. This is multiplayer diagnostic support, not multiplayer replay; live multiplayer traces are still needed.
+
 ## 0.8.0
 
 - Verify all 25 native resource slots for each of the eight players when loading the starting save, at periodic checkpoints and at the ending boundary.
