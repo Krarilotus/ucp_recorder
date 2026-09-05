@@ -137,13 +137,15 @@ for _,site in pairs(sites) do
  if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
 end
 for _,site in pairs(require('code/ui-sites').SHC) do core.writeBytes(site.address,site.bytes) end
+for _,site in ipairs(require('code/scoped-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 core.hookCode=function() return function() return 0 end end
 core.writeString=function() end
 core.callTo=function() return {} end
 package.loaded['code/sessions']={captureSettings=function() end}
 local module=dofile(source_root..'/init.lua')
 module:enable({rngLogMethod='trace',useFixedSeed=true,fixedSeed=123})
-assert(callbacks[0x46a74a]({EAX=456}).EAX==123)
+assert(core.readInteger(module.recorder.engine.scope)==0)
+assert(callbacks[0x46a74a]==nil) -- seed changes live inside the native scope gate
 -- Session playback keeps the native single-player identity path intact.
 assert(callbacks[0x47eaf0]==nil)
 ''')

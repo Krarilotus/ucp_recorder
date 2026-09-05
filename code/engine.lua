@@ -29,6 +29,7 @@ function M.new(sites)
   e.loadNative=core.exposeCode(sites.load.address,1,0)
   e.buffer=core.allocate(1260,true)
   e.pathBuffer=core.allocate(512,true)
+  e.scope=core.allocate(4,true)
   e.pendingSlots={}
   return setmetatable(e,{__index=M})
 end
@@ -39,7 +40,13 @@ function M:singlePlayer()
   local mode=core.readInteger(self.base+0x618)
   return mode==0 or mode==99
 end
-function M:pause() core.writeInteger(self.sites.paused,1) end
+function M:setScope(active)
+  assert(not active or self:singlePlayer(),'Replay simulation scope requires single-player')
+  core.writeInteger(self.scope,active and 1 or 0)
+end
+function M:pause()
+  if self:singlePlayer() then core.writeInteger(self.sites.paused,1) end
+end
 
 function M:rngState()
   return {core.readSmallInteger(self.rng),core.readSmallInteger(self.rng+2),
@@ -134,7 +141,7 @@ function M:install(recorder)
     return originalMapName(this,index)
   end,self.sites.mapName.address,2,1,#self.sites.mapName.bytes)
   originalQueue=core.hookCode(function(this,category)
-    if recorder.mode=='play' and not self.loading then return 0 end
+    if recorder.mode=='play' and self:singlePlayer() and not self.loading then return 0 end
     return originalQueue(this,category)
   end,self.sites.queue.address,2,1,#self.sites.queue.bytes)
   -- Replace exactly MOV EAX,[ESI+commandSize] before the timed payload copy.

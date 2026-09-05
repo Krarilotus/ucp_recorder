@@ -17,7 +17,7 @@ function Session:guard(callback)
   if not ok then
     if self.status=='error' and (self.active or self.mode~='none') then return false end -- retain the first session failure
     self.status='error'; self.error=tostring(reason)
-    local stopSimulation=self.active or self.mode=='play'
+    local stopSimulation=self.engine:singlePlayer() and (self.active or self.mode=='play')
     core.writeInteger(self.halt,stopSimulation and 1 or 0)
     if stopSimulation then self.engine:pause() end
     print('Replay stopped: ' .. self.error)
@@ -43,10 +43,12 @@ function Session:startRecording()
   self:openFiles('w')
   self.mode='record'; self.status='armed'; self.active=false
   self.error=nil; self.observedTick=false
+  self.engine:setScope(true)
   core.writeInteger(self.halt,0)
 end
 
 function Session:activateRecording()
+  self:reconcileMode()
   if self.mode~='record' or self.status~='armed' then return end
   local path=store.path(self.manifest.id)
   self.engine:saveSnapshot(path..'/start.sav')
@@ -86,6 +88,7 @@ function Session:startPlayback(id)
   self.manifest=manifest
   self.mode='play'; self.status='loading'; self.active=false
   self.error=nil
+  self.engine:setScope(true)
   core.writeInteger(self.halt,0)
   self.engine:loadSnapshot(path..'/start.sav')
   local bytes={}; for i=1,#rng do bytes[i]=rng:byte(i) end
@@ -98,6 +101,7 @@ function Session:startPlayback(id)
 end
 
 function Session:onCommand(category,time,address,size)
+  self:reconcileMode()
   if self.status~='recording' or not self.active or time<=0 then return end
   validation.integer(size,0,1260,'native command size')
   validation.sessionCommand({commandCategory=category,time=time,player=self.engine:player(),
@@ -107,6 +111,7 @@ function Session:onCommand(category,time,address,size)
 end
 
 function Session:feed()
+  self:reconcileMode()
   if self.status~='playing' then return end
   local now=self.engine:tick()
   while self.engine:canSchedule() do
@@ -121,6 +126,7 @@ function Session:feed()
 end
 
 function Session:onTick()
+  self:reconcileMode()
   if not self.active then return end
   local now=self.engine:tick()
   if self.status=='recording' then
@@ -160,6 +166,8 @@ function Session:onTick()
 end
 
 function Session:reset()
+  self.engine:setScope(false)
+  core.writeInteger(self.halt,0)
   local manifest=self.mode=='record' and self.manifest
   local complete=manifest and self.active and self.observedTick and self.status=='recording'
   self.active=false
@@ -180,6 +188,14 @@ function Session:reset()
   self.status='idle'; self.manifest=nil; self.nextCheckpoint=nil
   self.observedTick=false; self.error=nil
   core.writeInteger(self.halt,0)
+end
+
+function Session:reconcileMode()
+  if self.mode~='none' and not self.engine:singlePlayer() then
+    self.status='error'
+    self.error='Replay session ended when entering multiplayer'
+    self:reset()
+  end
 end
 
 function Session:discardFiles() end -- Cancelling never deletes a previous recording.

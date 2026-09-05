@@ -66,3 +66,24 @@ end
 assert(not pcall(function() engine:scheduleCommand(command()) end))
 assert(bytes[slot]==10 and not engine.expectedSize)
 ''')
+
+    def test_stale_playback_does_not_block_multiplayer_queue(self):
+        self.check('''
+local hooks={}; local forwarded=0
+core.hookCode=function(callback)
+ hooks[#hooks+1]=callback; return function() forwarded=forwarded+1; return 42 end
+end
+engine:install({mode='play'})
+memory[engine.base+0x618]=1
+assert(hooks[3](engine.base,28)==42 and forwarded==1)
+memory[engine.base+0x618]=0
+assert(hooks[3](engine.base,28)==0 and forwarded==1)
+''')
+
+    def test_multiplayer_cannot_enable_scope_or_be_paused_by_recorder(self):
+        self.check('''
+memory[engine.base+0x618]=1; memory[engine.sites.paused]=0
+engine:pause(); assert(memory[engine.sites.paused]==0)
+assert(not pcall(function() engine:setScope(true) end))
+engine:setScope(false); assert(memory[engine.scope]==0)
+''')

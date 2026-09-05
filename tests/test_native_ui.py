@@ -62,3 +62,21 @@ core.writeString=function(_,value) text=value end
 ui:text('a\nb\0c'..string.rep('x',200),20,30)
 assert(#text==150 and text:sub(1,5)=='a b c')
 ''')
+
+    def test_multiplayer_hides_only_recorder_items_after_array_reallocation(self):
+        self.check('''
+local hook; local calls=0
+core.hookCode=function(callback) hook=callback; return function() calls=calls+1; return 42 end end
+local owner,oldItem,array=0x7000,0x8000,0x9000
+memory[oldItem+0x4c]=owner; memory[oldItem+20]=123
+memory[owner]=array
+memory[array]=3; memory[array+20]=123
+memory[array+80]=3; memory[array+80+20]=456
+memory[array+160]=0x66
+local visible=false
+ui:trackVisibility({oldItem},function() return visible end)
+assert(hook(owner,0)==42)
+assert(memory[array]==-2147483645 and memory[array+80]==3 and calls==1)
+visible=true; hook(owner,1); assert(memory[array]==3 and memory[array+80]==3)
+visible=false; hook(owner+100,0); assert(memory[array]==3)
+''')

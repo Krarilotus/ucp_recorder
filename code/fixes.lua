@@ -1,34 +1,33 @@
-local native = require("code/native")
---[[
-	Fixes which might be needed for stable recordings
-	Test this
-]]--
+local native=require('code/native')
+local profiles=require('code/scoped-sites')
+local emitter=require('code/scoped-code')
+local M={}
 
-return {
-	apply = function()
-		--- faulty randomness line? This one is called extra when loading from the load game menu
-		-- Dust spawning normally returns with RET 0x2c (11 arguments).
-		-- Replace the whole CALL and perform exactly its 44-byte cleanup.
-		core.writeCode(native.addr(0x004fc4a3), {0x90, 0x90, 0x90, 0x90, 0x90})
-		core.writeCode(native.addr(0x004fc627), {0x83, 0xC4, 0x2C, 0x90, 0x90})
+function M.verify()
+  local sites=assert(profiles[native.profile.name])
+  for _,site in ipairs(sites) do
+    local actual=core.readBytes(site.address,#site.bytes)
+    for i,byte in ipairs(site.bytes) do
+      assert(actual[i]==byte,'Recorder simulation hook conflicts at '..site.name)
+    end
+  end
+  return sites
+end
 
-		--- Mother RNG fix, nopping out. Could also switch with RNG1 to keep the baby cry noise
-		core.writeCode(native.addr(0x005474a3), {0x90, 0x90, 0x90, 0x90, 0x90})
+function M.install(sites,enabled,mode,seed)
+  for _,site in ipairs(sites) do
+    if site.kind~='seed' or seed~=nil then
+      local size=#emitter.build(site,enabled,mode,seed,0)
+      local target=core.allocateCode(size)
+      core.writeCode(target,emitter.build(site,enabled,mode,seed,target))
+      core.writeCode(site.address,emitter.jump(site.address,target,#site.bytes))
+    end
+  end
+end
 
-		-- removing all function calls to RNG1 that come from the music thread.
-		core.writeCode(native.addr(0x0047a8d5), {0x90, 0x90, 0x90, 0x90, 0x90})
-		core.writeCode(native.addr(0x0047a86b), {0x90, 0x90, 0x90, 0x90, 0x90})
-
-		core.writeCode(native.addr(0x0047c348), {0x90, 0x90, 0x90, 0x90, 0x90})
-
-		--- Right click menu fixes (during pause):
-		-- Do not process tick when game is paused and pull down terrain or flatten terrain is used
-		core.writeCode(native.addr(0x0045ceff), {0x90, 0x90})
-
-		-- Do not increase match time when game is paused and flatten terrain is used
-		core.writeCode(native.addr(0x0045ce34), {0xEB, 0x46})
-
-		-- Removing mothers and children (TODO test without this)
-		core.writeCode(native.addr(0x004582ed), {0xEB})
-	end
-}
+function M.installTick(site,enabled,mode,halt,callback)
+  local tick={address=site.address,bytes=site.bytes,kind='raw',patch='tick',
+    halt=halt,callback=callback,skipTick=site.address+0x25}
+  M.install({tick},enabled,mode)
+end
+return M

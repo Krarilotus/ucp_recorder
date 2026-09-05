@@ -47,15 +47,18 @@ function M.createButtons(recorder,sites)
   ui:button(record,250,550,145,30,function()
     return recorder.status=='armed' and 'Cancel recording' or 'Record next match'
   end,function()
+    if not recorder.engine:singlePlayer() then return end
     if recorder.mode=='none' then recorder:guard(function() recorder:startRecording() end)
     elseif recorder.mode=='record' then recorder:guard(function() recorder:stopRecording() end) end
   end,function() return recorder.status=='armed' end)
   ui:button(browse,410,550,145,30,'Replays',function()
+    if not recorder.engine:singlePlayer() then return end
     browser:refresh(); ui:show(dialog)
   end)
   core.writeCode(native.addr(0x59ab30),{
     core.AssemblyLambda('push array',{array=array})
   })
+  ui:trackVisibility({record,browse},function() return recorder.engine:singlePlayer() end)
 end
 
 function M.resetButtons() end -- Labels derive from session state at render time.

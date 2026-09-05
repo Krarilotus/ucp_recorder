@@ -43,7 +43,7 @@ def check(folder):
         menu = native.addr(0x59ab30)
         assert reader(menu, 1) == b'\x68'
         assert struct.unpack('<I', reader(menu+1, 4))[0] == native.addr(0x5e9848)
-        for profile_file in ('engine-sites.lua','ui-sites.lua'):
+        for profile_file in ('engine-sites.lua','ui-sites.lua','scoped-sites.lua'):
             sites=lua.execute((root/'code'/profile_file).read_text())[name]
             for site_name,site in sites.items():
                 if hasattr(site, 'items'):

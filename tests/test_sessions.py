@@ -21,6 +21,7 @@ package.loaded['code/sessions']={
 Session=require('code/session-recorder')
 now=0; snapshots=0; space=true
 engine={rng=0x1a279c0,
+ setScope=function(_,active) scoped=active end,
  singlePlayer=function() return true end,
  tick=function() return now end,
  player=function() return 1 end,
@@ -166,4 +167,30 @@ assert(r.mode=='none' and memory[r.halt]==0 and not paused)
 local r=session(); r.mode='play'; r.status='loading'; r.active=false
 assert(not r:guard(function() error('load failed after native changes') end))
 assert(memory[r.halt]==1 and paused)
+''')
+
+    def test_scope_is_only_enabled_for_requested_session_and_cleared_on_cancel(self):
+        self.check('''
+local r=session(); r:startRecording(); assert(scoped)
+r:reset(); assert(not scoped)
+engine.singlePlayer=function() return false end
+assert(not r:guard(function() r:startRecording() end))
+assert(not scoped and not paused and memory[r.halt]==0)
+''')
+
+    def test_mode_transition_aborts_capture_without_pausing_multiplayer(self):
+        self.check('''
+local r=session(); r:startRecording(); r:activateRecording(); now=64; r:onTick()
+engine.singlePlayer=function() return false end
+r:reconcileMode()
+assert(r.mode=='none' and not scoped and not paused and memory[r.halt]==0)
+assert(savedManifest.status=='failed')
+''')
+
+    def test_error_in_stale_playback_cannot_pause_multiplayer(self):
+        self.check('''
+local r=session(); r.mode='play'; r.active=true
+engine.singlePlayer=function() return false end
+assert(not r:guard(function() error('stale session') end))
+assert(not paused and memory[r.halt]==0)
 ''')

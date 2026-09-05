@@ -92,4 +92,31 @@ end
 
 function M:show(id) self.activateNative(self.sites.modalComposition.value,id,0) end
 function M:close() self:show(-1) end
+
+function M:trackVisibility(referenceItems,predicate)
+  local callbacks={}
+  for _,item in ipairs(referenceItems) do callbacks[core.readInteger(item+20)]=true end
+  local original
+  original=core.hookCode(function(this,action)
+    if this==core.readInteger(referenceItems[1]+0x4c) then
+      local ok,reason=pcall(function()
+        local item=core.readInteger(this)
+        local visible=predicate()
+        -- Find our callbacks in the current array, allowing other modules to
+        -- reallocate or append items. A negative type skips only this item.
+        for _=1,4096 do
+          local kind=core.readInteger(item)
+          if kind==0x66 then return end
+          if callbacks[core.readInteger(item+20)] then
+            core.writeInteger(item,visible and 3 or -2147483645)
+          end
+          item=item+self.ITEM_SIZE
+        end
+        error('Replay menu array has no terminator')
+      end)
+      if not ok then self.onError(reason) end
+    end
+    return original(this,action)
+  end,self.sites.handleMenu.address,2,1,#self.sites.handleMenu.bytes)
+end
 return M

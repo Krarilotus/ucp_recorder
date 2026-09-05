@@ -2,6 +2,7 @@
 -- Signatures and ABI: UCP ui module ui/game.lua and ui/headers/latest/ui.h.
 return {
   SHC = {
+    handleMenu = {address=0x004F6280, bytes={83,139,217,86,139,51,199,67,20,0,0,0,0}},
     menuConstructor = {address=0x004F4100, bytes={81,83,139,217}},
     modalConstructor = {address=0x004A9E00, bytes={139,84,36,8,139,193,139,76,36,4,137,8}},
     activateModal = {address=0x004A9ED0, bytes={83,85,51,237,57,108,36,16}},
@@ -15,6 +16,7 @@ return {
     modalStack = {address=0x004A9E40, bytes={139,21,164,66,223,0,137,80,36}, value=0x00DF42A4},
   },
   Extreme = {
+    handleMenu = {address=0x004F6610, bytes={83,139,217,86,139,51,199,67,20,0,0,0,0}},
     menuConstructor = {address=0x004F4490, bytes={81,83,139,217}},
     modalConstructor = {address=0x004A9F70, bytes={139,84,36,8,139,193,139,76,36,4,137,8}},
     activateModal = {address=0x004AA040, bytes={83,85,51,237,57,108,36,16}},

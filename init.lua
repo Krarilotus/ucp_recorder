@@ -7,13 +7,15 @@ function module:enable(config)
   native.verify()
   local sites=Engine.verify()
   local uiSites=require('code/native-ui').verify()
+  local fixes=require('code/fixes')
+  local fixSites=fixes.verify()
   local seed
   if config.useFixedSeed then
     seed=require('code/validation').integer(config.fixedSeed,-2147483648,2147483647,'fixed seed')
   end
   require('code/sessions').captureSettings()
-  require('code/fixes').apply()
   local engine=Engine.new(sites)
+  fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
   local recorder=Session:new(engine)
   self.recorder=recorder
   engine:install(recorder)
@@ -22,7 +24,10 @@ function module:enable(config)
 
   local function observe(address,size,callback)
     core.detourCode(function(registers)
-      recorder:guard(function() callback(registers) end)
+      recorder:guard(function()
+        recorder:reconcileMode()
+        callback(registers)
+      end)
       return registers
     end,address,size)
   end
@@ -44,26 +49,7 @@ function module:enable(config)
 
   local tickCallback=core.allocateCode({0x90,0x90,0x90,0x90,0x90,0xC3})
   observe(tickCallback,5,function() recorder:onTick() end)
-  core.insertCode(sites.tick.address,5,{
-    core.AssemblyLambda([[
-      pushfd
-      pushad
-      call callback
-      popad
-      cmp dword [halt], 0
-      je continueTick
-      popfd
-      jmp skipTick
-    continueTick:
-      popfd
-    ]],{callback=tickCallback,halt=recorder.halt,skipTick=sites.tick.address+0x25})
-  },nil,'after')
-  if seed then
-    core.detourCode(function(registers)
-      registers.EAX=seed
-      return registers
-    end,native.addr(0x46a74a),6)
-  end
+  fixes.installTick(sites.tick,engine.scope,engine.base+0x618,recorder.halt,tickCallback)
 end
 
 function module:disable()

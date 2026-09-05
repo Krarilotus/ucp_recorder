@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0
+
+- Gate randomness, dust, pause and fixed-seed changes by both an active recorder scope and the native single-player mode. Multiplayer and idle paths execute the original instruction sequences.
+- Gate the simulation observer and halt path as well, so a stale replay cannot freeze multiplayer or suppress its commands.
+- Abort an active capture on a multiplayer mode transition without changing the multiplayer pause flag.
+- Hide recorder controls from both rendering and input in multiplayer using the native menu's skipped-item behaviour, preserving other extensions' items.
+- Add x86 emulation comparisons for original versus gated paths in Crusader and Extreme, including condition flags, stack cleanup and stale halt state.
+- Use simulation profile `recorder-sp-v2`; earlier experimental captures require their original module version.
+
+This closes the known unconditional simulation-patch gap. It does not add multiplayer recording or certify multiplayer compatibility. Live multiplayer comparison and full single-player replay/menu tests remain pending.
+
 ## 0.4.0
 
 - Replace temporary Skirmish checkboxes with labelled **Record next match** and **Replays** controls.
