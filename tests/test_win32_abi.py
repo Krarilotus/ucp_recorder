@@ -22,14 +22,15 @@ class Win32ABITests(unittest.TestCase):
                 lua = LuaRuntime()
                 lua.execute('''
 core={
- openLibraryHandle=function() return {getProcAddress=function() return 0x102000 end} end,
  callTo=function(address) return {target=address} end,
- allocateCode=function(code) captured=code; return 0x100000 end,
+ calculateCodeSize=function(code) return #code+4 end,
+ allocateCode=function(size) assert(type(size)=='number'); allocated=size; return 0x100000 end,
+ writeCode=function(address,code) assert(address==0x100000); captured=code end,
  exposeCode=function(address,count,convention) return {address,count,convention} end,
 }
 ''')
                 platform = lua.execute((ROOT/'code/platform.lua').read_text())
-                bridge = platform.stdcall('fake.dll', 'fake', count)
+                bridge = platform.stdcallAddress(0x102000, count)
                 self.assertEqual(list(bridge.values()), [0x100000, count, 0])
                 code = bytearray()
                 for instruction in lua.globals().captured.values():
@@ -37,6 +38,7 @@ core={
                         code.append(instruction)
                     else:
                         code += b'\xe8'+struct.pack('<i', instruction['target']-(0x100000+len(code)+5))
+                self.assertEqual(len(code), lua.globals().allocated)
                 emulator = Uc(UC_ARCH_X86, UC_MODE_32)
                 emulator.mem_map(0x100000, 0x4000)
                 emulator.mem_map(0x200000, 0x2000)

@@ -44,14 +44,16 @@ function M.createButtons(recorder,sites)
   local record=array+originalSize-itemSize
   local browse=record+itemSize
   core.copyMemory(browse+itemSize,record,itemSize)
-  ui:button(record,250,550,145,30,function()
-    return recorder.status=='armed' and 'Cancel recording' or 'Record next match'
+  -- The native bottom-row sprites occupy x=10..190, 300..345,
+  -- 444..489 and 520..800 (including transparent hit-box portions).
+  ui:button(record,195,550,100,30,function()
+    return recorder.status=='armed' and 'Cancel' or 'Record'
   end,function()
     if not recorder.engine:singlePlayer() then return end
     if recorder.mode=='none' then recorder:guard(function() recorder:startRecording() end)
     elseif recorder.mode=='record' then recorder:guard(function() recorder:stopRecording() end) end
   end,function() return recorder.status=='armed' end)
-  ui:button(browse,410,550,145,30,'Replays',function()
+  ui:button(browse,350,550,90,30,'Replays',function()
     if not recorder.engine:singlePlayer() then return end
     browser:refresh(); ui:show(dialog)
   end)

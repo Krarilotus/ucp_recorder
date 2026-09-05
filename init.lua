@@ -34,7 +34,7 @@ function module:enable(config)
   end
   observe(native.addr(0x4428c6),10,function()
     if engine.trace then engine.trace:observe('stop','new match') end
-    recorder:activateRecording()
+    recorder:prepareRecording()
     ui.resetButtons()
   end)
   observe(native.addr(0x490690),8,function() recorder:feed() end)

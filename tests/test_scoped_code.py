@@ -93,6 +93,34 @@ class ScopedCodeTests(unittest.TestCase):
             self.assertEqual(stopped[-3],tick['skipTick'])
             self.assertEqual(stopped[7],0x4108000); self.assertEqual(stopped[8],0xa83)
 
+    def test_pause_gate_preserves_incoming_unpaused_branch(self):
+        for variant,sites in self.profiles.items():
+            site=next(s for s in sites.values() if s['patch']=='equalFlags')
+            address=site['address']
+            mode_pointer=struct.unpack('<I',bytes(site['bytes'].values())[2:6])[0]
+            for enabled,mode in ((0,0),(1,0),(1,99),(1,1)):
+                for paused in (0,1):
+                    with self.subTest(variant=variant,enabled=enabled,mode=mode,paused=paused):
+                        machine=Uc(UC_ARCH_X86,UC_MODE_32)
+                        machine.mem_map(0x400000,0x4000000)
+                        def put(a,v): machine.mem_write(a,struct.pack('<I',v))
+                        put(0x600104,enabled); put(mode_pointer,mode); put(0x600108,paused)
+                        # Original JE arrives at the MOV immediately after JGE.
+                        machine.mem_write(address-9,b'\x83\x3d'+struct.pack('<I',0x600108)+b'\x00\x74\x09')
+                        gate=bytes(self.emitter.build(site,0x600104,mode_pointer,123,0x4000000).values())
+                        machine.mem_write(0x4000000,gate)
+                        machine.mem_write(address,bytes(self.emitter.jump(address,0x4000000,7).values()))
+                        machine.mem_write(address+7,b'\x7d\x46\xb9\x78\x56\x34\x12')
+                        stops={address+14,address+0x4f}
+                        def stop(uc,a,size,data):
+                            if a in stops: uc.emu_stop()
+                        machine.hook_add(UC_HOOK_CODE,stop)
+                        machine.reg_write(UC_X86_REG_ESP,0x4108000)
+                        machine.emu_start(address-9,0,count=1000)
+                        skip=paused and (mode>=8 or (enabled and mode in (0,99)))
+                        self.assertEqual(machine.reg_read(UC_X86_REG_EIP),address+0x4f if skip else address+14)
+                        if not skip: self.assertEqual(machine.reg_read(UC_X86_REG_ECX),0x12345678)
+
     def test_optional_tick_diagnostics_preserve_native_multiplayer_execution(self):
         engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
         for variant,engine in engines.items():

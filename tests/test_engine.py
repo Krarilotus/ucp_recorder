@@ -24,7 +24,7 @@ engine=Engine.new(sites)
 core.readByte=function(a) return bytes[a] or 0 end
 core.writeByte=function(a,v) bytes[a]=v end
 core.writeString=function(a,s)
- for i=1,#s do bytes[a+i-1]=s:byte(i) end; bytes[a+#s]=0
+ for i=1,#s do bytes[a+i-1]=s:byte(i) end
 end
 ''')
 
@@ -87,9 +87,9 @@ core.hookCode=function(callback)
 end
 engine:install({mode='play'})
 memory[engine.base+0x618]=1
-assert(hooks[3](engine.base,28)==42 and forwarded==1)
+assert(hooks[1](engine.base,28)==42 and forwarded==1)
 memory[engine.base+0x618]=0
-assert(hooks[3](engine.base,28)==0 and forwarded==1)
+assert(hooks[1](engine.base,28)==0 and forwarded==1)
 ''')
 
     def test_multiplayer_cannot_enable_scope_or_be_paused_by_recorder(self):

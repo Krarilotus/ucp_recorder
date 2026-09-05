@@ -1,4 +1,4 @@
-"""Optional original-binary validation. Requires lupa, uses no native writes."""
+"""Optional original-binary validation. Requires lupa/capstone, no native writes."""
 from pathlib import Path
 import argparse
 import struct
@@ -49,6 +49,19 @@ def check(folder):
                 if hasattr(site, 'items'):
                     expected=bytes(site['bytes'].values())
                     assert reader(site['address'],len(expected))==expected, f'{name}: {site_name}'
+        # Decode the complete mood-selection function, including conditional
+        # branches: checking only known patch sites would miss an extra RNG call.
+        from capstone import Cs, CS_ARCH_X86, CS_MODE_32
+        start=0x47a340 if name=='SHC' else 0x47a510
+        rng_call=0x46a800 if name=='SHC' else 0x46aa20
+        calls=set()
+        for instruction in Cs(CS_ARCH_X86,CS_MODE_32).disasm(reader(start,0x212),start):
+            if instruction.bytes[0]==0xe8 and len(instruction.bytes)==5:
+                target=instruction.address+5+struct.unpack('<i',instruction.bytes[1:])[0]
+                if target==rng_call: calls.add(instruction.address)
+        scoped=lua.execute((root/'code/scoped-sites.lua').read_text())[name]
+        guards={site['address'] for site in scoped.values() if site['name'].startswith('moodMusic')}
+        assert len(calls)==7 and calls==guards, f'{name}: incomplete mood-music RNG guards'
         print(f'PASS: {name} native patch sites, RNG fields, player layout and menu reference')
 
 

@@ -60,7 +60,7 @@ assert(not pcall(function() ui:modal({},0,680,440,function() end) end))
 local text
 core.writeString=function(_,value) text=value end
 ui:text('a\nb\0c'..string.rep('x',200),20,30)
-assert(#text==150 and text:sub(1,5)=='a b c')
+assert(#text==151 and text:sub(1,5)=='a b c' and text:byte(151)==0)
 ''')
 
     def test_multiplayer_hides_only_recorder_items_after_array_reallocation(self):

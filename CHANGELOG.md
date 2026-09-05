@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.0
+
+- Fix the lobby crash caused by Lua filename hooks clobbering registers used by native callers. Use native filename overrides only while loading the replay's starting save.
+- Fix the first-tick crash by moving the pause guard away from an incoming branch target, preserving the original unpaused entry path.
+- Bootstrap Windows file operations from loaded system exports, including named forwarders, and compile the stdcall bridge through the supported UCP assembly API.
+- Terminate native path/text buffers explicitly, use the initialized game font with a shadow, and place Record/Replays in gaps between existing Skirmish controls.
+- Capture the starting save at the first simulation boundary following match initialization.
+- Guard all seven mood-selection calls that advance simulation RNG, in addition to the previous music guards, for Crusader and Extreme. Music keeps using the current RNG value; this can change track variety. These changes apply only during single-player recorder sessions; idle and multiplayer paths retain native behavior.
+- Use simulation profile `recorder-sp-v6`; older captures require their original module version.
+
+Validation: 104 automated tests and original-executable checks for both variants, including complete mood-function RNG-call coverage. Live Crusader tests verified recording, browser selection and starting-save loading, and exposed RNG drift traced to music selection. The final music fix has not yet been retested in game. Complete playback, player commands, Extreme, settings restart and multiplayer still need live validation; multiplayer replay remains disabled. See [live evidence](docs/live-validation.md).
+
 ## 0.11.0
 
 - Compare SHA-256 of the complete 40,016-byte RNG structure after restoring the starting save, at periodic checkpoints and at the ending boundary. Detect different stored random arrays even when current RNG values and indices match.

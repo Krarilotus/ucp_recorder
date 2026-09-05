@@ -72,6 +72,12 @@ function Session:activateRecording()
   print('Recording '..self.manifest.id)
 end
 
+function Session:prepareRecording()
+  -- The start-menu callback returns before the first simulation boundary.
+  -- Capture after that initialization, at the same boundary playback verifies.
+  if self.mode=='record' and self.status=='armed' then self.capturePending=true end
+end
+
 function Session:startPlayback(id)
   assert(self.mode=='none','A replay session is already active')
   assert(self.engine:singlePlayer(),'Replay playback is single-player only')
@@ -133,6 +139,10 @@ end
 
 function Session:onTick()
   self:reconcileMode()
+  if self.capturePending then
+    self.capturePending=nil
+    self:activateRecording()
+  end
   if not self.active then return end
   local now=self.engine:tick()
   if self.status=='recording' then
@@ -208,6 +218,7 @@ function Session:checkResources(expected,phase)
 end
 
 function Session:reset()
+  self.capturePending=nil
   self.engine:setScope(false)
   self.engine:resetCommands()
   core.writeInteger(self.halt,0)

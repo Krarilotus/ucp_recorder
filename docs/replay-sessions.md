@@ -16,7 +16,7 @@ The manifest moves through armed, recording and complete. Cancelled and failed s
 
 ## Simulation boundary
 
-Capture starts after the native Skirmish launch function initializes the game. Checkpoints observe the same point immediately before each simulation tick, independent of render-frame count. The ending state is the last observed boundary, not the later time at which an exit dialog runs. Future commands still queued when recording ends are excluded from the finalized stream.
+The native Skirmish launch callback requests capture; the starting save is taken at the first following simulation boundary. Checkpoints observe the same point immediately before each simulation tick, independent of render-frame count. The ending state is the last observed boundary, not the later time at which an exit dialog runs. Future commands still queued when recording ends are excluded from the finalized stream.
 
 Playback preflights all files, loads the native starting save, restores the full RNG structure, and checks the loaded tick and local player. The native scheduler receives recorded commands with their recorded execution tick. It must have a free slot; its inferred payload length must match the recorded length. At completion, all recorded commands must have been scheduled and observed returning from their native handlers. Ownership, dispatch order, actor, tick, category and payload are checked before execution. Verification covers two RNG values, two RNG indices and all 25 resource integers for players 1 through 8. Resource checks run after loading the starting save, at the periodic checkpoints and at the final boundary. This is **not a full world-state checksum**: units, buildings, economy variables outside these resource slots and private extension state need additional coverage.
 
@@ -24,7 +24,7 @@ The local single-player identity stays intact. New commands queued by a spectato
 
 ## Configuration compatibility
 
-Version 0.11.0 uses simulation profile `recorder-sp-v5`. It additionally compares
+Version 0.12.0 uses simulation profile `recorder-sp-v6`, adding mood-music RNG guards and capture at the first simulation boundary. It compares
 SHA-256 of all `0x9c50` bytes of the native RNG structure: current values, seed,
 stored arrays and indices. Checks run after restoration, every 64 ticks and at
 the ending boundary. A mismatch writes a `rng-state` diagnostic with its phase,
@@ -33,7 +33,7 @@ The recorder retains the last observed RNG bytes at each tick and hashes that
 retained state when finishing, rather than reading possibly reset state after
 quitting. Older experimental recordings require their original recorder version.
 
-Settings are captured when the module enables, not reread when the user begins a recording. Playback requires the captured configuration bytes and the resolved configuration/extension-version environment to match. A restart with the saved configuration is necessary when these differ. This stage does not relaunch automatically.
+Settings are captured when the module enables, not reread when the user begins a recording. Playback requires the captured configuration bytes and the resolved configuration/extension-version environment to match. A restart with the saved configuration is necessary when these differ; the replay browser offers an explicit settings restart, which still needs live verification.
 
 Version equality does not prove that unpacked extensions have identical source files, or that map assets and external resources are unchanged. No extension download, installation or version switching is performed. Replays are local test artifacts; native save/payload handling has not been audited as a parser for hostile downloaded files.
 

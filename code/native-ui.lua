@@ -33,9 +33,11 @@ end
 
 function M:text(label,x,y,alignment)
   label=tostring(label):gsub('[\r\n%z]',' '):sub(1,150)
-  core.writeString(self.textBuffer,label)
-  local color=core.readSmallInteger(self.sites.gold.value)%65536
-  self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,color,0,0,0)
+  core.writeString(self.textBuffer,label..'\0')
+  -- Font slots 0..14 are uninitialized in the HD menus. Slot 19 is the
+  -- game's 16-pixel antialiased font; text expects BGR24, unlike RGB15 borders.
+  self.textNative(self.sites.textManager.value,self.textBuffer,x+1,y+1,alignment or 0,0,19,0,0)
+  self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,0x9AD7E4,19,0,0)
 end
 
 function M:button(address,x,y,width,height,label,action,selected)

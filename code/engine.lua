@@ -37,6 +37,7 @@ function M.new(sites)
   e.loadNative=core.exposeCode(sites.load.address,1,0)
   e.buffer=core.allocate(1260,true)
   e.pathBuffer=core.allocate(512,true)
+  e.pathOverride=core.allocate(4,true)
   e.scope=core.allocate(4,true)
   M.resetCommands(e)
   return setmetatable(e,{__index=M})
@@ -92,10 +93,10 @@ function M:saveSnapshot(path)
   local oldName=core.readBytes(filename,1001)
   local oldProgress=core.readInteger(self.sites.packager+0x20)
   core.writeInteger(resource+0xbc4,1)
-  core.writeString(filename,path)
+  core.writeString(filename,path..'\0')
   core.writeInteger(self.sites.packager+0x20,0) -- no progress callback/audio during capture
   temporarily(function() self.saveNative(self.sites.packager,self.sites.sections) end,function()
-    core.writeBytes(filename,oldName) -- writeString would add a byte past this fixed array.
+    core.writeBytes(filename,oldName) -- Restore all bytes of the fixed native array.
     core.writeInteger(resource+0xbc4,oldType)
     core.writeInteger(self.sites.packager+0x20,oldProgress)
   end)
@@ -110,13 +111,15 @@ function M:loadSnapshot(path)
   local old={}
   for _,offset in ipairs({0x58,0x7c,0x80,0x884}) do old[offset]=core.readInteger(state+offset) end
   self.overridePath=path
-  core.writeString(self.pathBuffer,path)
+  core.writeString(self.pathBuffer,path..'\0')
   core.writeInteger(state+0x58,31) -- native Load action
   core.writeInteger(state+0x7c,1)
   core.writeInteger(state+0x80,0)
   core.writeInteger(state+0x884,0)
   self.loading=true
+  core.writeInteger(self.pathOverride,1)
   temporarily(function() self.loadNative(0) end,function()
+    core.writeInteger(self.pathOverride,0)
     self.loading=false
     self.overridePath=nil
     -- These four fields belong to the load dialog; preserve the game's menu transition.
@@ -196,16 +199,11 @@ function M:afterCommand(recorder)
 end
 
 function M:install(recorder)
-  local originalFileName, originalMapName, originalQueue
-  originalFileName=core.hookCode(function(this)
-    if self.overridePath and core.readInteger(this+0xbc4)==1 then return self.pathBuffer end
-    return originalFileName(this)
-  end,self.sites.fileName.address,1,1,#self.sites.fileName.bytes)
-  local dummy=core.allocate(16,true); core.writeString(dummy,'replay')
-  originalMapName=core.hookCode(function(this,index)
-    if self.overridePath then return dummy end
-    return originalMapName(this,index)
-  end,self.sites.mapName.address,2,1,#self.sites.mapName.bytes)
+  local originalQueue
+  local resources=require('code/resource-hooks')
+  resources.install(self.sites.fileName,self.pathOverride,self.pathBuffer,true)
+  local dummy=core.allocate(16,true); core.writeString(dummy,'replay\0')
+  resources.install(self.sites.mapName,self.pathOverride,dummy,false)
   originalQueue=core.hookCode(function(this,category)
     if recorder.mode=='play' and self:singlePlayer() and not self.loading then return 0 end
     return originalQueue(this,category)

@@ -28,6 +28,7 @@ function M.build(site,enabled,mode,seed,origin)
   labels.patched=#out; emit(0x9d)
   if site.patch=='cleanup' then emit(0x8d,0x64,0x24,0x2c) -- lea esp,[esp+44], no flag changes
   elseif site.patch=='taken' then rel({0xe9},site.target)
+  elseif site.patch=='equalFlags' then emit(0x39,0xc0) -- cmp eax,eax: take the following JGE without changing a register
   elseif site.patch=='fallthrough' then for i=3,#site.bytes do emit(site.bytes[i]) end
   elseif site.patch=='seed' then
     emit(0xb8); dword(out,seed)

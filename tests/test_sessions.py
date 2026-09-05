@@ -6,6 +6,26 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_start_callback_defers_snapshot_to_one_simulation_boundary(self):
+        self.check('''
+local r=session(); r:startRecording(); r:prepareRecording()
+assert(snapshots==0 and not r.active)
+now=1; r:onTick()
+assert(snapshots==1 and r.active and r.manifest.startTick==1)
+now=2; r:onTick(); assert(snapshots==1)
+r:reset(); r:startRecording(); r:prepareRecording(); r:reset()
+r:startRecording(); now=3; r:onTick()
+assert(snapshots==1 and not r.active and not r.capturePending)
+''')
+
+    def test_pending_snapshot_is_cancelled_by_multiplayer_transition(self):
+        self.check('''
+local r=session(); r:startRecording(); r:prepareRecording()
+engine.singlePlayer=function() return false end
+now=1; r:onTick()
+assert(snapshots==0 and not r.capturePending and r.mode=='none')
+''')
+
     def test_full_rng_array_mismatch_halts_at_checkpoint_and_ending_boundary(self):
         self.lua.globals().hash_string = lambda value: hashlib.sha256(value.encode()).hexdigest()
         self.check('''
