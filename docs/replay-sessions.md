@@ -24,7 +24,7 @@ The local single-player identity stays intact. New commands queued by a spectato
 
 ## Configuration compatibility
 
-Version 0.12.0 uses simulation profile `recorder-sp-v6`, adding mood-music RNG guards and capture at the first simulation boundary. It compares
+Version 0.14.0 uses simulation profile `recorder-sp-v7`, adding the [audited audio/UI RNG guards](presentation-rng.md) to the earlier mood-music guards and capture at the first simulation boundary. It compares
 SHA-256 of all `0x9c50` bytes of the native RNG structure: current values, seed,
 stored arrays and indices. Checks run after restoration, every 64 ticks and at
 the ending boundary. A mismatch writes a `rng-state` diagnostic with its phase,

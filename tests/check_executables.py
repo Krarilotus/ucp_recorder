@@ -1,4 +1,4 @@
-"""Optional original-binary validation. Requires lupa/capstone, no native writes."""
+"""Optional original-binary validation. Requires lupa/capstone/unicorn; no native writes."""
 from pathlib import Path
 import argparse
 import struct
@@ -62,6 +62,25 @@ def check(folder):
         scoped=lua.execute((root/'code/scoped-sites.lua').read_text())[name]
         guards={site['address'] for site in scoped.values() if site['name'].startswith('moodMusic')}
         assert len(calls)==7 and calls==guards, f'{name}: incomplete mood-music RNG guards'
+        # Entire audited audio functions, ending before their trailing jump tables.
+        # Count actual instructions, not byte patterns inside operands/data.
+        audio_functions = [
+            (0x44bce0,0x44bf10,0x701,{'ambientSound'}),
+            (0x471720,0x471940,0xcf,{'resourceSpeech'}),
+            (0x47a130,0x47a300,0x80,{'audioLaunch'}),
+            (0x47ab10,0x47ace0,0x424,{'battleMusic1','battleMusic2'}),
+            (0x47b890,0x47ba60,0x68d,{'ambientMusic'}),
+        ]
+        for shc,extreme,size,names in audio_functions:
+            start=shc if name=='SHC' else extreme
+            instructions=list(Cs(CS_ARCH_X86,CS_MODE_32).disasm(reader(start,size),start))
+            assert instructions[-1].address+instructions[-1].size==start+size
+            calls={i.address for i in instructions if i.bytes[0]==0xe8 and len(i.bytes)==5
+                and i.address+5+struct.unpack('<i',i.bytes[1:])[0]==rng_call}
+            guards={s['address'] for s in scoped.values() if s['name'] in names}
+            assert len(calls)==len(names) and calls==guards, f'{name}: incomplete {names} RNG guards'
+        from check_presentation_native import check_heads_placement
+        check_heads_placement(reader,lua,name,scoped)
         print(f'PASS: {name} native patch sites, RNG fields, player layout and menu reference')
 
 

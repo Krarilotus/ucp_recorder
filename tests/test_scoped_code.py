@@ -42,12 +42,15 @@ class ScopedCodeTests(unittest.TestCase):
             gate=bytes(self.emitter.build(site,scope,mode_pointer,123,0x4000000).values())
             machine.mem_write(0x4000000,gate)
             machine.mem_write(site['address'],bytes(self.emitter.jump(site['address'],0x4000000,len(original)).values()))
-        if site['kind']=='call':
+        if site['kind'] in ('call','tail'):
             ret=b'\xc2\x2c\0' if site['patch']=='cleanup' else b'\xc3'
             machine.mem_write(site['target'],b'\xff\x05'+struct.pack('<I',counter)+b'\xb8\x01\0\0\0'+ret)
         initial=[0x500000,0x600010,0x600000,0x20,0x600000,0xabcdef00,0x410f000,0x4108000,flags]
         for register,value in zip(REGS,initial): machine.reg_write(register,value)
         stops={site['address']+len(original)}
+        if site['kind']=='tail':
+            put(initial[7],0x4f1000)
+            stops.add(0x4f1000)
         if site['kind']=='branch': stops.add(site['target'])
         if site['patch']=='tick': stops.add(site['skipTick'])
         def stop(uc,address,size,data):
@@ -77,6 +80,11 @@ class ScopedCodeTests(unittest.TestCase):
                         if site['patch']=='seed': self.assertEqual(result[-1],123)
                         if site['patch']=='taken': self.assertEqual(result[-3],site['target'])
                         if site['patch']=='cleanup': self.assertEqual(result[7],0x4108000+44)
+                        if site['patch']=='return':
+                            self.assertEqual(result[-3],0x4f1000)
+                            self.assertEqual(result[7],0x4108004)
+                            self.assertEqual(result[:7],(0x500000,0x600010,0x600000,0x20,0x600000,0xabcdef00,0x410f000))
+                            self.assertEqual(result[8],0x202)
 
     def test_multiplayer_tick_ignores_stale_halt_and_does_not_call_recorder(self):
         engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())

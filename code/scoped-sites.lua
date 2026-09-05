@@ -1,6 +1,14 @@
 -- Complete instructions for scope-gated simulation changes.
 return {
   SHC = {
+    {name="headsSelection",address=0x00444868,kind="call",patch="skip",bytes={232,147,95,2,0}, target=0x0046A800},
+    {name="headsNextPreview",address=0x00445777,kind="tail",patch="return",bytes={233,132,80,2,0}, target=0x0046A800},
+    {name="ambientSound",address=0x0044C272,kind="call",patch="skip",bytes={232,137,229,1,0}, target=0x0046A800},
+    {name="resourceSpeech",address=0x0047176B,kind="call",patch="skip",bytes={232,144,144,255,255}, target=0x0046A800},
+    {name="audioLaunch",address=0x0047A157,kind="call",patch="skip",bytes={232,164,6,255,255}, target=0x0046A800},
+    {name="battleMusic1",address=0x0047AE06,kind="call",patch="skip",bytes={232,245,249,254,255}, target=0x0046A800},
+    {name="battleMusic2",address=0x0047AE5C,kind="call",patch="skip",bytes={232,159,249,254,255}, target=0x0046A800},
+    {name="ambientMusic",address=0x0047BE45,kind="call",patch="skip",bytes={232,182,233,254,255}, target=0x0046A800},
     {name="moodMusic1",address=0x0047A34A,kind="call",patch="skip",bytes={232,177,4,255,255}, target=0x0046A800},
     {name="moodMusic2",address=0x0047A3B0,kind="call",patch="skip",bytes={232,75,4,255,255}, target=0x0046A800},
     {name="moodMusic3",address=0x0047A3CF,kind="call",patch="skip",bytes={232,44,4,255,255}, target=0x0046A800},
@@ -20,6 +28,14 @@ return {
     {name="seed",address=0x0046A74A,kind="seed",patch="seed",bytes={131,196,4,137,70,4}},
   },
   Extreme = {
+    {name="headsSelection",address=0x00444A98,kind="call",patch="skip",bytes={232,131,95,2,0}, target=0x0046AA20},
+    {name="headsNextPreview",address=0x004459A7,kind="tail",patch="return",bytes={233,116,80,2,0}, target=0x0046AA20},
+    {name="ambientSound",address=0x0044C4A2,kind="call",patch="skip",bytes={232,121,229,1,0}, target=0x0046AA20},
+    {name="resourceSpeech",address=0x0047198B,kind="call",patch="skip",bytes={232,144,144,255,255}, target=0x0046AA20},
+    {name="audioLaunch",address=0x0047A327,kind="call",patch="skip",bytes={232,244,6,255,255}, target=0x0046AA20},
+    {name="battleMusic1",address=0x0047AFD6,kind="call",patch="skip",bytes={232,69,250,254,255}, target=0x0046AA20},
+    {name="battleMusic2",address=0x0047B02C,kind="call",patch="skip",bytes={232,239,249,254,255}, target=0x0046AA20},
+    {name="ambientMusic",address=0x0047C015,kind="call",patch="skip",bytes={232,6,234,254,255}, target=0x0046AA20},
     {name="moodMusic1",address=0x0047A51A,kind="call",patch="skip",bytes={232,1,5,255,255}, target=0x0046AA20},
     {name="moodMusic2",address=0x0047A580,kind="call",patch="skip",bytes={232,155,4,255,255}, target=0x0046AA20},
     {name="moodMusic3",address=0x0047A59F,kind="call",patch="skip",bytes={232,124,4,255,255}, target=0x0046AA20},

@@ -26,7 +26,8 @@ function M.build(site,enabled,mode,seed,origin)
   compare(mode,0); rel({0x0f,0x84},'patched')
   compare(mode,99); rel({0x0f,0x85},'original')
   labels.patched=#out; emit(0x9d)
-  if site.patch=='cleanup' then emit(0x8d,0x64,0x24,0x2c) -- lea esp,[esp+44], no flag changes
+  if site.patch=='return' then emit(0xc3) -- suppressed tail call: return to the original caller
+  elseif site.patch=='cleanup' then emit(0x8d,0x64,0x24,0x2c) -- lea esp,[esp+44], no flag changes
   elseif site.patch=='taken' then rel({0xe9},site.target)
   elseif site.patch=='equalFlags' then emit(0x39,0xc0) -- cmp eax,eax: take the following JGE without changing a register
   elseif site.patch=='fallthrough' then for i=3,#site.bytes do emit(site.bytes[i]) end
@@ -51,6 +52,7 @@ function M.build(site,enabled,mode,seed,origin)
     emit(0x61,0x9d)
   end
   if site.kind=='call' then rel({0xe8},site.target)
+  elseif site.kind=='tail' then rel({0xe9},site.target)
   elseif site.kind=='branch' then
     rel({0x0f,site.condition},site.target)
     for i=3,#site.bytes do emit(site.bytes[i]) end

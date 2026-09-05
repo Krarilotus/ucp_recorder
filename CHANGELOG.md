@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.0
+
+- Prevent resource-warning speech, ambient sound selection, audio initialization and battle/ambient music from advancing the simulation RNG during single-player recording and playback. These paths depend on local UI, audio or wall-clock activity that the command stream does not reproduce.
+- Isolate RNG advances when selecting heads-on-spikes and choosing the next placement preview. Preserve the queued placement command, including its selected variant, and the preview update.
+- Handle the native placement handler's tail jump explicitly: active sessions return to its caller; idle and multiplayer paths still jump to the original RNG function with the original stack and flags.
+- Use simulation profile `recorder-sp-v7`. Older recordings need their original module version. Reusing the current RNG value can reduce audio/preview variety; these changes do not alter normal multiplayer behavior or enable multiplayer replay.
+
+Validation: 112 automated tests, exact hook-byte and audited audio-function call coverage checks on both original executables, plus 56 native placement-tail emulation cases per variant checking command contents, preview, RNG state, saved registers and return stack. No new live test is claimed. See [evidence and remaining gaps](docs/presentation-rng.md).
+
 ## 0.13.0
 
 - Capture locally queued multiplayer payloads before native transmission; these do not pass through the received-command copy hook and were previously reported as untracked.
