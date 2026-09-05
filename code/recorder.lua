@@ -1,3 +1,4 @@
+local native = require("code/native")
 --[[
 Replay implementation
 --]]
@@ -180,7 +181,7 @@ function Recorder:loadInfo()
 end
 
 function Recorder:ScheduleCommandWrapper(commandCategory, player, time, address)
-  self._scheduleCommand(0x191d768, commandCategory, player, time, address)
+  self._scheduleCommand(native.addr(0x191d768), commandCategory, player, time, address)
 end
 
 function Recorder:scheduleCommand(command)
@@ -227,15 +228,15 @@ function Recorder:consumeSavedCommand()
   return c
 end
 
--- 0x004428b5 SHC
+-- native.addr(0x004428b5) SHC
 function Recorder:onStartSkirmish(registers) -- SINGLEPLAYER ONLY (TODO make this work for multiplayer too)
 	if core.readInteger(self.commandRecorderState) == self.RECORDER_STATES.RECORD then
-		local gameRNG1index = core.readInteger(0x01a3160c)
-		local gameRNG2index = core.readInteger(0x01a31608)
-		local gameRNG1 = core.readSmallInteger(0x01a279c0)
-		local gameRNG2 = core.readSmallInteger(0x01a279c2)
+		local gameRNG1index = core.readInteger(native.addr(0x01a3160c))
+		local gameRNG2index = core.readInteger(native.addr(0x01a31608))
+		local gameRNG1 = core.readSmallInteger(native.addr(0x01a279c0))
+		local gameRNG2 = core.readSmallInteger(native.addr(0x01a279c2))
 		local mapSeed = self.mapSeed
-		local matchSeed = core.readInteger(0x01a279c4)
+		local matchSeed = core.readInteger(native.addr(0x01a279c4))
 
 		self:saveInfo(0, mapSeed, matchSeed, gameRNG1, gameRNG2, gameRNG1index, gameRNG2index)
 
@@ -244,24 +245,24 @@ function Recorder:onStartSkirmish(registers) -- SINGLEPLAYER ONLY (TODO make thi
 
 	elseif core.readInteger(self.commandRecorderState) == self.RECORDER_STATES.PLAYBACK then
 		local skirmishInfo = self:loadInfo()
-		local populateRNG1040 = core.exposeCode(0x0046a760, 1, 1)
+		local populateRNG1040 = core.exposeCode(native.addr(0x0046a760), 1, 1)
 
 		-- Set SEC_CurrentPlayerSlotID to 0 (Disallows actions during playback) TODO move this
 		print("recorder in Playback state")
-		--core.writeInteger(0x01a275dc, 0)
+		--core.writeInteger(native.addr(0x01a275dc), 0)
 
 		-- Load mapSeed and fill RNG table
-		core.writeInteger(0x01a279c4, skirmishInfo.mapSeed)
-		populateRNG1040(0x01a279c0);
+		core.writeInteger(native.addr(0x01a279c4), skirmishInfo.mapSeed)
+		populateRNG1040(native.addr(0x01a279c0));
 
 		-- Load matchSeed (populateRNG1040() is called later in LaunchGame() after the map is setup)
-		core.writeInteger(0x01a279c4, skirmishInfo.matchSeed)
+		core.writeInteger(native.addr(0x01a279c4), skirmishInfo.matchSeed)
 
 		-- Load starting RNG values
-		core.writeInteger(0x01a3160c, skirmishInfo.RNGindex1)
-		core.writeInteger(0x01a31608, skirmishInfo.RNGindex2)
-		core.writeSmallInteger(0x01a279c0, skirmishInfo.RNGvalue1)
-		core.writeSmallInteger(0x01a279c2, skirmishInfo.RNGvalue2)
+		core.writeInteger(native.addr(0x01a3160c), skirmishInfo.RNGindex1)
+		core.writeInteger(native.addr(0x01a31608), skirmishInfo.RNGindex2)
+		core.writeSmallInteger(native.addr(0x01a279c0), skirmishInfo.RNGvalue1)
+		core.writeSmallInteger(native.addr(0x01a279c2), skirmishInfo.RNGvalue2)
 
 		print("Loaded skirmish information:")
 		print(string.format("Gametype=%d, mapSeed=%d, matchSeed=%d, gameRNG1=%d, gameRNG2=%d, gameRNG1index=%d, gameRNG2index=%d", skirmishInfo.gameType, skirmishInfo.mapSeed, skirmishInfo.matchSeed, skirmishInfo.RNGvalue1, skirmishInfo.RNGvalue2, skirmishInfo.RNGindex1, skirmishInfo.RNGindex2))
@@ -270,20 +271,20 @@ function Recorder:onStartSkirmish(registers) -- SINGLEPLAYER ONLY (TODO make thi
   return registers
 end
 
--- 0x00442877 SHC
+-- native.addr(0x00442877) SHC
 function Recorder:onBeforeSetMatchSeed(registers) -- SINGLEPLAYER ONLY (TODO make this work for multiplayer too)
-  self.mapSeed = core.readInteger(0x01a279c4)
-	local setTimeBasedSeed = core.exposeCode(0x0046a740, 1, 1)
+  self.mapSeed = core.readInteger(native.addr(0x01a279c4))
+	local setTimeBasedSeed = core.exposeCode(native.addr(0x0046a740), 1, 1)
 
   -- original code
-  setTimeBasedSeed(0x01a279c0)
+  setTimeBasedSeed(native.addr(0x01a279c0))
   return registers
 end
 
--- 0x0042bf4c SHC
+-- native.addr(0x0042bf4c) SHC
 function Recorder:onCustomSkirmishGame(registers) -- SINGLEPLAYER ONLY (TODO test if playerIDs work fine in multiplayer)
   -- Make singleplayer skirmishes use real playerID for commands, not -1
-  local DAT_QueuedCommandPlayer = 0x191de0c
+  local DAT_QueuedCommandPlayer = native.addr(0x191de0c)
   core.writeInteger(DAT_QueuedCommandPlayer, 01) -- In Singleplayer multiplayerID is always 01
   return registers
 end
@@ -298,7 +299,7 @@ function Recorder:scheduleNextCommand(registers)
     return
   end
 
-  print(string.format("Matchtime now: %d", core.readInteger(0x01fe7da8)))
+  print(string.format("Matchtime now: %d", core.readInteger(native.addr(0x01fe7da8))))
   print(string.format("Scheduling the command: Command<type=%d,time=%d,address=%X,size=%d,multiplayerID=%d>", c.commandCategory, c.time, self.commandDataAddress, c.size, c.player))
   self:scheduleCommand(c)
 
@@ -343,7 +344,7 @@ function Recorder:onReceiveAllTransmittedCommandsASM(scheduleNextCommandAddress)
     endOfFunction:
   ]], {
     commandRecorderState = self.commandRecorderState,
-    SEC_MatchTime = 0x01fe7da8,
+    SEC_MatchTime = native.addr(0x01fe7da8),
     nextUpCommandTimeAddress = self.nextUpCommandTimeAddress,
     scheduleNextCommandAddress = scheduleNextCommandAddress,
   })
@@ -364,7 +365,7 @@ function Recorder:onTransmitCommand(registers)
   local address = core.readInteger(registers.ESP + 12)
   local size = core.readInteger(registers.ESP + 16)
   -- local idTo = core.readInteger(registers.ESP + 20)
-  local player = core.readInteger(0x0191de0c)
+  local player = core.readInteger(native.addr(0x0191de0c))
   print(string.format("Transmitted Command<type=%d,time=%d,address=%X,size=%d,multiplayerID=%d>", commandCategory, time, address, size, player))
 
   self:onCommand(commandCategory, time, address, size, player)
@@ -376,7 +377,7 @@ function Recorder:onScheduleCommand(registers)
   local player = core.readInteger(registers.ESP + 8 + 0x10)
   local time = core.readInteger(registers.ESP + 12 + 0x10)
   local address = core.readInteger(registers.ESP + 16 + 0x10)
-  local size = core.readInteger(0x0194af98)
+  local size = core.readInteger(native.addr(0x0194af98))
   print(string.format("Received Command<type=%d,time=%d,address=%X,size=%d,multiplayerID=%d>", commandCategory, time, address, size, player))
 
   self:onCommand(commandCategory, time, address, size, player)
@@ -393,11 +394,11 @@ end
 
 function Recorder:syncCheck(registers, traceF)
   local actual = {
-    time = core.readInteger(0x01fe7da8),
-    rng1 = core.readSmallInteger(0x01a279c0),
-    rng2 = core.readSmallInteger(0x01a279c2),
-    index1 = core.readInteger(0x01a3160c),
-    index2 = core.readInteger(0x01a31608),
+    time = core.readInteger(native.addr(0x01fe7da8)),
+    rng1 = core.readSmallInteger(native.addr(0x01a279c0)),
+    rng2 = core.readSmallInteger(native.addr(0x01a279c2)),
+    index1 = core.readInteger(native.addr(0x01a3160c)),
+    index2 = core.readInteger(native.addr(0x01a31608)),
     extra = {},
   }
   if traceF then actual.extra["ra" .. traceF] = core.readInteger(registers.ESP) end

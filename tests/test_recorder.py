@@ -48,6 +48,8 @@ io.open = function(path,mode)
   return handle
 end
 os.remove=function(path) files[path]=nil; return true end
+realNative = require('code/native')
+realNative.profile={addresses=setmetatable({}, {__index=function(_,a) return a end})}
 Recorder = require('code/recorder')
 function fixture(name)
   local r=Recorder:new({name=name,rngLogMethod='trace'})
@@ -128,7 +130,7 @@ assert(memory[r.commandRecorderState]==0 and memory[r.rngRecorderState]==0)
 
     def test_real_init_callbacks_return_register_changes(self):
         self.check('''
-package.loaded['code/native']={verify=function() end}
+package.loaded['code/native']={verify=function() end,addr=function(a) return a end}
 local module=dofile(source_root..'/init.lua')
 module:enable({rngLogMethod='trace',useFixedSeed=true,fixedSeed=123})
 assert(callbacks[0x46a74a]({EAX=456}).EAX==123)

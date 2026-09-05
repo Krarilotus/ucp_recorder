@@ -1,7 +1,8 @@
+local native = require("code/native")
 local menuItemSize = 0x50
 
 local originalMenuItemArraySize = 0x1D10
-local originalMenuItemArrayAddress = 0x005e9848
+local originalMenuItemArrayAddress = native.addr(0x005e9848)
 
 local newSize = originalMenuItemArraySize + 2 * menuItemSize -- 2 additional MenuItems
 local newMenuItemArrayAddress = core.allocate(newSize, true)
@@ -33,7 +34,7 @@ local placeRecordButton = function(recorder)
 		core.writeInteger(newItem1Address + 16, 80) -- height
 		core.writeInteger(newItem1Address + 20, utils.createLuaFunctionWrapper(recordButtonCallback)) --
 		core.writeInteger(newItem1Address + 24, 2) -- callbackParam
-		core.writeInteger(newItem1Address + 28, 0x0042AE90) -- renderFunc
+		core.writeInteger(newItem1Address + 28, native.addr(0x0042AE90)) -- renderFunc
 		core.writeInteger(newItem1Address + 32, 0x4000023A) -- unkown | buttonGraphic 23A off 239 on
 		core.writeInteger(newItem1Address + 36, 0x00000003) -- unknown
 		core.writeInteger(newItem1Address + 40, 0x00000000) -- unknown
@@ -66,7 +67,7 @@ local placePlaybackButton = function(recorder)
 		core.writeInteger(newItem2Address + 16, 80) -- height
 		core.writeInteger(newItem2Address + 20, utils.createLuaFunctionWrapper(playbackButtonCallback)) --
 		core.writeInteger(newItem2Address + 24, 2) -- callbackParam
-		core.writeInteger(newItem2Address + 28, 0x0042AE90) -- renderFunc
+		core.writeInteger(newItem2Address + 28, native.addr(0x0042AE90)) -- renderFunc
 		core.writeInteger(newItem2Address + 32, 0x4000023A) -- unkown | buttonGraphic 23A off 239 on
 		core.writeInteger(newItem2Address + 36, 0x00000003) -- unknown
 		core.writeInteger(newItem2Address + 40, 0x00000000) -- unknown
@@ -90,7 +91,7 @@ return {
 		placePlaybackButton(recorder)
 
 		-- overwrite reference
-		core.writeCode(0x0059AB30, { core.AssemblyLambda([[
+		core.writeCode(native.addr(0x0059AB30), { core.AssemblyLambda([[
 			push newMenuItemArrayAddress
 		]],
 		{ newMenuItemArrayAddress = newMenuItemArrayAddress, }) })
