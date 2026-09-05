@@ -139,7 +139,7 @@ function M:install(recorder)
   end,self.sites.queue.address,2,1,#self.sites.queue.bytes)
   -- Replace exactly MOV EAX,[ESI+commandSize] before the timed payload copy.
   -- A corrupt record cannot cause a native read beyond its declared payload.
-  core.writeBytes(self.sites.copySize.address,{0x90,0x90,0x90,0x90,0x90,0x90})
+  core.writeCode(self.sites.copySize.address,{0x90,0x90,0x90,0x90,0x90,0x90})
   core.detourCode(function(registers)
     local size=core.readInteger(registers.ESI+0x2d830)
     if self.expectedSize and registers.EDX==self.buffer and size~=self.expectedSize then

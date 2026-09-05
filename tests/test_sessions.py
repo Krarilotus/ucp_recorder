@@ -153,3 +153,17 @@ local c=command(); c.commandCategory=119
 assert(not pcall(validation.sessionCommand,c,{player=1,variant='SHC'}))
 assert(pcall(validation.sessionCommand,c,{player=1,variant='Extreme'}))
 ''')
+
+    def test_rejected_preflight_does_not_halt_a_later_normal_match(self):
+        self.check('''
+local r=session()
+assert(not r:guard(function() error('damaged recording before native load') end))
+assert(r.mode=='none' and memory[r.halt]==0 and not paused)
+''')
+
+    def test_failed_native_load_halts_even_before_playback_becomes_active(self):
+        self.check('''
+local r=session(); r.mode='play'; r.status='loading'; r.active=false
+assert(not r:guard(function() error('load failed after native changes') end))
+assert(memory[r.halt]==1 and paused)
+''')

@@ -15,10 +15,11 @@ end
 function Session:guard(callback)
   local ok, reason=xpcall(callback,debug.traceback)
   if not ok then
-    if self.status=='error' then return false end -- retain the first failure
+    if self.status=='error' and (self.active or self.mode~='none') then return false end -- retain the first session failure
     self.status='error'; self.error=tostring(reason)
-    core.writeInteger(self.halt,1)
-    if self.active then self.engine:pause() end
+    local stopSimulation=self.active or self.mode=='play'
+    core.writeInteger(self.halt,stopSimulation and 1 or 0)
+    if stopSimulation then self.engine:pause() end
     print('Replay stopped: ' .. self.error)
     if self.manifest then
       pcall(store.write,store.path(self.manifest.id)..'/last-error.txt',self.error)
