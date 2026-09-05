@@ -152,3 +152,49 @@ engine:resetCommands(); assert(before().EDX==0)
 memory[engine.base+0x618]=1; bytes[address+8]=200
 assert(before().EDX==-56) -- original signed-byte conversion, no replay policy in MP
 ''')
+
+    def test_custom_receive_buffer_is_staged_and_restored_on_success_and_failure(self):
+        self.check('''
+local address=engine.base+0xcdc
+for i=0,1260 do bytes[address+i]=42 end
+local c=command(10); c.commandCategory=122; c.size=272; c.data='83000000'..string.rep('00',268)
+for _,fail in ipairs({false,true}) do
+ engine:resetCommands()
+ engine.schedule=function()
+  assert(bytes[address]==131 and bytes[address+1]==0 and bytes[address+1259]==0)
+  assert(bytes[address+1260]==42)
+  if fail then error('receive callback failed') end
+ end
+ local ok=pcall(function() engine:scheduleCommand(c) end)
+ assert(ok~=fail and not engine.expectedSize)
+ for i=0,1260 do assert(bytes[address+i]==42) end
+ assert(engine:commandsPending()==not fail)
+end
+''')
+
+    def test_save_wrapper_acceptance_requires_known_extension_and_preserved_tail(self):
+        self.check('''
+realNative.profile.name='SHC'
+for _,site in pairs(engine.sites) do
+ if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
+end
+assert(Engine.verify())
+bytes[engine.sites.save.address]=0xE9
+assert(not pcall(Engine.verify))
+allActiveExtensions={{name='map-extensions',version='1.0.0'}}; modules={['map-extensions']={}}
+assert(Engine.verify())
+bytes[engine.sites.save.address+5]=0
+assert(not pcall(Engine.verify))
+''')
+
+    def test_protocol_must_install_its_dispatch_before_recorder(self):
+        self.check('''
+realNative.profile.name='SHC'
+for _,site in pairs(engine.sites) do
+ if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
+end
+allActiveExtensions={{name='protocol',version='1.0.0'}}
+local ok,reason=pcall(Engine.verify)
+assert(not ok and tostring(reason):find('after protocol',1,true))
+bytes[engine.sites.execute.address+8]=0xE9; assert(Engine.verify())
+''')

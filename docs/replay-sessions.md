@@ -30,7 +30,7 @@ Version equality does not prove that unpacked extensions have identical source f
 
 ## Unsupported cases
 
-Multiplayer capture/playback, resynchronization packets, lobby commands, native save/load commands, unknown extension commands and cross-variant playback are excluded. Unsupported commands during recording fail the capture with an error instead of silently omitting actions. Game speed and pause behaviour, automated actions, native save/load RNG side effects, repeated playback, match-end transitions and Extreme matches still require live verification.
+Multiplayer capture/playback, resynchronization packets, lobby commands, native save/load commands, unknown extension commands (except the explicit Automarket 1.1.0 adapter) and cross-variant playback are excluded. Unsupported commands during recording fail the capture with an error instead of silently omitting actions. Game speed and pause behaviour, automated actions, native save/load RNG side effects, repeated playback, match-end transitions and Extreme matches still require live verification.
 
 ## Native evidence
 

@@ -41,8 +41,12 @@ for _,id in ipairs({14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
 
 function M.sessionCommand(command, manifest)
   M.command(command)
-  assert(gameplay[command.commandCategory],
+  if command.commandCategory==122 then
+    require('code/automarket-replay').command(command,manifest.automarket)
+  else
+    assert(gameplay[command.commandCategory],
     'Unsupported replay command category '..command.commandCategory..' (save/load and network commands are excluded)')
+  end
   assert(command.commandCategory~=119 or manifest.variant=='Extreme','Tactical powers require Extreme')
   assert(command.player==manifest.player,'Replay command uses a different player slot')
   return command
@@ -58,6 +62,7 @@ end
 
 function M.manifest(value)
   assert(type(value)=='table','Invalid replay manifest')
+  require('code/automarket-replay').descriptor(value.automarket)
   M.integer(value.player,1,8,'player slot')
   M.integer(value.startTick,0,2147483647,'starting tick')
   M.integer(value.lastTick,value.startTick,2147483647,'ending tick')

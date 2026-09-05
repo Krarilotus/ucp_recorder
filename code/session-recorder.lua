@@ -38,7 +38,9 @@ end
 function Session:startRecording()
   assert(self.mode=='none','A replay session is already active')
   assert(self.engine:singlePlayer(),'Recording currently supports single-player Skirmish')
+  local automarket=require('code/automarket-replay').current()
   self.manifest=store.new(native.profile)
+  self.manifest.automarket=automarket
   self:setName(store.path(self.manifest.id)..'/stream')
   self:openFiles('w')
   self.mode='record'; self.status='armed'; self.active=false

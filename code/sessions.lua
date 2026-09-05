@@ -163,6 +163,7 @@ end
 function M.compatible(manifest)
   local current=M.settings()
   return current.hash==manifest.settingsHash and current.environmentHash==manifest.environmentHash
+    and require('code/automarket-replay').compatible(manifest.automarket)
 end
 
 M.read, M.write = read, write

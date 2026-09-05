@@ -11,11 +11,19 @@ end
 
 function M.verify()
   local sites = assert(allSites[native.profile.name])
+  local adapter=require('code/automarket-replay')
+  if adapter.version('protocol') then
+    assert(core.readByte(sites.execute.address+8)==0xE9,
+      'Enable recorder after protocol in the UCP extension order')
+  end
   for name, site in pairs(sites) do
     if type(site)=='table' then
       local actual=core.readBytes(site.address, #site.bytes)
+      -- map-extensions wraps this callable entry to include extension save data.
+      -- We call that entry, never bypass or overwrite its five-byte hook.
+      local wrappedSave=name=='save' and adapter.saveHookAvailable() and actual[1]==0xE9
       for i, value in ipairs(site.bytes) do
-        assert(actual[i]==value, 'Recorder session hook conflicts at ' .. name)
+        assert((wrappedSave and i<=5) or actual[i]==value, 'Recorder session hook conflicts at ' .. name)
       end
     end
   end
@@ -117,9 +125,20 @@ function M:scheduleCommand(command)
   local slot=core.readInteger(self.base+self.sites.writeIndexOffset)
   self.expectedSize=command.size
   self.copyError=nil
+  -- protocol 1.0.0's receive callback reads this native packet buffer even when
+  -- the scheduler was given a different pointer. Restore it after the copy.
+  local received=self.base+0xcdc
+  local oldReceived
+  if command.commandCategory==122 then
+    oldReceived=core.readBytes(received,1260)
+    core.writeBytes(received,bytes)
+  end
   temporarily(function()
     self.schedule(self.base,command.commandCategory,command.player,command.time,self.buffer)
-  end,function() self.expectedSize=nil end)
+  end,function()
+    if oldReceived then core.writeBytes(received,oldReceived) end
+    self.expectedSize=nil
+  end)
   if self.copyError then
     core.writeByte(self.base+0x3c67c+slot*1272+9,10)
     error(self.copyError)

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Add an explicit Automarket 1.1.0 adapter for settings commits through protocol 1.0.0. Validate the registered protocol number, payload size, owning player, fee and Boolean fields. Unknown custom protocols remain excluded.
+- Stage replay parameters in protocol's native receive buffer and restore that buffer after success or failure.
+- Preserve Map Extensions 1.0.0's save wrapper so the starting save follows its custom-state serialization path. Require recorder to load after protocol before modifying dispatch code.
+- Include the Automarket adapter and protocol registration in replay compatibility checks. Weekly automatic trades continue through the simulation without duplicate replay injection.
+
+Validation: 73 automated tests, Lua syntax checks and original-executable checks for both variants. The adapter, custom save restoration and actual automated trades still require live testing; this is not a multiplayer replay release.
+
 ## 0.6.0
 
 - Capture timed commands when their native handlers return, including inputs delivered directly to the received-command scheduler. Record their actual execution tick and resolved actor.
