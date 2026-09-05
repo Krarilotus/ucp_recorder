@@ -136,6 +136,7 @@ local sites=require('code/engine-sites').SHC
 for _,site in pairs(sites) do
  if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
 end
+for _,site in pairs(require('code/ui-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 core.hookCode=function() return function() return 0 end end
 core.writeString=function() end
 core.callTo=function() return {} end

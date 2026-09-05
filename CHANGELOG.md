@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Replace temporary Skirmish checkboxes with labelled **Record next match** and **Replays** controls.
+- Add a paged replay picker using the game's native red frame, text and input handling. Show session status, tick duration and settings compatibility before playback.
+- Add **Queue settings restart**: a hidden helper waits for the current game to exit, verifies the executable and saved configuration, and restarts with that configuration. The normal UCP configuration stays unchanged.
+- Preselect the requested replay when opening the browser after a queued restart.
+- Check native UI entry points separately for Crusader and Extreme; avoid overwriting existing modal IDs or writing past menu arrays.
+- Keep rejected preflight checks from freezing a later normal match, while pausing after a failed native playback load.
+
+Validation: 53 tests, including Windows helper tests with process waiting/launching replaced by fakes and emulation of the 32-bit Windows call wrappers; original-binary checks for both games. Native rendering, input handling and the real restart remain **pending live testing**, together with the full replay test from 0.3.0. No game was launched by these automated tests.
+
 ## 0.3.0
 
 - Store each recording in its own folder with a starting save, full RNG state, UCP configuration, resolved settings and extension versions.
@@ -10,7 +21,7 @@
 - Publish completed recordings only after closing and validating their streams. Cancelled or failed captures remain distinguishable.
 - Restore temporary save/load dialog state and filenames after errors; never overwrite an earlier recording.
 
-Validation: 34 portable regression tests and native-site checks against Crusader and Extreme. The new starting-save capture and playback path has **not yet passed an end-to-end in-game test**. This is a review/test build, single-player only. Save/load and network commands are unsupported during capture; encountering one marks the capture failed. Replay browsing and settings relaunch follow separately.
+Validation: 36 portable regression tests and native-site checks against Crusader and Extreme. The new starting-save capture and playback path has **not yet passed an end-to-end in-game test**. This is a review/test build, single-player only. Save/load and network commands are unsupported during capture; encountering one marks the capture failed. Replay browsing and settings relaunch follow separately.
 
 ## 0.2.0
 

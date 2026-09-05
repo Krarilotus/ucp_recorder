@@ -1,111 +1,62 @@
-local native = require("code/native")
-local menuItemSize = 0x50
+local native=require('code/native')
+local NativeUI=require('code/native-ui')
+local Browser=require('code/browser')
+local M={}
 
-local originalMenuItemArraySize = 0x1D10
-local originalMenuItemArrayAddress = native.addr(0x005e9848)
+function M.createButtons(recorder,sites)
+  local browser=Browser:new(recorder)
+  local ui=NativeUI.new(sites,function(reason)
+    browser.message=tostring(reason):match('^[^\n]+'):gsub('^.-:%d+: ','')
+    print('Replay menu: '..tostring(reason))
+  end)
+  M.browser=browser
+  local items={}
+  local function button(x,y,width,label,action,selected)
+    items[#items+1]={x=x,y=y,width=width,height=30,label=label,action=action,selected=selected}
+  end
+  for row=0,Browser.PAGE_SIZE-1 do
+    local offset=row
+    button(24,76+row*36,632,function() return browser:row(browser:firstRow()+offset) end,
+      function() browser:select(browser:firstRow()+offset) end,
+      function() return browser.index==browser:firstRow()+offset end)
+  end
+  button(24,376,86,'Previous',function() browser:page(-1) end)
+  button(114,376,62,'Next',function() browser:page(1) end)
+  button(180,376,80,'Refresh',function() browser:refresh() end)
+  button(274,376,66,'Close',function() ui:close() end)
+  button(364,376,90,'Play',function()
+    if browser:play() then ui:close()
+    elseif recorder.error then browser.message=recorder.error:match('^[^\n]+'):gsub('^.-:%d+: ','') end
+  end)
+  button(466,376,190,'Queue settings restart',function() browser:restart() end)
+  local dialog=ui:modal(items,#items,680,440,function(x,y)
+    ui:text('Recorded Skirmishes',x+24,y+22)
+    ui:text(native.profile.name..'  |  '..#browser.items..' recordings',x+24,y+46)
+    local item=browser.items[browser.index]
+    ui:text(item and ('Selected: '..item.id) or 'Record your next match from the Skirmish lobby.',x+24,y+310)
+    ui:text(browser.message,x+24,y+336)
+  end)
 
-local newSize = originalMenuItemArraySize + 2 * menuItemSize -- 2 additional MenuItems
-local newMenuItemArrayAddress = core.allocate(newSize, true)
-
-local newItem1Address = newMenuItemArrayAddress + newSize - 3 * menuItemSize
-local newItem2Address = newMenuItemArrayAddress + newSize - 2 * menuItemSize
-local newTerminatorAddress = newMenuItemArrayAddress + newSize - 1 * menuItemSize
-
-local placeRecordButton = function(recorder)
-		-- init button
-
-		local recordButtonCallback = function()
-			if recorder.mode == "none" then
-				recorder:startRecording()
-				core.writeInteger(newItem1Address + 32, 0x40000239) -- buttonGraphic
-				print("Starting new recording!")
-			elseif recorder.mode == "record" then
-				recorder:stopRecording()
-				recorder:discardFiles()
-				core.writeInteger(newItem1Address + 32, 0x4000023A) -- buttonGraphic
-				print("discarded")
-			end
-		end
-
-		core.writeInteger(newItem1Address + 0, 0x00000003) -- type
-		core.writeInteger(newItem1Address + 4, 380) -- xPos
-		core.writeInteger(newItem1Address + 8, 560) -- yPos
-		core.writeInteger(newItem1Address + 12, 80) -- width
-		core.writeInteger(newItem1Address + 16, 80) -- height
-		core.writeInteger(newItem1Address + 20, utils.createLuaFunctionWrapper(function(registers)
-      recorder:guard(recordButtonCallback)
-      return registers
-    end))
-		core.writeInteger(newItem1Address + 24, 2) -- callbackParam
-		core.writeInteger(newItem1Address + 28, native.addr(0x0042AE90)) -- renderFunc
-		core.writeInteger(newItem1Address + 32, 0x4000023A) -- unkown | buttonGraphic 23A off 239 on
-		core.writeInteger(newItem1Address + 36, 0x00000003) -- unknown
-		core.writeInteger(newItem1Address + 40, 0x00000000) -- unknown
-		core.writeInteger(newItem1Address + 44, 0x00000000) -- unknown
-		core.writeInteger(newItem1Address + 48, 0x0000FFF0) -- unknown
-
-		core.writeInteger(newItem1Address + 72, 0x00000045) -- unknown
+  -- Extend only the original Skirmish menu's item array, retaining its sentinel.
+  local originalSize,itemSize=0x1d10,NativeUI.ITEM_SIZE
+  local array=core.allocate(originalSize+2*itemSize,true)
+  core.copyMemory(array,native.addr(0x5e9848),originalSize)
+  local record=array+originalSize-itemSize
+  local browse=record+itemSize
+  core.copyMemory(browse+itemSize,record,itemSize)
+  ui:button(record,250,550,145,30,function()
+    return recorder.status=='armed' and 'Cancel recording' or 'Record next match'
+  end,function()
+    if recorder.mode=='none' then recorder:guard(function() recorder:startRecording() end)
+    elseif recorder.mode=='record' then recorder:guard(function() recorder:stopRecording() end) end
+  end,function() return recorder.status=='armed' end)
+  ui:button(browse,410,550,145,30,'Replays',function()
+    browser:refresh(); ui:show(dialog)
+  end)
+  core.writeCode(native.addr(0x59ab30),{
+    core.AssemblyLambda('push array',{array=array})
+  })
 end
 
-local placePlaybackButton = function(recorder)
-		-- init button
-
-		local playbackButtonCallback = function()
-			print("playback button")
-			if recorder.mode == "none" then
-				recorder:startPlayback()
-				core.writeInteger(newItem2Address + 32, 0x40000239) -- buttonGraphic
-				print("Starting new playback!")
-			elseif recorder.mode == "play" then
-				recorder:stopPlayback()
-				core.writeInteger(newItem2Address + 32, 0x4000023A) -- buttonGraphic
-				print("discarded playback")
-			end
-		end
-
-		core.writeInteger(newItem2Address + 0, 0x00000003) -- type
-		core.writeInteger(newItem2Address + 4, 290) -- xPos
-		core.writeInteger(newItem2Address + 8, 560) -- yPos
-		core.writeInteger(newItem2Address + 12, 80) -- width
-		core.writeInteger(newItem2Address + 16, 80) -- height
-		core.writeInteger(newItem2Address + 20, utils.createLuaFunctionWrapper(function(registers)
-      recorder:guard(playbackButtonCallback)
-      return registers
-    end))
-		core.writeInteger(newItem2Address + 24, 2) -- callbackParam
-		core.writeInteger(newItem2Address + 28, native.addr(0x0042AE90)) -- renderFunc
-		core.writeInteger(newItem2Address + 32, 0x4000023A) -- unkown | buttonGraphic 23A off 239 on
-		core.writeInteger(newItem2Address + 36, 0x00000003) -- unknown
-		core.writeInteger(newItem2Address + 40, 0x00000000) -- unknown
-		core.writeInteger(newItem2Address + 44, 0x00000000) -- unknown
-		core.writeInteger(newItem2Address + 48, 0x0000FFF0) -- unknown
-
-		core.writeInteger(newItem2Address + 72, 0x00000045) -- unknown
-end
-
-return {
-	createButtons = function(recorder)
-				-- copy original ui array to new array
-		core.copyMemory(newMenuItemArrayAddress, originalMenuItemArrayAddress, originalMenuItemArraySize)
-
-		-- copy 0x66 terminator one element further back
-		core.copyMemory(newTerminatorAddress,
-										newItem1Address,
-										menuItemSize)
-
-		placeRecordButton(recorder)
-		placePlaybackButton(recorder)
-
-		-- overwrite reference
-		core.writeCode(native.addr(0x0059AB30), { core.AssemblyLambda([[
-			push newMenuItemArrayAddress
-		]],
-		{ newMenuItemArrayAddress = newMenuItemArrayAddress, }) })
-
-	end,
-
-	resetButtons = function()
-		core.writeInteger(newItem1Address + 32, 0x4000023A) -- reset recording button graphic
-		core.writeInteger(newItem2Address + 32, 0x4000023A) -- reset playback button graphic
-	end,
-}
+function M.resetButtons() end -- Labels derive from session state at render time.
+return M

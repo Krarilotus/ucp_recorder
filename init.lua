@@ -6,6 +6,7 @@ local module={}
 function module:enable(config)
   native.verify()
   local sites=Engine.verify()
+  local uiSites=require('code/native-ui').verify()
   local seed
   if config.useFixedSeed then
     seed=require('code/validation').integer(config.fixedSeed,-2147483648,2147483647,'fixed seed')
@@ -17,7 +18,7 @@ function module:enable(config)
   self.recorder=recorder
   engine:install(recorder)
   local ui=require('code/ui')
-  ui.createButtons(recorder)
+  ui.createButtons(recorder,uiSites)
 
   local function observe(address,size,callback)
     core.detourCode(function(registers)
