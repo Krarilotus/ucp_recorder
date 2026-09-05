@@ -67,6 +67,16 @@ function M:rngState()
     core.readInteger(self.rng+0x9c48),core.readInteger(self.rng+0x9c4c)}
 end
 
+function M:resourceState()
+  local values={}
+  for player=1,8 do
+    for resource=0,24 do
+      values[#values+1]=core.readInteger(self.sites.playerResources+player*0x39f4+resource*4)
+    end
+  end
+  return values
+end
+
 function M:saveSnapshot(path)
   assert(#path<500 and self:singlePlayer(), 'Snapshot requires a single-player game')
   local resource=self.sites.resources

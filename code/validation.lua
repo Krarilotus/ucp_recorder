@@ -68,11 +68,18 @@ function M.manifest(value)
   M.integer(value.lastTick,value.startTick,2147483647,'ending tick')
   M.integer(value.commandCount,0,2147483647,'command count')
   M.rng(value.finalRng)
+  M.resources(value.startResources)
+  M.resources(value.finalResources)
   for _,key in ipairs({'settingsHash','environmentHash','snapshotHash','rngHash','commandsHash','checkpointsHash','infoHash'}) do
     assert(type(value[key])=='string' and #value[key]==64 and not value[key]:find('[^%x]'),
       'Invalid replay '..key)
   end
   return value
+end
+
+function M.resources(values)
+  assert(type(values)=='table' and #values==200,'Invalid replay resource state')
+  for i=1,200 do M.integer(values[i],-2147483648,2147483647,'resource amount') end
 end
 
 return M

@@ -53,14 +53,16 @@ store=require('code/sessions'); store.ROOT=temp_root..'/replays'
 CONFIG_FILE=temp_root..'/current.yml'
 store.write(CONFIG_FILE,'load-order: [recorder-0.3.0]\\n')
 profile={name='SHC',sha256=string.rep('a',64)}
+function resourceState(value) local t={}; for i=1,200 do t[i]=value or 0 end; return t end
 function recording()
  local m=store.new(profile)
  m.player=1; m.startTick=0; m.lastTick=64; m.finalRng={11,22,3,4}
+ m.startResources=resourceState(); m.finalResources=resourceState()
  m.snapshotHash=string.rep('b',64); m.rngHash=string.rep('c',64)
  local path=store.path(m.id)
  local function command(t) return {commandCategory=28,player=1,time=t,size=1,data='01'} end
  store.write(path..'/stream-commands.json',json:encode(command(10))..'\\n'..json:encode(command(65))..'\\n')
- store.write(path..'/stream-rng-sync.json',json:encode({time=0,rng={1,2,3,4}})..'\\n'..json:encode({time=64,rng=m.finalRng})..'\\n')
+ store.write(path..'/stream-rng-sync.json',json:encode({time=0,rng={1,2,3,4},resources=resourceState()})..'\\n'..json:encode({time=64,rng=m.finalRng,resources=resourceState()})..'\\n')
  store.write(path..'/stream-infself.json',json:encode({gameType=0,mapSeed=123,matchSeed=123,RNGvalue1=1,RNGvalue2=2,RNGindex1=4,RNGindex2=3})..'\\n')
  return m
 end
@@ -120,4 +122,19 @@ end
 local m=recording(); store.finish(m)
 m.lastTick=-1; store.save(m)
 assert(not pcall(store.load,m.id,profile))
+''')
+
+    def test_missing_or_malformed_resource_evidence_prevents_completion(self):
+        self.lua.execute('''
+local m=recording(); m.finalResources[200]=nil
+assert(not pcall(store.finish,m))
+m=recording()
+local path=store.path(m.id)..'/stream-rng-sync.json'
+store.write(path,json:encode({time=0,rng={1,2,3,4}})..'\\n')
+assert(not pcall(store.finish,m))
+local validation=require('code/validation')
+for _,invalid in ipairs({1.5,2147483648,-2147483649}) do
+ local values=resourceState(); values[100]=invalid
+ assert(not pcall(validation.resources,values))
+end
 ''')

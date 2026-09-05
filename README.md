@@ -2,7 +2,7 @@
 
 Work in progress: recording and playback of single-player Stronghold Crusader and Crusader Extreme Skirmishes using UCP3.
 
-Version 0.7.0 verifies native command execution and confines recorder simulation changes to requested single-player sessions and hides its controls in multiplayer. It includes a native replay browser, settings restart, starting saves and settings snapshots. **The save/load playback path, browser rendering and real restart still need in-game verification.** Multiplayer recording is not supported yet; normal multiplayer isolation has automated coverage but still needs a live comparison.
+Version 0.8.0 verifies player resources and native command execution and confines recorder simulation changes to requested single-player sessions and hides its controls in multiplayer. It includes a native replay browser, settings restart, starting saves and settings snapshots. **The save/load playback path, browser rendering and real restart still need in-game verification.** Multiplayer recording is not supported yet; normal multiplayer isolation has automated coverage but still needs a live comparison.
 
 Automarket 1.1.0 has an experimental replay adapter for its settings commits and native custom save section. Use protocol 1.0.0 and map-extensions 1.0.0, with **recorder after protocol in the extension order**. The normal weekly trades run in the simulation; they are not replayed as extra trades. Other custom protocols remain unsupported. See [Automarket replay notes](docs/automarket-replay.md).
 
@@ -32,4 +32,4 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.7.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
+The builder creates `dist/recorder-0.8.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.

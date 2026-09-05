@@ -206,3 +206,19 @@ local ok,reason=pcall(Engine.verify)
 assert(not ok and tostring(reason):find('after protocol',1,true))
 bytes[engine.sites.execute.address+8]=0xE9; assert(Engine.verify())
 ''')
+
+    def test_resource_snapshot_covers_eight_players_and_ignores_ui_slot_zero(self):
+        self.check('''
+for _,sites in pairs(require('code/engine-sites')) do
+ local e=Engine.new(sites)
+ for player=0,8 do
+  for resource=0,24 do memory[sites.playerResources+player*0x39f4+resource*4]=player*1000+resource end
+ end
+ local state=e:resourceState(); assert(#state==200)
+ for player=1,8 do
+  for resource=0,24 do assert(state[(player-1)*25+resource+1]==player*1000+resource) end
+ end
+ memory[sites.playerResources+0x39f4+15*4]=-123
+ assert(e:resourceState()[16]==-123 and state[16]==1015)
+end
+''')

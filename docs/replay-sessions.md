@@ -10,7 +10,7 @@ Each session reserves `ucp/replays/YYYYMMDD-HHMMSS-NNNN/`. Its manifest records 
 - `rng.bin`: the complete 40,016-byte RNG structure, including its table.
 - `ucp-config.yml` and `environment.json`: startup settings and resolved environment.
 - `stream-commands.json`, `stream-rng-sync.json`, `stream-infself.json`: commands, 64-tick RNG checkpoints and initial match information.
-- `manifest.json`: status, timeline, command count, final RNG values/indices and SHA-256 hashes.
+- `manifest.json`: status, timeline, command count, final RNG values/indices, starting/final player resource arrays and SHA-256 hashes.
 
 The manifest moves through armed, recording and complete. Cancelled and failed sessions cannot play. Stream close failures and validation failures prevent completion. Metadata is replaced through a temporary file; this prevents a partial JSON document becoming the published manifest, but does not promise recovery from every power-loss scenario.
 
@@ -18,7 +18,7 @@ The manifest moves through armed, recording and complete. Cancelled and failed s
 
 Capture starts after the native Skirmish launch function initializes the game. Checkpoints observe the same point immediately before each simulation tick, independent of render-frame count. The ending state is the last observed boundary, not the later time at which an exit dialog runs. Future commands still queued when recording ends are excluded from the finalized stream.
 
-Playback preflights all files, loads the native starting save, restores the full RNG structure, and checks the loaded tick and local player. The native scheduler receives recorded commands with their recorded execution tick. It must have a free slot; its inferred payload length must match the recorded length. At completion, all recorded commands must have been scheduled and observed returning from their native handlers. Ownership, dispatch order, actor, tick, category and payload are checked before execution. RNG verification covers two values and two indices, **not a full world-state checksum**.
+Playback preflights all files, loads the native starting save, restores the full RNG structure, and checks the loaded tick and local player. The native scheduler receives recorded commands with their recorded execution tick. It must have a free slot; its inferred payload length must match the recorded length. At completion, all recorded commands must have been scheduled and observed returning from their native handlers. Ownership, dispatch order, actor, tick, category and payload are checked before execution. Verification covers two RNG values, two RNG indices and all 25 resource integers for players 1 through 8. Resource checks run after loading the starting save, at the periodic checkpoints and at the final boundary. This is **not a full world-state checksum**: units, buildings, economy variables outside these resource slots and private extension state need additional coverage.
 
 The local single-player identity stays intact. New commands queued by a spectator are blocked while playback is active, finished or failed. This hook may also block commands from automation extensions; compatibility with those extensions requires separate analysis and testing.
 

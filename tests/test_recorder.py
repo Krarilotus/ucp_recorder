@@ -59,6 +59,7 @@ function fixture(name)
   files[r.infoFileName]={{gameType=0,mapSeed=1,matchSeed=1,RNGvalue1=1,RNGvalue2=1,RNGindex1=1,RNGindex2=1}}
   return r
 end
+function resourceState(value) local t={}; for i=1,200 do t[i]=value or 0 end; return t end
 function command(tick) return {time=tick or 1,commandCategory=28,player=1,size=1,data='01'} end
 function allClosed() for _,h in ipairs(handles) do assert(h.closed) end end
 ''')

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0
+
+- Verify all 25 native resource slots for each of the eight players when loading the starting save, at periodic checkpoints and at the ending boundary.
+- Detect wrong gold/stockpile totals even when commands and RNG values still match; report the first differing player, resource, expected amount and actual amount.
+- Validate resource evidence before loading a replay, and preserve it in the completion report.
+- Use simulation profile `recorder-sp-v4`; earlier experimental captures require their original version.
+
+Validation: 79 automated tests and native operand checks for Crusader and Extreme. This adds resource-state verification, not a complete world-state checksum or multiplayer playback. Live replay tests remain pending.
+
 ## 0.7.0
 
 - Add an explicit Automarket 1.1.0 adapter for settings commits through protocol 1.0.0. Validate the registered protocol number, payload size, owning player, fee and Boolean fields. Unknown custom protocols remain excluded.

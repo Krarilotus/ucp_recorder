@@ -21,6 +21,7 @@ package.loaded['code/sessions']={
 Session=require('code/session-recorder')
 now=0; snapshots=0; space=true
 engine={rng=0x1a279c0,
+ resourceState=function() return resourceState() end,
  resetCommands=function(self) self.journal={executed=0} end,
  journal={executed=0},
  setScope=function(_,active) scoped=active end,
@@ -106,9 +107,9 @@ assert(not r:guard(function() r:onTick() end)); assert(r.status=='error')
     def test_final_checkpoint_boundary_finishes_without_next_checkpoint(self):
         self.check('''
 local r=session(); r.status='playing'; r.mode='play'; r.active=true; r.playedCommands=0
-r.manifest={id='test',lastTick=64,commandCount=0,finalRng={11,22,3,4}}
+r.manifest={id='test',lastTick=64,commandCount=0,finalRng={11,22,3,4},finalResources=resourceState()}
 local reads=0
-r.rngFile={read=function() reads=reads+1; assert(reads==1); return {time=64,rng={11,22,3,4}} end}
+r.rngFile={read=function() reads=reads+1; assert(reads==1); return {time=64,rng={11,22,3,4},resources=resourceState()} end}
 now=64; r:onTick(); r:onTick()
 assert(r.status=='finished' and paused and reads==1)
 ''')
@@ -116,7 +117,7 @@ assert(r.status=='finished' and paused and reads==1)
     def test_queued_commands_are_not_reported_as_executed(self):
         self.check('''
 local r=session(); r.status='playing'; r.mode='play'; r.active=true; r.playedCommands=2
-r.manifest={id='test',lastTick=65,commandCount=2,finalRng={11,22,3,4}}
+r.manifest={id='test',lastTick=65,commandCount=2,finalRng={11,22,3,4},finalResources=resourceState()}
 engine.commandsPending=function() return true end
 now=65; assert(not r:guard(function() r:onTick() end)); assert(r.status=='error')
 ''')
@@ -195,4 +196,32 @@ local r=session(); r.mode='play'; r.active=true
 engine.singlePlayer=function() return false end
 assert(not r:guard(function() error('stale session') end))
 assert(not paused and memory[r.halt]==0)
+''')
+
+    def test_resource_divergence_stops_even_when_rng_is_identical(self):
+        self.check('''
+local r=session(); r.mode='play'; r.status='playing'; r.active=true
+r.manifest={id='test',lastTick=128}
+r.rngFile={read=function() return {time=64,rng={11,22,3,4},resources=resourceState()} end}
+engine.resourceState=function() local state=resourceState(); state[41]=5; return state end
+now=64; assert(not r:guard(function() r:onTick() end))
+assert(paused and r.status=='error' and r.firstDesync.kind=='resources')
+assert(r.firstDesync.player==2 and r.firstDesync.resource==15 and r.firstDesync.actual==5)
+''')
+
+    def test_ending_resource_state_is_checked_between_checkpoints(self):
+        self.check('''
+local r=session(); r.mode='play'; r.status='playing'; r.active=true; r.playedCommands=0
+r.manifest={id='test',lastTick=65,commandCount=0,finalRng={11,22,3,4},finalResources=resourceState()}
+r.manifest.finalResources[200]=1
+now=65; assert(not r:guard(function() r:onTick() end))
+assert(r.status=='error' and r.firstDesync.player==8 and r.firstDesync.resource==24)
+assert(r.firstDesync.phase=='ending state')
+''')
+
+    def test_starting_resource_mismatch_has_its_own_diagnostic(self):
+        self.check('''
+local r=session(); r.mode='play'; r.status='loading'; r.manifest={id='test'}
+assert(not r:guard(function() r:checkResources(resourceState(1),'starting save') end))
+assert(paused and r.firstDesync.phase=='starting save' and r.firstDesync.player==1)
 ''')

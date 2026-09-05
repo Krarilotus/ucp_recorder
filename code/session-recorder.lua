@@ -61,6 +61,8 @@ function Session:activateRecording()
   self.manifest.player=self.engine:player()
   self.manifest.startTick=self.engine:tick()
   self.manifest.lastTick=self.manifest.startTick
+  self.manifest.startResources=self.engine:resourceState()
+  self.manifest.finalResources=self.manifest.startResources
   local r=self.engine:rngState()
   local seed=core.readInteger(self.engine.rng+4)
   self:saveInfo(0,seed,seed,r[1],r[2],r[4],r[3])
@@ -98,6 +100,7 @@ function Session:startPlayback(id)
   core.writeBytes(self.engine.rng,bytes)
   assert(self.engine:tick()==manifest.startTick,'Loaded save has a different starting tick')
   assert(self.engine:player()==manifest.player,'Loaded save has a different player slot')
+  self:checkResources(manifest.startResources,'starting save')
   self.active=true; self.status='playing'; self.playedCommands=0
   self.nextCheckpoint=nil
   print('Playing '..id)
@@ -133,9 +136,10 @@ function Session:onTick()
   if self.status=='recording' then
     self.manifest.lastTick=now
     self.manifest.finalRng=self.engine:rngState()
+    self.manifest.finalResources=self.engine:resourceState()
     self.observedTick=true
     if now%64==0 then
-      local line=json:encode({time=now,rng=self.engine:rngState()})
+      local line=json:encode({time=now,rng=self.engine:rngState(),resources=self.manifest.finalResources})
       assert(self.rngFile:write(line..'\n')); assert(self.rngFile:flush())
     end
   elseif self.status=='playing' then
@@ -153,6 +157,7 @@ function Session:onTick()
           error('RNG divergence at tick '..now..' (field '..i..')')
         end
       end
+      self:checkResources(expected.resources,'checkpoint')
     end
     if now>=self.manifest.lastTick then
       assert(self.playedCommands==self.manifest.commandCount,'Replay ended before all commands were scheduled')
@@ -160,9 +165,25 @@ function Session:onTick()
       assert(self.engine.journal.executed==self.manifest.commandCount,'Replay native execution count differs')
       local actual=self.engine:rngState()
       for i=1,4 do assert(actual[i]==self.manifest.finalRng[i],'Final RNG state differs at tick '..now) end
+      self:checkResources(self.manifest.finalResources,'ending state')
       self.status='finished'; core.writeInteger(self.halt,1); self.engine:pause()
       store.write(store.path(self.manifest.id)..'/last-playback.json',json:encode({
-        status='finished',lastTick=now,commands=self.playedCommands,rngCheckpoints='matched'}))
+        status='finished',lastTick=now,commands=self.playedCommands,rngCheckpoints='matched',resourceCheckpoints='matched'}))
+    end
+  end
+end
+
+function Session:checkResources(expected,phase)
+  validation.resources(expected)
+  local actual=self.engine:resourceState()
+  for i=1,200 do
+    if actual[i]~=expected[i] then
+      local player=math.floor((i-1)/25)+1
+      local resource=(i-1)%25
+      self.firstDesync={kind='resources',time=self.engine:tick(),phase=phase,
+        player=player,resource=resource,expected=expected[i],actual=actual[i]}
+      store.write(store.path(self.manifest.id)..'/desync.json',json:encode(self.firstDesync))
+      error('Resource divergence at tick '..self.engine:tick()..' (player '..player..', resource '..resource..')')
     end
   end
 end
