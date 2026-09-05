@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.0
+
+- Observe the native DirectPlay system-message branch in Crusader and Extreme before host/roster/timing mutations. Player removal and host migration bypass timed command dispatch and can no longer silently leave an open diagnostic trace looking complete.
+- Log a conservative coverage gap with the message type, declared size and removal handle when present. Do not dereference message pointers or treat the header as a captured/replayable system payload. Even native-ignored and unknown system messages mark this stage incomplete.
+- Use multiplayer diagnostic format 5 to distinguish the new coverage from format 4. Mixed-format comparisons are rejected; paired older traces retain their original evidence limits. Single-player simulation profile stays `recorder-sp-v7`.
+- Keep the observer opt-in, read-only and isolated from logging/validation failures. This does not implement host migration or player departure in replay, nor enable multiplayer recording/playback.
+
+Validation: 116 automated tests pass, including system events without sampled roster changes, unknown/short messages, write/read validation failures, single-player exclusion and comparison coverage. Original executable checks pass for both variants, including eight native receive-result/sender cases per variant proving this hook is reached only after a successful system-message receive. Live multiplayer behavior and performance remain unverified.
+
 ## 0.14.0
 
 - Prevent resource-warning speech, ambient sound selection, audio initialization and battle/ambient music from advancing the simulation RNG during single-player recording and playback. These paths depend on local UI, audio or wall-clock activity that the command stream does not reproduce.

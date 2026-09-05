@@ -1,4 +1,4 @@
-# Multiplayer diagnostics (0.13.0)
+# Multiplayer diagnostics (0.15.0)
 
 This stage observes execution and identity on each peer without changing the simulation scope, RNG seeds, pause flag, command ownership or dispatch decisions. Multiplayer recording/playback remains disabled. The existing single-player replay checks and isolation gates remain in effect.
 
@@ -59,13 +59,13 @@ window produces a gap with its category, actor, declared size and source.
 Harmless immediate commands can therefore also make this conservative stage
 incomplete; there is no unaudited whitelist.
 
-Lobby events before the trace opens are outside its window. DirectPlay system
-messages are not yet individually logged: persistent roster/sync changes can be
-noticed at later boundaries, but a transient change between observations can
-escape that sampling. Host migration, a synchronized starting snapshot, offline
-roster restoration, resync payload reconstruction and native-versus-extension
-state coverage remain implementation work. See the [native network-flow
-contribution](https://github.com/sourcehold/OpenSHC/pull/220) for the evidence.
+Lobby events before the trace opens are outside its window. Format 4 did not
+individually log DirectPlay system messages: persistent roster/sync changes could
+be noticed at later boundaries, but host-only or transient changes could escape
+that sampling. Format 5 adds the observation below. Replaying host migration, a
+synchronized starting snapshot, offline roster restoration, resync payload
+reconstruction and native-versus-extension state coverage remain implementation
+work. See the [native network-flow contribution](https://github.com/sourcehold/OpenSHC/pull/220).
 
 The source investigation also confirms that the wire timestamp uses three bytes,
 while command-ring ticks use four. A replay file must not silently equate these
@@ -73,3 +73,38 @@ formats. The reviewed RedirectPlay source forwards reliable flags but omits the
 ReceiveData size output; its exact correspondence to the shipped DLL remains
 unverified. Neither replacing transport nor recording raw packets alone closes
 the replay ownership and resync gaps.
+
+## Format 5: DirectPlay system-message coverage
+
+The native receive loop branches on `DPID_SYSMSG` (sender zero) after a successful
+`IDirectPlay4A::Receive`. A new opt-in detour at Crusader `0x490735` / Extreme
+`0x490895` observes that branch before its type switch. It retains the original
+`MOV EAX,[EDI]; CMP EAX,3` instructions. Ordinary packets and failed/no-message
+receives never enter it; the original-binary checker emulates those branches.
+
+Native analysis of `receiveAllTransmittedCommands` (Crusader `0x490690`, Extreme
+`0x4907F0`) establishes these paths. Type values also match `dplay.h` in the
+OpenSHC DirectX SDK dependency:
+
+| Type | Native effect relevant to recording |
+| --- | --- |
+| `0x0005` / `DPSYS_DESTROYPLAYERORGROUP` | Reads the transport handle at message offset 8, translates it to a player slot, then calls `removePlayerFromLobby` directly. |
+| `0x0101` / `DPSYS_HOST` | Sets local host status, resets hash/timing counters, starts a wall-clock autosave timer and clears player timing arrays. It also updates chat and, outside a match, lobby ordering. |
+| `0x0003` / `DPSYS_CREATEPLAYERORGROUP`, `0x0031` / `DPSYS_SESSIONLOST` | This native switch skips them. The diagnostic stage still records their occurrence conservatively. |
+| Other values | Native fallback formats a message; the recorder does not infer replay safety from that. |
+
+Every observed system message in an open trace produces a `gap` row and an
+incomplete footer, even if the next sampled roster and sync phase are unchanged.
+The details include type and declared receive size; a destroy-message handle is
+included only when the declared size covers its first 12 bytes. No pointers in
+the system structure are followed, and no raw pointer-bearing payload is saved.
+The receive size is provider-supplied diagnostic metadata, not proof that all
+those bytes were delivered; the RedirectPlay size-output concern above still
+applies. Invalid declared sizes disable diagnostics without altering native
+execution. A logging failure has the same isolation behavior.
+
+The comparator rejects these gaps and mixed format-4/5 pairs. Matching format-5
+traces still certify only the observed window and compared state, not a complete
+replay. Events before the first recorded boundary, resync contents and extension
+state remain outside that claim. This stage detects an unsupported transition;
+it does not reproduce or suppress it. No live two-peer test was performed.

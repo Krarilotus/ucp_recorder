@@ -81,6 +81,9 @@ def check(folder):
             assert len(calls)==len(names) and calls==guards, f'{name}: incomplete {names} RNG guards'
         from check_presentation_native import check_heads_placement
         check_heads_placement(reader,lua,name,scoped)
+        from check_network_native import check_system_branch
+        network=lua.execute((root/'code/network-sites.lua').read_text())[name]
+        check_system_branch(reader,name,network['systemMessage'])
         print(f'PASS: {name} native patch sites, RNG fields, player layout and menu reference')
 
 

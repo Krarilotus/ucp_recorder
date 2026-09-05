@@ -30,7 +30,7 @@ function M:open()
   local environmentHash=store.settings().environmentHash
   validation.hash(environmentHash,'diagnostic environment hash')
   self.network=self.engine:networkState()
-  self:write({kind='header',format=4,variant=native.profile.name,executable=native.profile.sha256,
+  self:write({kind='header',format=5,variant=native.profile.name,executable=native.profile.sha256,
     environmentHash=environmentHash,
     network=self.network,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
@@ -67,6 +67,19 @@ function M:immediateCommand(source)
     source=source,category=core.readByte(address+8),scheduledTime=core.readInteger(address),
     player=core.readInteger(self.engine.base+self.engine.sites.actorOffset),
     size=core.readInteger(self.engine.base+0x2d830)})
+end
+
+function M:systemMessage(source)
+  -- Native Receive succeeded and its sender is DPID_SYSMSG (zero). Observe
+  -- before the type switch mutates host/roster/timing state. Never read native
+  -- pointer fields from a DPMSG or pretend that this header is its full payload.
+  if not self.file then return end
+  local size=validation.integer(core.readInteger(self.engine.base+0x2d81c),4,61000,'system-message size')
+  local address=self.engine.base+0xcd8
+  local messageType=core.readInteger(address)
+  local details={source=source,messageType=messageType,declaredSize=size}
+  if messageType==5 and size>=12 then details.removedHandle=core.readInteger(address+8) end
+  self:gap('DirectPlay system message is outside replay coverage',details)
 end
 
 function M:record(event)

@@ -82,7 +82,7 @@ assert(#traceRows==0 and not engine.trace.file)
 memory[0x1fe7da8]=64
 engine.trace:observe('onTick'); engine.trace:observe('onTick')
 assert(#traceRows==2 and traceRows[2].kind=='checkpoint' and traceRows[2].time==64)
-assert(traceRows[1].format==4 and traceRows[1].environmentHash==string.rep('a',64))
+assert(traceRows[1].format==5 and traceRows[1].environmentHash==string.rep('a',64))
 assert(traceRows[2].rngHash==string.rep('b',64))
 memory[0x1fe7da8]=65; engine.trace:observe('onTick'); assert(#traceRows==2)
 memory[0x1fe7da8]=128; engine.trace:observe('onTick')
@@ -126,7 +126,7 @@ local regs={EAX=1,EBX=2,ECX=3,EDX=4,ESI=5,EDI=6,ESP=7,EBP=8,EFLAGS=0xa83}
 assert(callbacks[sites.remoteImmediate.address](regs)==regs and #traceRows==0)
 memory[0x1fe7da8]=64; engine.trace:observe('onTick')
 for name,site in pairs(sites) do
- if name~='localTimed' then
+ if name=='remoteImmediate' or name=='localImmediate' then
   assert(callbacks[site.address](regs)==regs)
   assert(traceRows[#traceRows].kind=='gap' and traceRows[#traceRows].details.source==name)
  end
@@ -135,6 +135,71 @@ engine.trace.file.write=function() return nil,'disk full' end
 assert(callbacks[sites.remoteImmediate.address](regs)==regs and engine.trace.failed)
 assert(regs.EAX==1 and regs.EBX==2 and regs.ECX==3 and regs.EDX==4 and regs.ESI==5)
 assert(regs.EDI==6 and regs.ESP==7 and regs.EBP==8 and regs.EFLAGS==0xa83)
+''')
+
+    def test_system_events_are_observed_before_host_or_roster_changes(self):
+        self.check('''
+local sites=require('code/network-sites').SHC
+local readBytes=core.readBytes
+core.readBytes=function(address,size)
+ for _,site in pairs(sites) do if address==site.address then return site.bytes end end
+ return readBytes(address,size)
+end
+require('code/network-observer').install(engine.trace)
+local callback=callbacks[sites.systemMessage.address]
+local regs={EAX=9,ECX=8,EDX=7,ESI=6,EDI=5,ESP=4,EBP=3,EBX=2,EFLAGS=0xa83}
+memory[engine.base+0x2d81c]=12
+memory[engine.base+0xcd8]=0x101
+assert(callback(regs)==regs and #traceRows==0) -- before the capture window
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+assert(callback(regs)==regs)
+local host=traceRows[3]
+assert(host.kind=='gap' and host.details.messageType==0x101 and host.details.source=='systemMessage')
+assert(host.details.declaredSize==12 and host.details.removedHandle==nil)
+-- No roster or sync change is needed for the system event itself to be visible.
+memory[engine.base+0xcd8]=5; memory[engine.base+0xce0]=103
+assert(callback(regs)==regs and traceRows[4].details.removedHandle==103)
+memory[engine.base+0xcd8]=0x777 -- unknown events must not be silently whitelisted
+assert(callback(regs)==regs and traceRows[5].kind=='gap')
+engine.trace:observe('stop','test ended')
+assert(traceRows[6].status=='incomplete')
+assert(regs.EAX==9 and regs.ECX==8 and regs.EDX==7 and regs.ESI==6 and regs.EDI==5)
+assert(regs.ESP==4 and regs.EBP==3 and regs.EBX==2 and regs.EFLAGS==0xa83)
+''')
+
+    def test_system_observer_never_reads_missing_handle_or_changes_singleplayer(self):
+        self.check('''
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+memory[engine.base+0x2d81c]=4; memory[engine.base+0xcd8]=5
+local readInteger=core.readInteger
+core.readInteger=function(address)
+ assert(address~=engine.base+0xce0,'read beyond declared header')
+ return readInteger(address)
+end
+engine.trace:observe('systemMessage','systemMessage')
+assert(traceRows[3].details.removedHandle==nil and not engine.trace.failed)
+memory[engine.base+0x618]=0
+engine.trace:observe('systemMessage','systemMessage')
+assert(not engine.trace.file and #traceRows==4)
+''')
+
+    def test_invalid_system_size_or_write_failure_only_disables_diagnostics(self):
+        for size in (0,3,61001):
+            with self.subTest(size=size):
+                self.check('''
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+memory[engine.base+0x2d81c]=%d
+engine.trace:observe('systemMessage','systemMessage')
+assert(engine.trace.failed and not engine.trace.file)
+assert(before().EDX==28 and not recorder.error)
+engine.trace:observe('stop','reset')
+''' % size)
+        self.check('''
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+memory[engine.base+0x2d81c]=4; memory[engine.base+0xcd8]=0x101
+engine.trace.file.write=function() return nil,'disk full' end
+engine.trace:observe('systemMessage','systemMessage')
+assert(engine.trace.failed and not engine.trace.file and before().EDX==28)
 ''')
 
     def test_network_hook_conflict_cannot_partially_install_observers(self):
@@ -297,3 +362,16 @@ class CompareTraceTests(unittest.TestCase):
         result=self.compare(a,a)
         self.assertEqual(result['status'],'incomplete')
         self.assertIn('immediate command',result['reason'])
+
+    def test_system_aware_format_does_not_accept_older_coverage_or_system_gaps(self):
+        a,b=self.network_trace(),self.network_trace()
+        a[0]['format']=5
+        self.assertEqual(self.compare(a,b)['status'],'incomplete')
+        b[0]['format']=5
+        self.assertEqual(self.compare(a,b)['status'],'matched')
+        a.insert(2,dict(kind='gap',sequence=2,time=65,
+            reason='DirectPlay system message is outside replay coverage',details=dict(messageType=0x101)))
+        a[-1].update(events=2,status='incomplete')
+        result=self.compare(a,a)
+        self.assertEqual(result['status'],'incomplete')
+        self.assertIn('DirectPlay system message',result['reason'])

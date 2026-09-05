@@ -118,7 +118,7 @@ def compare(left, right):
             ar, br = rows(a), rows(b)
             ah, bh = next(ar), next(br)
             for header in (ah, bh):
-                if header.get('kind') != 'header' or header.get('format') not in (1, 2, 3, 4):
+                if header.get('kind') != 'header' or header.get('format') not in (1, 2, 3, 4, 5):
                     raise ValueError('Unsupported trace format')
                 if header['format'] >= 3:
                     hash_value(header.get('environmentHash'))
