@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.18)
 project(recorder_framework_settings LANGUAGES C CXX)
 include(CTest)
 include(FetchContent)
+# yaml-cpp 0.7.0 predates CMake 4; retain that exact framework dependency while
+# opting its build into the oldest policy level supported by current CMake.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_Declare(framework
     GIT_REPOSITORY https://github.com/UnofficialCrusaderPatch/UnofficialCrusaderPatch3.git
     GIT_TAG 02a7a6bc8ab956a91fc752e8c8ed215c149855e7
