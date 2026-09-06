@@ -31,7 +31,7 @@ def check_dispatch(reader,variant):
     names=('EAX','EBX','ECX','EDX','ESI','EDI','EBP','ESP','EFLAGS')
     registers={name:getattr(reg,'UC_X86_REG_'+name) for name in names}
 
-    def scenario(replay):
+    def scenario(replay,capture=False):
         machine=Uc(UC_ARCH_X86,UC_MODE_32)
         machine.mem_map(0x400000,0x3e00000)
         def read(a,n): return bytes(machine.mem_read(int(a),int(n)))
@@ -40,6 +40,11 @@ def check_dispatch(reader,variant):
         def put(a,v): write(a,struct.pack('<I',int(v)&0xffffffff))
         for a,size in ((schedule,0x22c),(selector,0x140),(dispatch,0xcb),(translator,0x89)):
             write(a,reader(a,size))
+        local_queue=0x489100 if shc else 0x489210
+        transmit=0x487c50 if shc else 0x487d60
+        if capture:
+            write(local_queue,reader(local_queue,0x1e3))
+            write(transmit,b'\xc2\x14\x00') # transport is outside this queue test
         write(fill,b'\xc2\x0c\x00'); write(copy,b'\xc2\x0c\x00'); write(handler,b'\xc3')
         put(table+28*4,handler)
         write(handler+4,b'\xc3'); put(table,handler+4)
@@ -85,6 +90,11 @@ end
 engine:install(recorder)
 ''')
         engine=g.engine
+        if capture:
+            lua.execute('''
+recorder.mode='record'; recorder.status='recording'; recorder.commands={}
+function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=command end
+''')
 
         def call(address,args=(),thiscall=0):
             # Native exposeCode executes outside an existing emulation call.
@@ -113,6 +123,10 @@ engine:install(recorder)
                 write(destination,read(source,count))
             elif address==handler:
                 if get(base+0x2d828)==2: put(base+0x2d830,inferred_size[0])
+                elif get(base+0x2d828)==1 and capture:
+                    slot=get(base+0x2d824)
+                    put(base+0x3c67c+slot*1272+10,sequence)
+                    put(base+0x2d830,4)
                 elif get(base+0x2d828)==0:
                     slot=get(base+0x2d824)
                     observed.append((get(tick),slot,get(base+actor),get(base+0x3c67c+slot*1272+10)))
@@ -126,7 +140,8 @@ engine:install(recorder)
                 uc.reg_write(reg.UC_X86_REG_EIP,get(esp))
                 uc.reg_write(reg.UC_X86_REG_ESP,esp+4)
                 return
-            if address in detours and (replay or address==engine['sites']['copySize']['address']):
+            if address in detours and (replay or capture or address==engine['sites']['copySize']['address']):
+                assert not capture or address!=engine['sites']['copySize']['address'], 'local input used receive-copy path'
                 values=lua.table_from({name:uc.reg_read(r) for name,r in registers.items()})
                 returned=detours[address](values)
                 for name,r in registers.items(): uc.reg_write(r,int(returned[name]))
@@ -138,14 +153,17 @@ engine:install(recorder)
         machine.hook_add(UC_HOOK_CODE,observe)
         put(base+engine['sites']['writeIndexOffset'],199)
         sequence=0
-        for now in range(10,16) if replay else (10,):
+        for now in range(10,16) if replay or capture else (10,):
             put(tick,now)
-            count=100 if replay else 2
+            count=100 if replay or capture else 2
             for _ in range(count):
                 sequence+=1
                 command=lua.table_from(dict(commandCategory=28,player=3,time=now,size=4,
                     data=struct.pack('<I',sequence).hex()))
-                engine.scheduleCommand(engine,command)
+                if capture:
+                    call(local_queue,(base,28),1)
+                else:
+                    engine.scheduleCommand(engine,command)
             call(dispatch,(base,),1)
             if replay:
                 assert g.recorder['status']=='playing',g.recorder['error']
@@ -170,10 +188,20 @@ engine:install(recorder)
             assert read(address,1272)==before
             assert all(get(base+offset)==value for offset,value in scratch.items())
             assert not engine.commandsPending(engine) and engine['expectedSize'] is None
+        elif capture:
+            commands=list(g.recorder['commands'].values())
+            assert g.recorder['status']=='recording',g.recorder['error']
+            assert len(commands)==600 and len(observed)==600
+            assert [int(c['data'],16) for c in commands]==[
+                int.from_bytes(struct.pack('<I',row[3]),'big') for row in observed]
+            assert sorted(row[3] for row in observed)==list(range(1,601))
+            assert all(c['player']==3 and c['time']==row[0] for c,row in zip(commands,observed))
+            assert not list(engine['received'].items())
         else:
             assert [r[3] for r in observed]==[2,1],observed
         return observed
 
     scenario(False)
     scenario(True)
-    print(f'PASS: {variant} native ring-wrap reorder reproduced; 600 replay dispatches in recorded order; native size-failure rollback verified')
+    scenario(False,True)
+    print(f'PASS: {variant} native ring-wrap reorder reproduced; 600 replay dispatches and 600 local captures; native size-failure rollback verified')

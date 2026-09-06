@@ -42,6 +42,8 @@ function Session:guard(callback)
       pcall(store.write,store.path(self.manifest.id)..'/last-error.txt',self.error)
       if self.mode=='record' then
         self.manifest.status='failed'; pcall(store.save,self.manifest)
+      elseif self.mode=='play' then
+        pcall(self.playbackResult,self,'failed',{error=self.error})
       end
     end
     for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do
@@ -50,6 +52,15 @@ function Session:guard(callback)
     end
   end
   return ok
+end
+
+function Session:playbackResult(status,details)
+  local result=details or {}
+  result.status=status
+  result.started=self.playbackStarted
+  result.lastTick=self.engine:tick()
+  result.commands=self.playedCommands or 0
+  store.write(store.path(self.manifest.id)..'/last-playback.json',json:encode(result))
 end
 
 function Session:startRecording()
@@ -118,6 +129,11 @@ function Session:startPlayback(id)
   self.manifest=manifest
   self.mode='play'; self.status='loading'; self.active=false
   self.error=nil
+  self.playedCommands=0
+  self.playbackStarted=os.date('!%Y-%m-%dT%H:%M:%SZ')
+  -- Invalidate an earlier success before touching native state. An interrupted
+  -- or failed repeat must never retain the previous run's finished report.
+  self:playbackResult('loading')
   self.engine:setScope(true)
   core.writeInteger(self.halt,0)
   self.engine:loadSnapshot(path..'/start.sav')
@@ -129,6 +145,7 @@ function Session:startPlayback(id)
   self:checkResources(manifest.startResources,'starting save')
   self.active=true; self.status='playing'; self.playedCommands=0
   self.nextCheckpoint=nil
+  self:playbackResult('playing')
   print('Playing '..id)
 end
 
@@ -210,9 +227,8 @@ function Session:onTick()
       self:checkResources(self.manifest.finalResources,'ending state')
       self:checkRngData(self.manifest.finalRngHash,'ending state')
       self.status='finished'; core.writeInteger(self.halt,1); self.engine:pause()
-      store.write(store.path(self.manifest.id)..'/last-playback.json',json:encode({
-        status='finished',lastTick=now,commands=self.playedCommands,rngCheckpoints='matched',
-        fullRngCheckpoints='matched',resourceCheckpoints='matched'}))
+      self:playbackResult('finished',{rngCheckpoints='matched',
+        fullRngCheckpoints='matched',resourceCheckpoints='matched'})
     end
   end
 end
@@ -244,6 +260,10 @@ end
 
 function Session:reset()
   self.capturePending=nil
+  local reportOk,reportError=true,nil
+  if self.mode=='play' and (self.status=='playing' or self.status=='loading') and self.manifest then
+    reportOk,reportError=pcall(self.playbackResult,self,'interrupted')
+  end
   if self.mode=='play' then self.engine:abortPlayback() end
   self.engine:setScope(false)
   self.engine:resetCommands()
@@ -273,6 +293,7 @@ function Session:reset()
   self.observedTick=false; self.error=nil
   self.finalRngData=nil
   core.writeInteger(self.halt,0)
+  assert(reportOk,reportError)
 end
 
 function Session:reconcileMode()

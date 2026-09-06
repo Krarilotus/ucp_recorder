@@ -21,7 +21,10 @@ function M.verify()
       local actual=core.readBytes(site.address, #site.bytes)
       -- map-extensions wraps this callable entry to include extension save data.
       -- We call that entry, never bypass or overwrite its five-byte hook.
-      local wrappedSave=name=='save' and adapter.saveHookAvailable() and actual[1]==0xE9
+      -- RPS hookCode uses CALL rel32 in the shipped framework; other supported
+      -- wrappers use JMP rel32. Keep the untouched sixth byte checked below.
+      local wrappedSave=name=='save' and adapter.saveHookAvailable()
+        and (actual[1]==0xE8 or actual[1]==0xE9)
       for i, value in ipairs(site.bytes) do
         assert((wrappedSave and i<=5) or actual[i]==value, 'Recorder session hook conflicts at ' .. name)
       end
@@ -258,6 +261,15 @@ function M:beforeCommand(recorder)
   self.executing={slot=slot,source=source,command=actual}
 end
 
+function M:captureCommand(size, payload)
+  local validation=require('code/validation')
+  validation.integer(size,0,1260,'native payload size')
+  local slot=validation.integer(core.readInteger(self.base+0x2d824),0,199,'native ring slot')
+  local address=self.base+0x3c67c+slot*1272
+  self.received[slot]={command={commandCategory=core.readByte(address+8),time=core.readInteger(address),
+    size=size,data=require('code/utils').tableToHex(core.readBytes(payload or address+10,size))}}
+end
+
 function M:afterCommand(recorder)
   local current=self.executing
   self.executing=nil
@@ -291,6 +303,19 @@ function M:install(recorder)
     end)
     return ok and result or 0
   end,self.sites.select.address,1,1,#self.sites.select.bytes)
+  -- Local input handlers build payloads directly in the ring. They never pass
+  -- through the received-packet copy below, in SP as well as MP. Observe after
+  -- that handler returns, before transmission advances the write cursor.
+  -- Share this hook with optional MP diagnostics instead of detouring it twice.
+  core.detourCode(function(registers)
+    if self.trace then self.trace:observe('locallyQueuedCommand') end
+    if recorder.active and recorder.status=='recording' and self:singlePlayer() then
+      recorder:guard(function()
+        self:captureCommand(core.readInteger(self.base+0x2d830))
+      end)
+    end
+    return registers
+  end,self.sites.localTimed.address,#self.sites.localTimed.bytes)
   -- Replace exactly MOV EAX,[ESI+commandSize] before the timed payload copy.
   -- A corrupt record cannot cause a native read beyond its declared payload.
   core.writeCode(self.sites.copySize.address,{0x90,0x90,0x90,0x90,0x90,0x90})
@@ -307,12 +332,7 @@ function M:install(recorder)
     if self.trace then self.trace:observe('receivedCommand',registers.EDX,size) end
     if recorder.active and recorder.status=='recording' and self:singlePlayer() then
       local ok=recorder:guard(function()
-        require('code/validation').integer(size,0,1260,'native payload size')
-        local slot=core.readInteger(self.base+0x2d824)
-        require('code/validation').integer(slot,0,199,'native ring slot')
-        local address=self.base+0x3c67c+slot*1272
-        self.received[slot]={command={commandCategory=core.readByte(address+8),time=core.readInteger(address),
-          size=size,data=require('code/utils').tableToHex(core.readBytes(registers.EDX,size))}}
+        self:captureCommand(size,registers.EDX)
       end)
       if not ok then registers.EAX=0 end -- do not copy an invalid native length after stopping
     end

@@ -10,8 +10,7 @@ function M.install(trace)
   end
   for name,site in pairs(sites) do
     local source=name
-    local event=name=='localTimed' and 'locallyQueuedCommand'
-      or name=='systemMessage' and 'systemMessage' or 'immediateCommand'
+    local event=name=='systemMessage' and 'systemMessage' or 'immediateCommand'
     core.detourCode(function(registers)
       trace:observe(event,source)
       return registers

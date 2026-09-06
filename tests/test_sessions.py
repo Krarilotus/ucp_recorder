@@ -6,6 +6,29 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_playback_report_replaces_success_on_failure_and_interruption(self):
+        self.check('''
+local r=session(); r.mode='play'; r.status='playing'; r.active=true
+r.manifest={id='test'}; r.playedCommands=7; r.playbackStarted='attempt-2'; now=70
+r:playbackResult('finished',{rngCheckpoints='matched'})
+assert(lastEncoded.status=='finished')
+r:playbackResult('playing')
+assert(lastEncoded.status=='playing' and lastEncoded.rngCheckpoints==nil)
+assert(lastEncoded.started=='attempt-2' and lastEncoded.commands==7)
+assert(not r:guard(function() error('injected desync') end))
+assert(lastEncoded.status=='failed' and lastEncoded.error:find('injected desync',1,true))
+r.status='playing'; r:reset()
+assert(lastEncoded.status=='interrupted' and r.mode=='none' and aborted)
+''')
+
+    def test_report_write_failure_still_cleans_up_interrupted_playback(self):
+        self.check('''
+local r=session(); r.mode='play'; r.status='playing'; r.active=true; r.manifest={id='test'}
+require('code/sessions').write=function() error('disk full') end
+assert(not pcall(function() r:reset() end))
+assert(aborted and r.mode=='none' and not r.active and not scoped and memory[r.halt]==0)
+''')
+
     def test_default_recording_arms_before_seed_and_saves_each_match(self):
         self.check('''
 local r=session(); assert(r.autoRecord and not scoped)

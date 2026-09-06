@@ -3,6 +3,10 @@ local profiles=require('code/ui-sites')
 local M={ITEM_SIZE=0x50}
 
 function M.verify()
+  -- ui lazily resolves its main-state callable entries on first access (often
+  -- Automarket's GUI-loaded callback). Resolve them before we wrap activation;
+  -- the cached entry still points to the wrapper and retains both modules' UI.
+  if modules and modules.ui then modules.ui:access() end
   local sites=assert(profiles[native.profile.name])
   for name,site in pairs(sites) do
     local actual=core.readBytes(site.address,#site.bytes)

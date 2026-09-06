@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.0
+
+- Capture locally generated timed commands directly from the native queue, including troop orders. These bypass the received-packet hook; previously the first order stopped recording with a missing-payload error.
+- Share local command observation with multiplayer diagnostics without installing overlapping hooks. Preserve native registers and retain validation before dispatch.
+- Accept the verified map-extensions 1.0.0 save wrapper used by the shipped framework (`CALL rel32`), retaining the wrapper and extension snapshot data.
+- Resolve the optional UI module's callable entries before installing recorder menu hooks, keeping Automarket's later GUI initialization working.
+- Replace old playback reports at each new attempt and report failure or interruption, so repeat tests cannot retain a stale success.
+
+Validation: 148 automated tests and original-executable checks pass for both variants, including 600 local captures and 600 replay dispatches each. Development SHC playback completed twice with two AIs; the Automarket integration replay completed 69,573 ticks and 13 commands with RNG/resource checkpoints matched. See `docs/live-validation-0.18.md` for scope and remaining gates. Multiplayer playback remains disabled.
+
 ## 0.17.0
 
 - Record new single-player Skirmishes by default, arming after the lobby validates Start and before match seed initialization. Save the full replay on normal mission exit. Add a default-on UCP option and an Auto: on/off lobby toggle.

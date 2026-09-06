@@ -144,6 +144,44 @@ assert(#recorder.commands==1 and recorder.commands[1].time==12 and recorder.comm
 assert(not engine.received[0])
 ''')
 
+    def test_local_input_records_without_any_receive_copy(self):
+        self.command_hooks('record')
+        self.check('''
+local registers={ESI=engine.base,EDX=123,ECX=456,EAX=789}
+assert(callbacks[engine.sites.localTimed.address](registers)==registers)
+assert(registers.EDX==123 and registers.ECX==456 and registers.EAX==789)
+assert(engine.received[0] and #recorder.commands==0)
+assert(before().EDX==28); after()
+assert(#recorder.commands==1 and recorder.commands[1].data=='01')
+assert(not engine.received[0])
+-- Reusing a slot must capture its new payload, not an earlier command.
+bytes[address+10]=2
+callbacks[engine.sites.localTimed.address](registers)
+assert(before().EDX==28); after()
+assert(#recorder.commands==2 and recorder.commands[2].data=='02')
+''')
+
+    def test_local_capture_keeps_mp_diagnostics_without_sp_ownership(self):
+        self.command_hooks('record')
+        self.check('''
+memory[engine.base+0x618]=1
+local events={}
+engine.trace={observe=function(_,event) events[#events+1]=event end}
+callbacks[engine.sites.localTimed.address]({ESI=engine.base})
+assert(events[1]=='locallyQueuedCommand' and not engine.received[0])
+assert(not recorder.error and #recorder.commands==0)
+''')
+
+    def test_invalid_local_payload_stops_capture_before_dispatch(self):
+        self.command_hooks('record')
+        self.check('''
+memory[engine.base+0x2d830]=1261
+local registers={ESI=engine.base,EDX=123}
+callbacks[engine.sites.localTimed.address](registers)
+assert(registers.EDX==123 and recorder.status=='error' and not engine.received[0])
+assert(before().EDX==0 and #recorder.commands==0)
+''')
+
     def test_invalid_captured_size_cannot_reach_native_copy(self):
         self.command_hooks('record')
         self.check('''
@@ -211,6 +249,9 @@ bytes[engine.sites.save.address]=0xE9
 assert(not pcall(Engine.verify))
 allActiveExtensions={{name='map-extensions',version='1.0.0'}}; modules={['map-extensions']={}}
 assert(Engine.verify())
+bytes[engine.sites.save.address]=0xE8; assert(Engine.verify())
+modules={}; assert(not pcall(Engine.verify))
+modules={['map-extensions']={}}; assert(Engine.verify())
 bytes[engine.sites.save.address+5]=0
 assert(not pcall(Engine.verify))
 ''')

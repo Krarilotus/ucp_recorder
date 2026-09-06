@@ -5,6 +5,20 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_optional_ui_resolves_entries_before_recorder_hooks(self):
+        self.check('''
+local accessed=false
+modules={ui={access=function() accessed=true end}}
+core.readBytes=function(address,size)
+ assert(accessed,'UI callable entries were not resolved before native verification')
+ for _,site in pairs(sites) do if site.address==address then return site.bytes end end
+ error('unexpected address')
+end
+assert(NativeUI.verify()==sites)
+modules=nil
+assert(NativeUI.verify()==sites)
+''')
+
     def test_keyboard_is_consumed_only_in_our_singleplayer_dialogs(self):
         self.check('''
 local hook; local forwarded=0; local handled=0; local single=true
