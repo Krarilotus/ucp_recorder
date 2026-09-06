@@ -46,9 +46,10 @@ class InspectionTests(unittest.TestCase):
 
     def test_incompatible_start_and_damaged_counts_are_rejected(self):
         first = self.write('first', self.sample())
-        for damage in ('start', 'count', 'gap', 'duplicate'):
+        for damage in ('start', 'count', 'gap', 'duplicate', 'format'):
             rows = self.sample()
             if damage == 'start': rows[0]['rng'][0] = 99
+            if damage == 'format': rows[0]['format'] = 2
             if damage == 'count': rows[1]['count'] = 99
             if damage == 'gap': rows[1]['fromTick'] = 60
             if damage == 'duplicate': rows[1]['calls'] *= 2; rows[1]['count'] = 2

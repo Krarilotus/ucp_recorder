@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.30.1
+
+- Fix startup with single-player RNG diagnostics enabled under UCP's restricted
+  extension loader. Use an arithmetic ordering checksum instead of requiring
+  LuaJIT's host-only `bit` module. Trace format 2 distinguishes the new checksum;
+  the comparator rejects attempts with different checksum formats.
+- Test loading with extension-only dependencies and checksum equality on Lua
+  5.4 and LuaJIT, including large addresses and repeated integer wraparound.
+
 ## 0.30.0
 
 - Add optional single-player RNG caller diagnostics for both recording and

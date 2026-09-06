@@ -43,7 +43,7 @@ def failure(folder):
 
 def trace(path):
     entries = list(rows(path))
-    if not entries or entries[0].get("kind") != "header" or entries[0].get("format") != 1:
+    if not entries or entries[0].get("kind") != "header" or entries[0].get("format") not in (1, 2):
         raise ValueError(f"{path}: unsupported or missing attribution header")
     checkpoints = [e for e in entries if e.get("kind") == "checkpoint"]
     previous = entries[0]["firstTick"]
@@ -60,7 +60,7 @@ def trace(path):
 def compare(first, second):
     a_header, a_rows, a_complete = trace(first)
     b_header, b_rows, b_complete = trace(second)
-    for key in ("replay", "variant", "executable", "firstTick", "rng"):
+    for key in ("format", "replay", "variant", "executable", "firstTick", "rng"):
         if a_header[key] != b_header[key]:
             raise ValueError(f"Attribution starting {key} differs")
     result = {"firstClosed": a_complete, "secondClosed": b_complete,

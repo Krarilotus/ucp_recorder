@@ -100,3 +100,10 @@ creation (`0x00404AE0`), poison-cloud updates (`0x004087C0`), heads-on-spikes
 updates (`0x00405C00`), and crow creation (`0x004F3150`). These are investigation
 targets, not identified defects. Suppressing them indiscriminately would change
 gameplay or entity state. Use caller evidence before selecting a fix.
+
+### Restricted loader correction (0.30.1 / 0.31.1)
+
+The initial collector required a host `bit` module, which UCP cannot resolve
+inside an extension ZIP. The corrected collector has no external bit-library
+dependency. Format 2 identifies its arithmetic ordering checksum; the comparator
+accepts both formats separately but rejects comparisons across formats.
