@@ -18,3 +18,9 @@ jobs:
       - run: cmake -S tests/framework-settings -B build-framework-settings
       - run: cmake --build build-framework-settings --config Release
       - run: ctest --test-dir build-framework-settings -C Release --output-on-failure
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: framework-settings-validator-windows
+          path: build-framework-settings/Release/framework_settings_check.exe
+          if-no-files-found: error
