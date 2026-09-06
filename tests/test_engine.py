@@ -120,7 +120,7 @@ end
 function recorder:onExecutedCommand(c) self.commands[#self.commands+1]=c end
 engine:install(recorder)
 address=engine.base+0x3c67c
-memory[engine.base+0x2d824]=0; memory[address]=10; bytes[address+8]=28
+memory[engine.base+0x2d824]=0; memory[address]=10; bytes[address+8]=34
 memory[engine.base+engine.sites.actorOffset]=1
 memory[0x1fe7da8]=10
 memory[engine.base+0x2d830]=1; bytes[engine.buffer]=1; bytes[address+10]=1
@@ -138,7 +138,7 @@ function after() callbacks[engine.sites.executed.address]({ESI=engine.base}) end
 callbacks[engine.sites.copySize.address]({ESI=engine.base,EDX=engine.buffer})
 assert(#recorder.commands==0)
 memory[0x1fe7da8]=12 -- late delivery: record the actual execution boundary
-assert(before().EDX==28 and #recorder.commands==0)
+assert(before().EDX==34 and #recorder.commands==0)
 after()
 assert(#recorder.commands==1 and recorder.commands[1].time==12 and recorder.commands[1].data=='01')
 assert(not engine.received[0])
@@ -151,13 +151,13 @@ local registers={ESI=engine.base,EDX=123,ECX=456,EAX=789}
 assert(callbacks[engine.sites.localTimed.address](registers)==registers)
 assert(registers.EDX==123 and registers.ECX==456 and registers.EAX==789)
 assert(engine.received[0] and #recorder.commands==0)
-assert(before().EDX==28); after()
+assert(before().EDX==34); after()
 assert(#recorder.commands==1 and recorder.commands[1].data=='01')
 assert(not engine.received[0])
 -- Reusing a slot must capture its new payload, not an earlier command.
 bytes[address+10]=2
 callbacks[engine.sites.localTimed.address](registers)
-assert(before().EDX==28); after()
+assert(before().EDX==34); after()
 assert(#recorder.commands==2 and recorder.commands[2].data=='02')
 ''')
 
@@ -193,7 +193,7 @@ assert(result.EAX==0 and recorder.status=='error' and not engine.received[0])
     def test_valid_playback_counts_only_returned_handlers(self):
         self.command_hooks('play')
         self.check('''
-assert(before().EDX==28 and engine.journal.executed==0 and engine:commandsPending())
+assert(before().EDX==34 and engine.journal.executed==0 and engine:commandsPending())
 after(); assert(engine.journal.executed==1 and not engine:commandsPending())
 ''')
 

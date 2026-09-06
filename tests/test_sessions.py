@@ -185,7 +185,7 @@ assert(savedManifest.status=='complete' and savedManifest.lastTick==512)
 
     def test_full_ring_does_not_consume_prefetched_command(self):
         self.check('''
-local r=session(); r.status='playing'; r.mode='play'; r.playedCommands=0; r.manifest={player=1}; now=100; space=false
+local r=session(); r.status='playing'; r.mode='play'; r.playedCommands=0; r.manifest={player=1,variant='SHC'}; now=100; space=false
 r.nextCommand=command(110); r:feed()
 assert(scheduled==0 and r.nextCommand.time==110)
 space=true; now=110; r.loadCommand=function() return nil end; r:feed()
@@ -281,11 +281,12 @@ assert(not r:guard(function() r:reset() end)); assert(savedManifest.status=='fai
     def test_save_and_network_commands_are_not_replayed(self):
         self.check('''
 local validation=require('code/validation')
-for _,category in ipairs({2,39,46,89,95,109,121,122}) do
+for _,category in ipairs({2,14,39,46,89,95,109,121,122}) do
  local c=command(); c.commandCategory=category
  assert(not pcall(validation.sessionCommand,c,{player=1,variant='SHC'}))
 end
 local c=command(); c.commandCategory=119
+c.size=8; c.data=string.rep('00',8)
 assert(not pcall(validation.sessionCommand,c,{player=1,variant='SHC'}))
 assert(pcall(validation.sessionCommand,c,{player=1,variant='Extreme'}))
 ''')

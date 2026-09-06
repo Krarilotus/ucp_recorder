@@ -33,21 +33,18 @@ function M.info(info)
   return info
 end
 
--- Single-player simulation commands from OpenSHC's GameCommandType. Protocol,
--- lobby, save/load and unknown extension commands must never run from a replay.
-local gameplay = {}
-for _,id in ipairs({14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
-  31,34,35,36,38,41,42,43,44,45,68,69,70,71,78,113,119}) do gameplay[id]=true end
+local payloadSize=require('code/command-layouts')
 
 function M.sessionCommand(command, manifest)
   M.command(command)
   if command.commandCategory==122 then
     require('code/automarket-replay').command(command,manifest.automarket)
   else
-    assert(gameplay[command.commandCategory],
-    'Unsupported replay command category '..command.commandCategory..' (save/load and network commands are excluded)')
+    local expected=payloadSize(command.commandCategory,manifest.variant)
+    assert(expected,
+      'Unsupported replay command category '..command.commandCategory..' (immediate, save/load and network commands are excluded)')
+    assert(command.size==expected,'Replay command payload size differs from the native '..manifest.variant..' layout')
   end
-  assert(command.commandCategory~=119 or manifest.variant=='Extreme','Tactical powers require Extreme')
   assert(command.player==manifest.player,'Replay command uses a different player slot')
   return command
 end

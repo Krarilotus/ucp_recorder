@@ -60,7 +60,7 @@ function fixture(name)
   return r
 end
 function resourceState(value) local t={}; for i=1,200 do t[i]=value or 0 end; return t end
-function command(tick) return {time=tick or 1,commandCategory=28,player=1,size=1,data='01'} end
+function command(tick) return {time=tick or 1,commandCategory=34,player=1,size=1,data='01'} end
 function allClosed() for _,h in ipairs(handles) do assert(h.closed) end end
 ''')
 

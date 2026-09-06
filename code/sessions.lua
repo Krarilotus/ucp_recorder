@@ -1,6 +1,6 @@
 local platform = require('code/platform')
 local validation = require('code/validation')
-local M = {FORMAT = 1, ROOT = 'ucp/replays', PROFILE = 'recorder-sp-v8'}
+local M = {FORMAT = 1, ROOT = 'ucp/replays', PROFILE = 'recorder-sp-v9'}
 local activeSettings
 
 local function read(path)

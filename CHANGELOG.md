@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.23.0
+
+- Prevent delayed AI taunt replies from advancing simulation RNG during active
+  single-player recording/playback. Their native two-second wall-clock timer,
+  speaker selection and chat behavior remain; idle games and multiplayer retain
+  the original RNG path.
+- Validate exact native timed-command payload lengths before replay loading and
+  dispatch, including Crusader's 402-byte and Extreme's 1,252-byte unit-selection
+  payloads. Reject truncated/extended layouts even when replay checksums match.
+- Remove chat/taunt category 14 from the timed replay allowlist: its native
+  handler declares a 544-byte immediate message and resets its timestamp to zero.
+  This release does not add chat playback.
+- Use simulation profile `recorder-sp-v9`. Make fresh recordings with this
+  version; earlier recordings need their original recorder release. This avoids
+  silently playing old RNG histories with the new taunt guard.
+- Add original-executable tests for command layouts and the complete AI reply
+  selection routine on both variants. Multiplayer playback is still unavailable;
+  live taunt, Extreme, menu and settings-restart tests remain required.
+
 ## 0.22.0
 
 - Reject multiplayer comparisons that use the same logical player twice, omit

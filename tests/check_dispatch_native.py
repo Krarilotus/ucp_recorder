@@ -46,7 +46,7 @@ def check_dispatch(reader,variant):
             write(local_queue,reader(local_queue,0x1e3))
             write(transmit,b'\xc2\x14\x00') # transport is outside this queue test
         write(fill,b'\xc2\x0c\x00'); write(copy,b'\xc2\x0c\x00'); write(handler,b'\xc3')
-        put(table+28*4,handler)
+        put(table+15*4,handler)
         write(handler+4,b'\xc3'); put(table,handler+4)
         put(base+0x618,99); put(base+actor+4,3)
         hooks,detours={},{}
@@ -158,10 +158,10 @@ function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=com
             count=100 if replay or capture else 2
             for _ in range(count):
                 sequence+=1
-                command=lua.table_from(dict(commandCategory=28,player=3,time=now,size=4,
+                command=lua.table_from(dict(commandCategory=15,player=3,time=now,size=4,
                     data=struct.pack('<I',sequence).hex()))
                 if capture:
-                    call(local_queue,(base,28),1)
+                    call(local_queue,(base,15),1)
                 else:
                     engine.scheduleCommand(engine,command)
             call(dispatch,(base,),1)
@@ -183,7 +183,7 @@ function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=com
             scratch={offset:get(base+offset) for offset in offsets}
             inferred_size[0]=8
             ok,reason=lua.eval('function(c) return pcall(engine.scheduleCommand,engine,c) end')(
-                lua.table_from(dict(commandCategory=28,player=3,time=16,size=4,data='01000000')))
+                lua.table_from(dict(commandCategory=15,player=3,time=16,size=4,data='01000000')))
             assert not ok and 'payload size or source differs' in reason
             assert read(address,1272)==before
             assert all(get(base+offset)==value for offset,value in scratch.items())

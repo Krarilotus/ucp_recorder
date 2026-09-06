@@ -2,6 +2,12 @@
 
 Work in progress: recording and playback of single-player Stronghold Crusader and Crusader Extreme Skirmishes using UCP3.
 
+Version 0.23.0 isolates a wall-clock-triggered AI taunt RNG advance and checks
+exact native command payload lengths, including Extreme's larger selection
+packet. **Make fresh recordings:** this uses simulation profile `recorder-sp-v9`;
+older captures require their earlier release. See [taunt and command-layout
+findings](docs/taunts-and-command-layouts.md). Chat playback is not included.
+
 Version 0.17.0 records new single-player Skirmishes automatically, saves them on normal mission exit, and adds **Save replay as...** to the in-game pause menu. Named copies preserve the match so far while recording continues. The lobby has **Auto: on/off** and **Replays** buttons; the library supports naming and automatically chooses the recorded-settings restart when Play needs it. Buttons use the game's original interface skin, gold font and red modal frames.
 
 Development 0.18.0 Crusader playback completed twice with two AIs. A separate Automarket match replayed 69,573 ticks and 13 commands with RNG/resource checkpoints matched; native named-save controls were also exercised. A published 0.19.0 two-peer Ascension test captured 63 identical timed commands and 241 matching resource checkpoints, but RNG stream 1 differed and immediate messages left coverage incomplete. **Extreme gameplay, settings restart and full multiplayer replay still need live verification and engineering.** Multiplayer recording/playback remains unsupported. See the [library flow](docs/replay-library.md), [dispatch evidence](docs/replay-dispatch.md) and [multiplayer findings](docs/multiplayer-findings.md).
@@ -48,4 +54,4 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.22.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
+The builder creates `dist/recorder-0.23.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.

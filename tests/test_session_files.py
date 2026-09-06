@@ -122,7 +122,7 @@ function recording()
  m.startResources=resourceState(); m.finalResources=resourceState()
  m.snapshotHash=string.rep('b',64); m.rngHash=string.rep('c',64); m.finalRngHash=string.rep('d',64)
  local path=store.path(m.id)
- local function command(t) return {commandCategory=28,player=1,time=t,size=1,data='01'} end
+ local function command(t) return {commandCategory=34,player=1,time=t,size=1,data='01'} end
  store.write(path..'/stream-commands.json',json:encode(command(10))..'\\n'..json:encode(command(65))..'\\n')
  store.write(path..'/stream-rng-sync.json',json:encode({time=0,rng={1,2,3,4},resources=resourceState(),rngHash=m.rngHash})..'\\n'..json:encode({time=64,rng=m.finalRng,resources=resourceState(),rngHash=m.finalRngHash})..'\\n')
  store.write(path..'/stream-infself.json',json:encode({gameType=0,mapSeed=123,matchSeed=123,RNGvalue1=1,RNGvalue2=2,RNGindex1=4,RNGindex2=3})..'\\n')

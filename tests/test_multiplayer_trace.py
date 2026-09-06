@@ -122,6 +122,7 @@ memory[engine.base+0x618]=1
 memory[engine.base+engine.sites.actorOffset]=3
 for slot=1,8 do memory[engine.base+0x6a8+slot*4]=100+slot end
 memory[address+4]=103
+bytes[address+8]=28 -- independent diagnostic fixture; no SP schema validation
 recorder.active=false; recorder.mode='none'
 engine.resourceState=function() return resourceState() end
 core.writeInteger=function() error('diagnostics attempted native state write') end
