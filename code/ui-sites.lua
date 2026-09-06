@@ -2,6 +2,11 @@
 -- Signatures and ABI: UCP ui module ui/game.lua and ui/headers/latest/ui.h.
 return {
   SHC = {
+    basicButton = {address=0x00463A90, bytes={139,68,36,4,131,236,8,86,139,53,168,49,237,0,51,201}},
+    buttonSurface = {address=0x004918CC, bytes={185,188,199,242,0}, value=0x00F2C7BC},
+    windowProc = {address=0x004B2AE0, bytes={131,236,72,161,32,66,185,0}},
+    pauseArray = {address=0x0059AD80, bytes={104,216,1,96,0}, value=0x006001D8},
+    pauseModal = {address=0x0059B3C7, bytes={185,200,81,223,0}, value=0x00DF51C8},
     handleMenu = {address=0x004F6280, bytes={83,139,217,86,139,51,199,67,20,0,0,0,0}},
     menuConstructor = {address=0x004F4100, bytes={81,83,139,217}},
     modalConstructor = {address=0x004A9E00, bytes={139,84,36,8,139,193,139,76,36,4,137,8}},
@@ -16,6 +21,11 @@ return {
     modalStack = {address=0x004A9E40, bytes={139,21,164,66,223,0,137,80,36}, value=0x00DF42A4},
   },
   Extreme = {
+    basicButton = {address=0x00463CA0, bytes={139,68,36,4,131,236,8,86,139,53,40,54,237,0,51,201}},
+    buttonSurface = {address=0x00491A2C, bytes={185,60,204,242,0}, value=0x00F2CC3C},
+    windowProc = {address=0x004B2C50, bytes={131,236,72,161,176,67,185,0}},
+    pauseArray = {address=0x0059B1B0, bytes={104,232,0,96,0}, value=0x006000E8},
+    pauseModal = {address=0x0059B7F7, bytes={185,96,82,223,0}, value=0x00DF5260},
     handleMenu = {address=0x004F6610, bytes={83,139,217,86,139,51,199,67,20,0,0,0,0}},
     menuConstructor = {address=0x004F4490, bytes={81,83,139,217}},
     modalConstructor = {address=0x004A9F70, bytes={139,84,36,8,139,193,139,76,36,4,137,8}},

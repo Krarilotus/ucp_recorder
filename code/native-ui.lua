@@ -14,9 +14,10 @@ function M.verify()
 end
 
 function M.new(sites,onError)
-  local o=setmetatable({sites=sites,onError=onError,textBuffer=core.allocate(1024,true)},{__index=M})
+  local o=setmetatable({sites=sites,onError=onError,dialogs={},textBuffer=core.allocate(1024,true)},{__index=M})
   o.textNative=core.exposeCode(sites.text.address,9,1)
   o.borderNative=core.exposeCode(sites.border.address,6,1)
+  o.buttonNative=core.exposeCode(sites.basicButton.address,3,1)
   o.menuConstructor=core.exposeCode(sites.menuConstructor.address,2,1)
   o.modalConstructor=core.exposeCode(sites.modalConstructor.address,10,1)
   o.activateNative=core.exposeCode(sites.activateModal.address,3,1)
@@ -51,10 +52,13 @@ function M:button(address,x,y,width,height,label,action,selected)
     local drawX,drawY=core.readInteger(state),core.readInteger(state+4)
     local text=type(label)=='function' and label() or label
     if text=='' then return end
+    -- The same tiled interface_icons3 skin used by the native pause-menu buttons.
+    self.buttonNative(self.sites.buttonSurface.value,0,-1)
     local color=core.readSmallInteger(self.sites.gold.value)%65536
     local hover=core.readInteger(state+16)~=0
+    self.borderNative(self.sites.pencil.value,drawX,drawY,drawX+width-1,drawY+height-1,color)
     if hover or (selected and selected()) then
-      self.borderNative(self.sites.pencil.value,drawX,drawY,drawX+width-1,drawY+height-1,color)
+      self.borderNative(self.sites.pencil.value,drawX+2,drawY+2,drawX+width-3,drawY+height-3,color)
     end
     self:text(text,drawX+8,drawY+math.floor((height-12)/2))
   end))
@@ -74,6 +78,7 @@ function M:modal(items,count,width,height,render)
   core.writeInteger(array+count*self.ITEM_SIZE,0x66)
   self.menuConstructor(menu,array)
   local used={}
+  for id in pairs(self.dialogs) do used[id]=true end
   local pointer=core.readInteger(self.sites.modalStack.value)
   local seen={}; local entries=0
   while pointer~=0 and pointer~=-1 and pointer~=0xffffffff do
@@ -89,34 +94,82 @@ function M:modal(items,count,width,height,render)
   end)
   -- Native red double frame; centered coordinates and the game's own backdrop.
   self.modalConstructor(dialog,id,-1,-1,width,height,512,0,callback,menu)
+  self.dialogs[id]=true
   return id
 end
 
-function M:show(id) self.activateNative(self.sites.modalComposition.value,id,0) end
+-- Retain the native pause-menu stack when opening a replay submenu.
+function M:show(id) self.activateNative(self.sites.modalComposition.value,id,1) end
 function M:close() self:show(-1) end
+
+function M:activeDialog()
+  return core.readInteger(self.sites.modalComposition.value+0x2c)
+end
+
+function M:installInput(singlePlayer,handler)
+  local original
+  -- WindowProc is stdcall with four stack arguments. UCP's thiscall bridge with
+  -- an unused ECX argument has the same stack cleanup (ret 16); native code
+  -- never reads incoming ECX. No global game text buffer is borrowed.
+  original=core.hookCode(function(unused,window,message,key,data)
+    if singlePlayer() and self.dialogs[self:activeDialog()]
+      and (message==0x100 or message==0x101 or message==0x102) then
+      local ok,reason=pcall(handler,message,key)
+      if not ok then self.onError(reason) end
+      return 0
+    end
+    return original(unused,window,message,key,data)
+  end,self.sites.windowProc.address,5,1,#self.sites.windowProc.bytes)
+end
+
+function M:extendPause(label,action,predicate)
+  local size=10*self.ITEM_SIZE -- original nine entries plus sentinel
+  local array=core.allocate(size+self.ITEM_SIZE,true)
+  core.copyMemory(array,self.sites.pauseArray.value,size)
+  local item=array+size-self.ITEM_SIZE
+  core.copyMemory(item+self.ITEM_SIZE,item,self.ITEM_SIZE)
+  self:button(item,100,342,300,27,label,action)
+  core.writeCode(self.sites.pauseArray.address,{
+    core.AssemblyLambda('push array',{array=array})
+  })
+  self:trackVisibility({item},predicate)
+  local original
+  original=core.hookCode(function(this,id,retain)
+    if id==5 then
+      core.writeInteger(self.sites.pauseModal.value+0x10,predicate() and 405 or 357)
+    end
+    return original(this,id,retain)
+  end,self.sites.activateModal.address,3,1,#self.sites.activateModal.bytes)
+end
 
 function M:trackVisibility(referenceItems,predicate)
   local callbacks={}
   for _,item in ipairs(referenceItems) do callbacks[core.readInteger(item+20)]=true end
+  self.visibilityGroups=self.visibilityGroups or {}
+  self.visibilityGroups[#self.visibilityGroups+1]={items=referenceItems,callbacks=callbacks,predicate=predicate}
+  if self.visibilityInstalled then return end
+  self.visibilityInstalled=true
   local original
   original=core.hookCode(function(this,action)
-    if this==core.readInteger(referenceItems[1]+0x4c) then
-      local ok,reason=pcall(function()
-        local item=core.readInteger(this)
-        local visible=predicate()
-        -- Find our callbacks in the current array, allowing other modules to
-        -- reallocate or append items. A negative type skips only this item.
-        for _=1,4096 do
-          local kind=core.readInteger(item)
-          if kind==0x66 then return end
-          if callbacks[core.readInteger(item+20)] then
-            core.writeInteger(item,visible and 3 or -2147483645)
+    for _,group in ipairs(self.visibilityGroups) do
+      if this==core.readInteger(group.items[1]+0x4c) then
+        local ok,reason=pcall(function()
+          local item=core.readInteger(this)
+          local visible=group.predicate()
+          -- Find our callbacks in the current array, allowing other modules to
+          -- reallocate or append items. A negative type skips only this item.
+          for _=1,4096 do
+            local kind=core.readInteger(item)
+            if kind==0x66 then return end
+            if group.callbacks[core.readInteger(item+20)] then
+              core.writeInteger(item,visible and 3 or -2147483645)
+            end
+            item=item+self.ITEM_SIZE
           end
-          item=item+self.ITEM_SIZE
-        end
-        error('Replay menu array has no terminator')
-      end)
-      if not ok then self.onError(reason) end
+          error('Replay menu array has no terminator')
+        end)
+        if not ok then self.onError(reason) end
+      end
     end
     return original(this,action)
   end,self.sites.handleMenu.address,2,1,#self.sites.handleMenu.bytes)

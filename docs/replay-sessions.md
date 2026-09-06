@@ -24,7 +24,7 @@ The local single-player identity stays intact. New commands queued by a spectato
 
 ## Configuration compatibility
 
-Version 0.16.0 uses simulation profile `recorder-sp-v8`, adding dispatch-boundary scheduling and recorded batch ordering to the earlier [audio/UI RNG guards](presentation-rng.md) and capture at the first simulation boundary. It compares
+Versions 0.16.0 and 0.17.0 use simulation profile `recorder-sp-v8`, adding dispatch-boundary scheduling and recorded batch ordering to the earlier [audio/UI RNG guards](presentation-rng.md) and capture at the first simulation boundary. It compares
 SHA-256 of all `0x9c50` bytes of the native RNG structure: current values, seed,
 stored arrays and indices. Checks run after restoration, every 64 ticks and at
 the ending boundary. A mismatch writes a `rng-state` diagnostic with its phase,
@@ -33,7 +33,7 @@ The recorder retains the last observed RNG bytes at each tick and hashes that
 retained state when finishing, rather than reading possibly reset state after
 quitting. Older experimental recordings require their original recorder version.
 
-Settings are captured when the module enables, not reread when the user begins a recording. Playback requires the captured configuration bytes and the resolved configuration/extension-version environment to match. A restart with the saved configuration is necessary when these differ; the replay browser offers an explicit settings restart, which still needs live verification.
+Settings are captured when the module enables, not reread when the user begins a recording. Playback requires the captured configuration bytes and the resolved configuration/extension-version environment to match. A restart with the saved configuration is necessary when these differ; Play in the replay browser queues the required settings restart, which still needs live verification.
 
 Version equality does not prove that unpacked extensions have identical source files, or that map assets and external resources are unchanged. No extension download, installation or version switching is performed. Replays are local test artifacts; native save/payload handling has not been audited as a parser for hostile downloaded files.
 
@@ -46,3 +46,7 @@ Multiplayer capture/playback, resynchronization packets, lobby commands, native 
 `engine-sites.lua` contains checked entry bytes for both executables. Save/load uses FilePackager and the game's load-dialog handler, with a temporary filename override limited to save resources. Temporary resource type, filename, progress callback and list-selection fields are restored after failure. The scheduler copy guard replaces the six-byte load of `commandSize` before the payload copy. The simulation hook runs before the native RNG advance and tick increment; its halt branch skips that tick sequence.
 
 See `tests/check_executables.py` for read-only checks against original executable files and `tests/test_engine.py` for injected native-wrapper failures. Neither replaces a successful live capture/load/replay comparison.
+
+## Named copies (0.17.0)
+
+`displayName` is optional ASCII metadata (1-40 characters), separate from the stable directory identifier. `sourceId` identifies the recording a named copy came from. Copying flushes the active streams, copies the starting save/RNG/settings and journals into a new directory, then seals the copy at the retained last observed boundary. It never truncates the source or makes another native snapshot. The copy remains failed if copying or validation fails. Completed recordings can be renamed by atomic manifest replacement without changing replay streams. Normal mission exit seals the full automatic capture; forced process termination still leaves an incomplete recording.

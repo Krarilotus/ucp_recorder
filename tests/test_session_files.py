@@ -12,6 +12,44 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_named_copies_are_independent_complete_files_and_do_not_trim_source(self):
+        self.lua.execute('''
+local m=recording(); local path=store.path(m.id)
+store.write(path..'/start.sav','snapshot'); store.write(path..'/rng.bin','rng')
+m.snapshotHash=sha.sha256('snapshot'); m.rngHash=sha.sha256('rng')
+local original=store.read(path..'/stream-commands.json')
+local a=store.copy(m,'Stream match',m.finalRngHash)
+local b=store.copy(m,'Stream match',m.finalRngHash)
+assert(a.id~=b.id and a.id~=m.id and a.status=='complete' and a.commandCount==1)
+assert(a.displayName=='Stream match' and a.sourceId==m.id)
+assert(m.commandCount==0 and m.status=='armed' and store.read(path..'/stream-commands.json')==original)
+store.preflight(store.load(a.id,profile)); store.preflight(store.load(b.id,profile))
+local sealed=store.read(store.path(a.id)..'/stream-commands.json')
+store.rename(a.id,'Renamed',profile)
+assert(store.load(a.id,profile).displayName=='Renamed')
+assert(store.read(store.path(a.id)..'/stream-commands.json')==sealed)
+''')
+
+    def test_naming_rejects_controls_and_never_uses_name_as_path(self):
+        self.lua.execute('''
+local m=recording(); store.finish(m)
+for _,name in ipairs({'','   ',string.rep('x',41),'bad\\nname','bad\\0name'}) do
+ assert(not pcall(store.rename,m.id,name,profile))
+end
+local renamed=store.rename(m.id,' ../same/name ',profile)
+assert(renamed.id==m.id and renamed.displayName=='../same/name')
+assert(store.load(m.id,profile).displayName=='../same/name')
+''')
+
+    def test_failed_copy_cannot_be_played_and_preserves_source(self):
+        self.lua.execute('''
+local m=recording(); local before=store.read(store.path(m.id)..'/stream-commands.json')
+assert(not pcall(store.copy,m,'Missing snapshot',m.finalRngHash))
+assert(store.read(store.path(m.id)..'/stream-commands.json')==before)
+for _,item in ipairs(store.list()) do
+ if item.id~=m.id then assert(item.status=='failed' and not pcall(store.load,item.id,profile)) end
+end
+''')
     def test_oversized_same_tick_batch_cannot_be_sealed_or_loaded(self):
         self.lua.execute('''
 local m=recording(); local path=store.path(m.id)..'/stream-commands.json'

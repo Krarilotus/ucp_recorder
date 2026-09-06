@@ -62,6 +62,7 @@ end
 
 function M.manifest(value)
   assert(type(value)=='table','Invalid replay manifest')
+  if value.displayName~=nil then M.displayName(value.displayName) end
   require('code/automarket-replay').descriptor(value.automarket)
   M.integer(value.player,1,8,'player slot')
   M.integer(value.startTick,0,2147483647,'starting tick')
@@ -73,6 +74,14 @@ function M.manifest(value)
   for _,key in ipairs({'settingsHash','environmentHash','snapshotHash','rngHash','finalRngHash','commandsHash','checkpointsHash','infoHash'}) do
     M.hash(value[key],key)
   end
+  return value
+end
+
+function M.displayName(value)
+  assert(type(value)=='string','Enter a replay name')
+  value=value:match('^%s*(.-)%s*$')
+  assert(#value>=1 and #value<=40,'Use a replay name between 1 and 40 characters')
+  assert(not value:find('[^ -~]'),'Use letters, numbers and standard punctuation')
   return value
 end
 

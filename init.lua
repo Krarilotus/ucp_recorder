@@ -17,7 +17,7 @@ function module:enable(config)
   local engine=Engine.new(sites)
   if config.multiplayerDiagnostics then engine.trace=require('code/multiplayer-trace').new(engine) end
   fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
-  local recorder=Session:new(engine)
+  local recorder=Session:new(engine,config)
   self.recorder=recorder
   engine:install(recorder)
   if engine.trace then require('code/network-observer').install(engine.trace) end
@@ -33,6 +33,7 @@ function module:enable(config)
       return registers
     end,address,size)
   end
+  observe(native.addr(0x442877),5,function() recorder:beginMatch() end)
   observe(native.addr(0x4428c6),10,function()
     if engine.trace then engine.trace:observe('stop','new match') end
     recorder:prepareRecording()

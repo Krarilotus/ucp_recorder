@@ -19,12 +19,16 @@ package.loaded['code/sessions']={
   error('missing recording')
  end,
  compatible=function(m) return not m.different end,
+ title=function(m) return m.displayName or m.id end,
+ settings=function() return {hash=currentSettings or 'current'} end,
+ rename=function(id,name) for _,item in ipairs(entries) do if item.id==id then item.displayName=name end end end,
 }
+package.loaded['code/restart']={queue=function(id) restarted=id end}
 recorder={mode='none',guard=function(_,fn) fn(); return true end,
  startPlayback=function(_,id) played=id end}
 Browser=require('code/browser'); browser=Browser:new(recorder)
 function entry(id,state,variant)
- return {id=id,status=state or 'complete',variant=variant or 'SHC',startTick=0,lastTick=100}
+ return {id=id,status=state or 'complete',variant=variant or 'SHC',startTick=0,lastTick=100,settingsHash='recorded'}
 end
 ''')
 
@@ -47,8 +51,22 @@ assert(not played)
         self.check('''
 entries={entry('failed','failed'),entry('different')}; entries[2].different=true
 browser:refresh(); assert(not pcall(function() browser:play() end))
-browser:select(2); assert(not pcall(function() browser:play() end)); assert(not played)
+browser:select(2); assert(not browser:play()); assert(not played and restarted=='different')
 entries[2].different=false; browser:play(); assert(played=='different')
+''')
+
+    def test_matching_config_but_different_modules_does_not_restart_forever(self):
+        self.check('''
+entries={entry('different')}; entries[1].different=true; currentSettings='recorded'
+browser:refresh(); assert(not pcall(function() browser:play() end))
+assert(not restarted and not played)
+''')
+
+    def test_rename_keeps_identity_selection_and_displays_name(self):
+        self.check('''
+entries={entry('one'),entry('two')}; browser:refresh('two')
+browser:rename('Stream match'); assert(browser.selected.id=='two' and browser.index==2)
+assert(browser:row(2):find('Stream match',1,true))
 ''')
 
     def test_paging_bounds_and_active_recording(self):

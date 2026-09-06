@@ -2,7 +2,9 @@
 
 Work in progress: recording and playback of single-player Stronghold Crusader and Crusader Extreme Skirmishes using UCP3.
 
-Version 0.16.0 schedules replay commands at the native dispatch boundary, preserves their recorded order across ring wrap, checks the complete batch before dispatch and cleans up queued commands on failure or cancellation. It includes the earlier audio/UI RNG fixes and multiplayer diagnostics. Recordings, the native replay browser and loading a starting save have been exercised in game. **A complete replay with the latest fixes, Extreme gameplay and settings restart still need live verification.** Multiplayer recording/playback remains unsupported. See the [dispatch evidence](docs/replay-dispatch.md), [multiplayer evidence](docs/multiplayer-diagnostics.md) and [live findings and next tests](docs/live-validation.md).
+Version 0.17.0 records new single-player Skirmishes automatically, saves them on normal mission exit, and adds **Save replay as...** to the in-game pause menu. Named copies preserve the match so far while recording continues. The lobby has **Auto: on/off** and **Replays** buttons; the library supports naming and automatically chooses the recorded-settings restart when Play needs it. Buttons use the game's original interface skin, gold font and red modal frames.
+
+**The new controls, complete latest-build playback, Extreme gameplay and settings restart still need live verification.** Automated file/menu tests and original-executable checks pass. Multiplayer recording/playback remains unsupported. See the [library flow](docs/replay-library.md), [dispatch evidence](docs/replay-dispatch.md) and [remaining live tests](docs/live-validation.md).
 
 Automarket 1.1.0 has an experimental replay adapter for its settings commits and native custom save section. Use protocol 1.0.0 and map-extensions 1.0.0, with **recorder after protocol in the extension order**. The normal weekly trades run in the simulation; they are not replayed as extra trades. Other custom protocols remain unsupported. See [Automarket replay notes](docs/automarket-replay.md).
 
@@ -12,16 +14,16 @@ Optional **Multiplayer diagnostics** logs actual command execution and periodic 
 
 Use a separate game installation with UCP3 developer mode and this module enabled. If your game needs Graphics API Replacer, keep it and its dependencies enabled in the test configuration.
 
-1. Open a single-player Skirmish lobby and configure the match.
-2. Click **Record** near the bottom. This arms a new recording; **Cancel** cancels it.
-3. Start the match. The module captures the starting save and begins recording.
-4. Leave through **Quit Mission** to finalize the recording. Do not terminate the process to finish a replay.
-5. Return to a Skirmish lobby, open **Replays**, select a completed session and click **Play**. The saved starting state replaces manual map/AI setup.
-6. If settings differ, click **Queue settings restart**, close the dialog, and exit the game normally. The helper reopens the same game executable with the recorded UCP configuration. Open the Skirmish replay browser again; the requested recording is selected.
+1. Open a single-player Skirmish lobby and configure the match. **Auto: on** is the default; click it to disable recording for this game launch.
+2. Start the match. Recording begins automatically, including its starting save, RNG state and UCP settings.
+3. Optionally open the pause menu and choose **Save replay as...**. Type a name and save a completed copy up to the latest recorded boundary. The full-match recording continues.
+4. Leave through **Quit Mission** to save the full recording automatically. Do not terminate the process to finish a replay.
+5. Return to a Skirmish lobby, open **Replays**, select a completed session and click **Play**. Use **Rename replay...** to label a completed recording.
+6. If settings differ, Play queues a settings restart. Exit normally; the helper reopens the same executable with the recorded UCP configuration. Open **Skirmish > Replays** again; the requested recording is selected. Click **Play**.
 
 Do not delete older recordings to make a new one: every session has a separate folder under `ucp/replays/`. A settings restart leaves your normal `ucp-config.yml` intact. It requires the recorded extension versions to be installed; it does not download dependencies. If the helper fails, inspect `ucp/replays/restart-error.txt`.
 
-On failure, inspect `ucp3.log` and the session's `last-error.txt` or `desync.json`. A failed or cancelled capture cannot be played. Saving/loading during a recording is currently unsupported and fails the capture explicitly.
+On failure, inspect `ucp3.log` and the session's `last-error.txt` or `desync.json`. A failed or cancelled capture cannot be played. Native game saving/loading during a recording is currently unsupported and fails the capture explicitly. The recorder's **Save replay as...** action copies replay files without issuing a native save command.
 
 See [session format and limitations](docs/replay-sessions.md), [browser and restart testing](docs/replay-browser.md), [native port notes](docs/native-port.md) and [changelog](CHANGELOG.md).
 
@@ -34,4 +36,4 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.16.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
+The builder creates `dist/recorder-0.17.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.

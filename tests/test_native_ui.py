@@ -5,6 +5,44 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_keyboard_is_consumed_only_in_our_singleplayer_dialogs(self):
+        self.check('''
+local hook; local forwarded=0; local handled=0; local single=true
+core.hookCode=function(callback,address,count,convention,size)
+ assert(address==sites.windowProc.address and count==5 and convention==1 and size==8)
+ hook=callback
+ return function(ecx,window,message,key,data)
+   assert(ecx==10 and window==20 and data==30); forwarded=forwarded+1; return 42
+ end
+end
+ui.dialogs[300]=true
+ui:installInput(function() return single end,function() handled=handled+1 end)
+memory[sites.modalComposition.value+0x2c]=300
+for _,message in ipairs({0x100,0x101,0x102}) do assert(hook(10,20,message,65,30)==0) end
+assert(handled==3 and forwarded==0)
+assert(hook(10,20,0x200,65,30)==42) -- mouse goes to native buttons
+assert(hook(10,20,0x104,65,30)==42) -- system/Alt messages remain native
+single=false; assert(hook(10,20,0x102,65,30)==42)
+single=true; memory[sites.modalComposition.value+0x2c]=5
+assert(hook(10,20,0x102,65,30)==42)
+assert(handled==3 and forwarded==4)
+''')
+
+    def test_multiple_visibility_groups_install_only_one_native_hook(self):
+        self.check('''
+local installs=0; local hook
+core.hookCode=function(callback) installs=installs+1; hook=callback; return function() return 42 end end
+memory[0x8000+0x4c]=0x7000; memory[0x8000+20]=123
+memory[0x8100+0x4c]=0x7100; memory[0x8100+20]=456
+memory[0x7000]=0x9000; memory[0x7100]=0xa000
+memory[0x9000]=3; memory[0x9000+20]=123; memory[0x9000+80]=0x66
+memory[0xa000]=3; memory[0xa000+20]=456; memory[0xa000+80]=0x66
+ui:trackVisibility({0x8000},function() return false end)
+ui:trackVisibility({0x8100},function() return true end)
+assert(installs==1 and hook(0x7000,0)==42 and hook(0x7100,0)==42)
+assert(memory[0x9000]==-2147483645 and memory[0xa000]==3)
+''')
+
     def setUp(self):
         fixture.RecorderTests.setUp(self)
         self.check('''

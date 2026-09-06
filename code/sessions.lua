@@ -78,6 +78,46 @@ function M.save(manifest)
   platform.replace(path .. '.tmp', path)
 end
 
+-- Display names are metadata, never paths. Duplicate names cannot overwrite replays.
+function M.rename(id,name,profile)
+  name=validation.displayName(name)
+  local manifest=M.load(id,profile)
+  manifest.displayName=name
+  M.save(manifest)
+  return manifest
+end
+
+function M.title(manifest)
+  local ok,name=pcall(validation.displayName,manifest.displayName)
+  return ok and name or manifest.id
+end
+
+-- Seal a separate copy at the last observed boundary without stopping capture or
+-- calling the native save routine again. The source streams remain untouched.
+function M.copy(source,name,finalRngHash)
+  name=validation.displayName(name)
+  local copy=M.new({name=source.variant,sha256=source.executable})
+  local id,created=copy.id,copy.created
+  for key,value in pairs(source) do copy[key]=value end
+  copy.id=id; copy.created=created; copy.displayName=name; copy.sourceId=source.id
+  copy.status='copying'; copy.finalRngHash=finalRngHash
+  local path,original=M.path(id),M.path(source.id)
+  local ok,reason=xpcall(function()
+    M.save(copy)
+    for _,file in ipairs({'start.sav','rng.bin','ucp-config.yml','environment.json',
+      'stream-commands.json','stream-rng-sync.json','stream-infself.json'}) do
+      write(path..'/'..file,read(original..'/'..file))
+    end
+    assert(sha.sha256(read(path..'/start.sav'))==copy.snapshotHash,'Starting save is damaged')
+    assert(sha.sha256(read(path..'/rng.bin'))==copy.rngHash,'Starting RNG state is damaged')
+    assert(sha.sha256(read(path..'/ucp-config.yml'))==copy.settingsHash,'Recorded settings are damaged')
+    assert(sha.sha256(read(path..'/environment.json'))==copy.environmentHash,'Recorded environment is damaged')
+    M.finish(copy)
+  end,debug.traceback)
+  if not ok then copy.status='failed'; pcall(M.save,copy); error(reason) end
+  return copy
+end
+
 function M.list()
   local entries=ucp.internal.io.directories(M.ROOT) or {}
   local result={}

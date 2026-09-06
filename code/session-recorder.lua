@@ -4,12 +4,28 @@ local native = require('code/native')
 local validation = require('code/validation')
 local Session = setmetatable({}, {__index=Base})
 
-function Session:new(engine)
+function Session:new(engine,config)
   local o=Base:new({name='unused',rngLogMethod='checkpoints'})
   o.engine=engine
   o.halt=core.allocate(4,true)
   o.status='idle'
+  o.autoRecord=not config or config.autoRecord~=false
   return setmetatable(o,{__index=self})
+end
+
+-- Called only after the native lobby accepted Start, before its RNG seed call.
+function Session:beginMatch()
+  if self.engine.loading or not self.engine:singlePlayer() or self.mode=='play' then return end
+  if self.mode=='record' and self.status~='armed' then self:reset() end
+  if self.autoRecord and self.mode=='none' then self:startRecording() end
+end
+
+function Session:saveCopy(name)
+  assert(self.engine:singlePlayer() and self.mode=='record' and self.status=='recording'
+    and self.active and self.observedTick,'No active recording to save yet')
+  for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do assert(self[key]:flush()) end
+  assert(self.finalRngData,'Missing ending RNG state')
+  return store.copy(self.manifest,name,sha.sha256(self.finalRngData))
 end
 
 function Session:guard(callback)

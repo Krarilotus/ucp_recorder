@@ -49,6 +49,18 @@ def check(folder):
                 if hasattr(site, 'items'):
                     expected=bytes(site['bytes'].values())
                     assert reader(site['address'],len(expected))==expected, f'{name}: {site_name}'
+        ui=lua.execute((root/'code/ui-sites.lua').read_text())[name]
+        pause=ui['pauseArray']['value']
+        assert struct.unpack('<I',reader(pause+9*80,4))[0]==0x66
+        for index in range(1,9):
+            x,y,width,height=struct.unpack('<4i',reader(pause+index*80+4,16))
+            assert x==100 and width==300 and height==27 and y+height<342
+        # Full-instruction WinProc prologue and the shared stdcall/thiscall
+        # stack layout used by installInput's unused-ECX bridge.
+        from capstone import Cs, CS_ARCH_X86, CS_MODE_32
+        proc=ui['windowProc']
+        ins=list(Cs(CS_ARCH_X86,CS_MODE_32).disasm(reader(proc['address'],8),proc['address']))
+        assert [i.mnemonic for i in ins]==['sub','mov'] and sum(i.size for i in ins)==8
         # Decode the complete mood-selection function, including conditional
         # branches: checking only known patch sites would miss an extra RNG call.
         from capstone import Cs, CS_ARCH_X86, CS_MODE_32

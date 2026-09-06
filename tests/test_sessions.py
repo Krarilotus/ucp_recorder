@@ -6,6 +6,44 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_default_recording_arms_before_seed_and_saves_each_match(self):
+        self.check('''
+local r=session(); assert(r.autoRecord and not scoped)
+r:beginMatch(); assert(r.status=='armed' and scoped and snapshots==0)
+r:prepareRecording(); now=1; r:onTick(); assert(r.active and snapshots==1)
+now=65; r:onTick(); r:reset(); assert(savedManifest.status=='complete' and savedManifest.lastTick==65)
+r:beginMatch(); r:prepareRecording(); now=1; r:onTick(); assert(snapshots==2)
+''')
+
+    def test_default_recording_respects_disabled_loading_and_multiplayer(self):
+        self.check('''
+local r=session(); r.autoRecord=false; r:beginMatch(); assert(r.mode=='none')
+r.autoRecord=true; engine.loading=true; r:beginMatch(); assert(r.mode=='none')
+engine.loading=false; engine.singlePlayer=function() return false end
+r:beginMatch(); assert(r.mode=='none' and not scoped)
+engine.singlePlayer=function() return true end
+r.mode='play'; r:beginMatch(); assert(r.mode=='play' and not scoped)
+assert(not Session:new(engine,{autoRecord=false}).autoRecord)
+''')
+
+    def test_named_copy_flushes_source_and_keeps_recording_after_success_or_failure(self):
+        self.check('''
+local r=session(); r:beginMatch(); r:prepareRecording(); now=1; r:onTick()
+local copies=0; local flushes=0
+for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do
+ r[key].flush=function() flushes=flushes+1; return true end
+end
+require('code/sessions').copy=function(manifest,name,hash)
+ assert(flushes==3 and name=='Stream' and manifest.lastTick==1 and #hash==64)
+ copies=copies+1; return {id='copy'}
+end
+assert(r:saveCopy('Stream').id=='copy' and r.status=='recording' and r.active and scoped)
+require('code/sessions').copy=function() error('Disk full') end
+assert(not pcall(function() r:saveCopy('Stream') end))
+now=2; r:onTick(); assert(r.manifest.lastTick==2 and r.status=='recording' and r.active)
+assert(snapshots==1 and copies==1)
+''')
+
     def test_start_callback_defers_snapshot_to_one_simulation_boundary(self):
         self.check('''
 local r=session(); r:startRecording(); r:prepareRecording()

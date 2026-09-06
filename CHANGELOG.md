@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.0
+
+- Record new single-player Skirmishes by default, arming after the lobby validates Start and before match seed initialization. Save the full replay on normal mission exit. Add a default-on UCP option and an Auto: on/off lobby toggle.
+- Add Save replay as... to the native pause menu. Save a named, independently sealed copy of the match so far while automatic recording continues; failures leave the source capture intact. Names are bounded metadata and duplicate names never overwrite files.
+- Add keyboard name entry, library renaming and save confirmation. Use the game's original tiled button graphics, always-visible gold outlines, hover/selection highlights, font and red modal frames in both executable profiles.
+- Make Play choose a recorded-settings restart when required. Keep the normal configuration intact and reject unresolved extension/framework mismatches instead of repeatedly restarting with identical configuration bytes.
+- Preserve native pause actions and the pause stack. Share one visibility hook across both menus; consume keyboard messages only while a recorder dialog is active in single-player.
+
+Validation: 142 automated tests pass, including file-copy isolation/failure, default capture lifecycle, actual menu actions, keyboard editing and settings routing. Original hook bytes, pause-menu layout and existing native dispatch/RNG checks pass for Crusader and Extreme. Live rendering/input, complete latest-build playback and settings handoff remain unverified; multiplayer playback remains disabled. SP simulation profile stays `recorder-sp-v8`.
+
 ## 0.16.0
 
 - Feed replay commands at the native command-selection boundary when they are due. Remove the receive-loop prefetch hook and its 64-tick lookahead; scheduling no longer depends on how often networking is polled.

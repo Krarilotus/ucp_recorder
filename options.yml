@@ -1,6 +1,14 @@
 meta:
   version: 1.0.0
 options:
+- url: recorder.autoRecord
+  header: "Record Skirmishes automatically"
+  text: "Record new single-player Skirmishes and save them when you leave the match. Named copies can also be saved from the pause menu."
+  hasHeader: true
+  display:
+  contents:
+    type: boolean
+    value: true
 - url: recorder.rngLogMethod
   header: "Type of logging method"
   text: "Type of logging method for recorded gameplay"
