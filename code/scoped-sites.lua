@@ -1,6 +1,8 @@
 -- Complete instructions for scope-gated simulation changes.
 return {
   SHC = {
+    {name="weddingHusband",address=0x00539EAB,kind="call",patch="skip",bytes={232,80,9,243,255}, target=0x0046A800},
+    {name="weddingWife",address=0x00539EC6,kind="call",patch="skip",bytes={232,53,9,243,255}, target=0x0046A800},
     {name="aiTauntReply",address=0x004D11F1,kind="call",patch="skip",bytes={232,10,150,249,255}, target=0x0046A800},
     {name="headsSelection",address=0x00444868,kind="call",patch="skip",bytes={232,147,95,2,0}, target=0x0046A800},
     {name="headsNextPreview",address=0x00445777,kind="tail",patch="return",bytes={233,132,80,2,0}, target=0x0046A800},
@@ -29,6 +31,8 @@ return {
     {name="seed",address=0x0046A74A,kind="seed",patch="seed",bytes={131,196,4,137,70,4}},
   },
   Extreme = {
+    {name="weddingHusband",address=0x0053A2CB,kind="call",patch="skip",bytes={232,80,7,243,255}, target=0x0046AA20},
+    {name="weddingWife",address=0x0053A2E6,kind="call",patch="skip",bytes={232,53,7,243,255}, target=0x0046AA20},
     {name="aiTauntReply",address=0x004D1441,kind="call",patch="skip",bytes={232,218,149,249,255}, target=0x0046AA20},
     {name="headsSelection",address=0x00444A98,kind="call",patch="skip",bytes={232,131,95,2,0}, target=0x0046AA20},
     {name="headsNextPreview",address=0x004459A7,kind="tail",patch="return",bytes={233,116,80,2,0}, target=0x0046AA20},

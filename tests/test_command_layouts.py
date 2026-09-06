@@ -55,8 +55,8 @@ assert(not ok and err:find('payload size',1,true))
     def test_old_rng_profile_is_rejected_before_native_load(self):
         self.lua.execute('''
 local m=recording(); store.finish(m)
-assert(m.simulationProfile=='recorder-sp-v9')
-m.simulationProfile='recorder-sp-v8'; store.save(m)
+assert(m.simulationProfile=='recorder-sp-v10')
+m.simulationProfile='recorder-sp-v9'; store.save(m)
 local ok,err=pcall(store.load,m.id,profile)
 assert(not ok and err:find('different simulation profile',1,true))
 ''')

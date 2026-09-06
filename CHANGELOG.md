@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.27.0
+
+- Prevent the chapel, church and cathedral wedding announcement from advancing
+  simulation RNG during single-player recording or playback. Keep the native
+  panel and eligible-couple selection available; presentation choices reuse the
+  current random value. Idle games and multiplayer keep their original behavior.
+- Advance the single-player simulation profile to `recorder-sp-v10`. Record a
+  fresh match to test this fix. Older captures still require their original
+  package; this cannot reconstruct unrecorded menu visits in an existing replay.
+- Add original-executable tests on Crusader and Extreme for wedding selection,
+  empty candidate lists, repeat visits, candidate limits, RNG wrap, read-only
+  unit data and unchanged idle/multiplayer behavior.
+- Track replay-only player viewing, usable inspection controls, failed-playback
+  feedback, native menu polish and offline multiplayer playback in the roadmap.
+
 ## 0.26.0
 
 - Check Automarket compatibility and every enabled multiplayer diagnostic hook

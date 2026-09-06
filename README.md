@@ -11,7 +11,7 @@ gameplay and the recorded-settings restart still need live verification.
 ## Install and try it
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download the
-   `recorder-0.26.0.zip` asset from this PR's test release, not GitHub's source ZIP.
+   `recorder-0.27.0.zip` asset from this PR's test release, not GitHub's source ZIP.
    Release links are posted on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls);
    assets are hosted in the [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -60,12 +60,18 @@ investigation tool, not a playable multiplayer recording. See
 [capture instructions](docs/multiplayer-diagnostics.md) and the
 [harder test matrix](docs/multiplayer-test-matrix.md).
 
-Fresh recordings use simulation profile `recorder-sp-v9`. Keep older packages for
+Version 0.27.0 prevents the church wedding announcement from consuming gameplay
+random numbers during recording/playback. This fixes a code-confirmed source of
+desync from inspecting religious buildings; a fresh in-game comparison is still
+needed. See [the evidence and test steps](docs/wedding-rng.md).
+
+Fresh recordings use simulation profile `recorder-sp-v10`. Keep older packages for
 older captures. Further details: [session limitations](docs/replay-sessions.md),
 [Automarket integration](docs/automarket-replay.md), [native port](docs/native-port.md),
 [library flow](docs/replay-library.md), [dispatch](docs/replay-dispatch.md),
 [world hashes](docs/native-world-hashes.md) and
 [paired capture analysis](docs/multiplayer-comparison.md).
+Requested menu, inspection and player-view work is tracked in [the roadmap](docs/roadmap.md).
 
 ## Development
 
@@ -76,6 +82,6 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.26.0.zip` with a flat module layout.
+The builder creates `dist/recorder-0.27.0.zip` with a flat module layout.
 `definition.yml` uses metadata schema version `1.0.0`; that is separate from
-the extension version `0.26.0`.
+the extension version `0.27.0`.
