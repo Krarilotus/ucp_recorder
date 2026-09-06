@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.32.0
+
+- Start multiplayer diagnostic capture only after the native simulation begins.
+  Loading-time RNG and network callbacks can no longer use a stale tick to open
+  and immediately close the test window before a match starts. Keep queued
+  payloads for later execution and still flag genuinely missed boundaries.
+- Translate multiplayer capture status into the selected menu language, show
+  incomplete captures explicitly, and fit status text using native font metrics.
+- Steam host/join and a two-PC AI match were exercised with Ascension and
+  Automarket. This fixes an observed capture failure; multiplayer replay playback
+  and a successful paired deterministic comparison remain unfinished.
+
 ## 0.31.2
 
 - Fix replay menus staying English in a German game when launched without a GUI

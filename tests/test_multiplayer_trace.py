@@ -130,6 +130,7 @@ function receive(size)
  memory[engine.base+0x2d830]=size or 1
  return callbacks[engine.sites.copySize.address]({ESI=engine.base,EDX=engine.buffer})
 end
+memory[0x1fe7da8]=1; engine.trace:observe('onTick') -- native simulation has begun
 ''')
 
     def test_trace_observes_resolved_remote_actor_without_changing_dispatch(self):
@@ -164,7 +165,7 @@ assert(before().EDX==28)
         self.check('''
 before(); after(); engine.trace:observe('stop','missing receipt')
 assert(traceRows[2].kind=='untracked' and traceRows[3].status=='incomplete')
-traceRows={}; receive(); before(); engine.trace:observe('stop','interrupted')
+traceRows={}; engine.trace:observe('onTick'); receive(); before(); engine.trace:observe('stop','interrupted')
 assert(traceRows[2].kind=='end' and traceRows[2].status=='incomplete')
 ''')
 
@@ -380,6 +381,7 @@ assert(#traceRows==6 and traceRows[5].kind=='header' and traceRows[6].sequence==
     def test_window_does_not_hide_system_events_at_its_start(self):
         self.bounded()
         self.check('''
+memory[0x1fe7da8]=63; engine.trace:observe('onTick')
 memory[0x1fe7da8]=64
 memory[engine.base+0x2d81c]=4; memory[engine.base+0xcd8]=0x101
 engine.trace:observe('systemMessage','systemMessage')
@@ -387,6 +389,62 @@ assert(traceRows[2].kind=='gap' and traceRows[2].details.messageType==0x101)
 engine.trace:observe('onTick')
 memory[0x1fe7da8]=128; engine.trace:observe('onTick')
 assert(traceRows[#traceRows].status=='incomplete')
+''')
+
+    def test_loading_events_with_stale_ticks_cannot_open_or_seal_capture(self):
+        self.bounded(1024, 131072)
+        self.check('''
+memory[0x1fe7da8]=197223 -- reproduced at Steam match startup, before roster setup
+memory[9000]=0x471770
+for _,event in ipairs({'rngCall','worldHash','systemMessage','immediateCommand','beforeCommand','afterCommand'}) do
+ engine.trace:observe(event,1,9000)
+end
+receive(); engine.trace:observe('locallyQueuedCommand')
+assert(#traceRows==0 and not engine.trace.closed and not engine.trace.failed)
+assert(next(engine.trace.received))
+memory[0x1fe7da8]=1; engine.trace:observe('onTick')
+memory[engine.base+0x6a8+8*4]=-1; memory[engine.base+0x714+8*4]=4
+for tick=1024,131072,64 do
+ memory[0x1fe7da8]=tick; engine.trace:observe('onTick')
+ if tick==1024 then before(); after() end
+end
+assert(traceRows[1].firstTick==1024 and traceRows[1].network.roster[8].kind=='ai')
+assert(traceRows[#traceRows].status=='complete' and traceRows[#traceRows].commands==1)
+engine.trace:observe('stop','new match')
+memory[0x1fe7da8]=197223; engine.trace:observe('rngCall',1,9000)
+assert(not engine.trace.file and not engine.trace.closed and not engine.trace.simulationObserved)
+memory[0x1fe7da8]=1; engine.trace:observe('onTick')
+memory[0x1fe7da8]=1024; engine.trace:observe('onTick')
+assert(engine.trace.file and not engine.trace.failed and engine.trace.network.roster[8].kind=='ai')
+''')
+
+    def test_real_late_simulation_start_still_marks_capture_incomplete(self):
+        self.bounded()
+        self.check('''
+memory[0x1fe7da8]=197223; engine.trace:observe('onTick')
+assert(engine.trace.closed and traceRows[#traceRows].status=='incomplete')
+assert(engine.trace:statusLines()[1]:find('Incomplete'))
+''')
+
+    def test_unbounded_capture_also_ignores_loading_dispatch(self):
+        self.check('''
+engine.trace:observe('stop','new match'); traceRows={}
+memory[0x1fe7da8]=197223; receive(); before(); after()
+assert(#traceRows==0 and not engine.trace.file)
+memory[0x1fe7da8]=1; engine.trace:observe('onTick'); receive(); before(); after()
+assert(traceRows[1].firstTick==1 and traceRows[2].kind=='command')
+''')
+
+    def test_capture_status_uses_selected_language_and_distinguishes_incomplete(self):
+        self.bounded()
+        self.check('''
+os.getenv=function() return 'de' end
+assert(engine.trace:statusLines()[1]=='Warte auf Testaufzeichnung ab Tick 64.')
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+assert(engine.trace:statusLines()[1]=='Testaufzeichnung läuft: Tick 64 / 128')
+engine.trace:observe('stop','early exit')
+assert(engine.trace:statusLines()[1]=='Unvollständige Testaufzeichnung bei Tick 64 gespeichert.')
+assert(engine.trace.lastResult.status=='incomplete')
 ''')
 
     def test_bounded_capture_handles_ring_reuse_and_ai_roster(self):

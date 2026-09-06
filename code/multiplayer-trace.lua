@@ -4,6 +4,7 @@ local platform=require('code/platform')
 local native=require('code/native')
 local validation=require('code/validation')
 local utils=require('code/utils')
+local tr=require('code/locale').text
 local unpack=table.unpack or unpack
 local M={ROOT='ucp/replay-diagnostics'}
 
@@ -146,22 +147,24 @@ function M:worldHashEvidence()
 end
 
 function M:statusLines()
-  if self.failed then return {'Test capture stopped: '..tostring(self.failureReason or 'error'):match('^[^\n]+'),
-    'Multiplayer replay playback is not available.'} end
+  if self.failed then return {tr('Test capture stopped: %s',tostring(self.failureReason or 'error'):match('^[^\n]+')),
+    tr('Multiplayer replay playback is not available.')} end
   if self.file then
-    local ending=self.window and tostring(self.window.endTick) or 'match exit'
-    return {'Test capture active: tick '..self.engine:tick()..' / '..ending,
-      self.count..' commands; '..(self.gaps or 0)..' uncovered network events.',
-      'Saved automatically. This is not a playable replay.'}
+    local ending=self.window and tostring(self.window.endTick) or tr('match exit')
+    return {tr('Test capture active: tick %d / %s',self.engine:tick(),ending),
+      tr('%d commands; %d uncovered network events.',self.count,self.gaps or 0),
+      tr('Saved automatically. This is not a playable replay.')}
   end
   if self.lastResult then
-    return {'Test capture saved at tick '..tostring(self.lastResult.lastTick or '?')..'.',
-      self.lastResult.commands..' commands; '..self.lastResult.gaps..' uncovered network events.',
-      'Capture ended; further actions are not being saved.',
-      'This is not a playable multiplayer replay.'}
+    return {tr(self.lastResult.status=='complete' and 'Test capture saved at tick %s.'
+        or 'Incomplete test capture saved at tick %s.',tostring(self.lastResult.lastTick or '?')),
+      tr('%d commands; %d uncovered network events.',self.lastResult.commands,self.lastResult.gaps),
+      tr('Capture ended; further actions are not being saved.'),
+      tr('This is not a playable multiplayer replay.')}
   end
-  return {'Waiting for multiplayer test capture'..(self.window and (' at tick '..self.window.startTick) or '')..'.',
-    'Multiplayer replay playback is not available.'}
+  return {self.window and tr('Waiting for multiplayer test capture at tick %d.',self.window.startTick)
+      or tr('Waiting for multiplayer test capture.'),
+    tr('Multiplayer replay playback is not available.')}
 end
 
 function M:systemMessage(source)
@@ -251,7 +254,8 @@ function M:stop(reason)
         or (self.window and self.lastTick~=self.window.endTick)
       self:write({kind='end',status=incomplete and 'incomplete' or 'complete',lastTick=self.lastTick,
         commands=self.count,events=self.events,reason=reason,pendingNativeHashes=#self.pendingNativeHashes})
-      self.lastResult={path=self.path,lastTick=self.lastTick,commands=self.count,gaps=self.gaps or 0}
+      self.lastResult={path=self.path,lastTick=self.lastTick,commands=self.count,gaps=self.gaps or 0,
+        status=incomplete and 'incomplete' or 'complete'}
     end)
     self.file=nil
     local closed,closeError=f:close()
@@ -263,6 +267,7 @@ function M:stop(reason)
   self.lastTick=nil
   self.network=nil
   self.closed=false
+  self.simulationObserved=false
 end
 
 function M:observe(event,...)
@@ -270,7 +275,17 @@ function M:observe(event,...)
   local args={...}
   local ok,reason=pcall(function()
     if event~='stop' and self.engine:singlePlayer() then
-      if self.file or next(self.received) then self:stop('left multiplayer') end
+      if self.simulationObserved or self.file or next(self.received) then self:stop('left multiplayer') end
+      return
+    end
+    -- Loading and lobby code also call the shared RNG and command observers.
+    -- Their tick/roster fields may still describe an earlier game. Only the
+    -- native simulation boundary establishes that gameplay has begun. Keep
+    -- queued payloads, but never open/seal a window from pre-simulation events.
+    if event=='onTick' then self.simulationObserved=true end
+    local receipt=event=='receivedCommand' or event=='locallyQueuedCommand'
+    if event~='stop' and not self.simulationObserved then
+      if receipt then self[event](self,unpack(args)) end
       return
     end
     if self.window and event~='stop' then

@@ -115,3 +115,21 @@ Optional original-executable tests execute both native RNG methods at initial
 and wraparound indices, with and without the actual Lua observer callback, and
 compare the full RNG structure and registers. The UCP detour bridge is a test
 stand-in; these tests do not replace a live UI/observer compatibility check.
+# Two physical PCs over Steam (0.31.2)
+
+Both PCs passed the runtime/profile/extension and base-file hash check. Steam
+friends-only host creation, second-account discovery/join and match start worked
+with recorder 0.31.2, Ascension 1.0.11, Automarket 1.1.0, Graphics API Replacer
+1.3.0 and Steam multiplayer 1.2.3. The match used Der grüne Punkt, Wolf and Saladin
+on opposite corners, and one human allied with each AI. No replacement transport
+DLL was deployed. This did not reproduce the earlier Host-button crash.
+
+The host trace opened at tick 197223 during loading, before the AI roster was
+populated. With the requested 1024–131072 window it immediately wrote missed-start
+and missed-end gaps, then an incomplete footer with zero commands. Gameplay
+continued and the host could place and inspect a functioning granary. This is a
+diagnostic lifecycle failure, not evidence that the match itself desynchronized.
+
+Version 0.32.0 gates capture on the native simulation callback and includes a
+regression using that stale tick, loading callbacks, subsequent roster setup and
+the complete requested window. Its paired live comparison must be repeated.

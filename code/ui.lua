@@ -107,7 +107,7 @@ function M.createButtons(recorder,sites)
     if not recorder.engine:singlePlayer() then
       local lines=recorder.engine.trace and recorder.engine.trace:statusLines()
         or {'Multiplayer replay recording is not available.', 'Test capture is disabled for this launch.'}
-      for i,line in ipairs(lines) do ui:text(tr(line):sub(1,80),x+24,y+48+i*26) end
+      for i,line in ipairs(lines) do ui:text(tr(line),x+24,y+48+i*26,0,18,false,552) end
       return
     end
     local message=browser.message
