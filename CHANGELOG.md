@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.20.0
+
+- Show Replay status in the multiplayer pause menu. Distinguish waiting, active,
+  saved and failed test captures, show command/coverage counts, and explicitly
+  state when later actions are no longer being saved or replay is unavailable.
+- Attribute both native RNG streams to their return addresses between diagnostic
+  checkpoints without changing RNG results. Bound caller storage and isolate
+  diagnostic failures from multiplayer command execution.
+- Preserve immediate-command handles and payloads alongside coverage gaps so
+  network messages can be investigated without silently excluding them.
+- Document the first two-peer Ascension action test and its limits: matching
+  timed commands/resources, divergent RNG stream 1, and incomplete event coverage.
+
+Multiplayer replay remains disabled. Diagnostic evidence is not a playable replay.
+
 ## 0.19.0
 
 - Add optional shared start/end ticks for multiplayer diagnostic capture. Both peers can seal the same simulation interval automatically before either leaves the match, while gameplay continues.

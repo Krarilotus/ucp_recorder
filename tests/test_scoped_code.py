@@ -17,6 +17,21 @@ REGS=[UC_X86_REG_EAX,UC_X86_REG_EBX,UC_X86_REG_ECX,UC_X86_REG_EDX,
 
 
 class ScopedCodeTests(unittest.TestCase):
+    def test_relocated_return_address_mapping_matches_emitted_call(self):
+        for profile in self.profiles.values():
+            for site in profile.values():
+                if site['kind'] != 'call':
+                    continue
+                mapping = self.lua.table()
+                origin = 0x4000000
+                encoded = bytes(self.emitter.build(site, 0x600104, 0x600108, 123, origin, mapping).values())
+                self.assertEqual(len(list(mapping.items())), 1)
+                for relocated, original in mapping.items():
+                    offset = relocated-origin-5
+                    self.assertEqual(encoded[offset], 0xe8)
+                    self.assertEqual(relocated+struct.unpack_from('<i', encoded, offset+1)[0], site['target'])
+                    self.assertEqual(original, site['address']+len(site['bytes']))
+
     def setUp(self):
         self.lua=LuaRuntime()
         self.emitter=self.lua.execute((ROOT/'code/scoped-code.lua').read_text())

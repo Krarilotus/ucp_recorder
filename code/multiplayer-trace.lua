@@ -16,7 +16,7 @@ function M.new(engine,config)
     assert(first%64==0 and last%64==0,'Diagnostic window ticks must be multiples of 64')
     window={startTick=first,endTick=last}
   end
-  return setmetatable({engine=engine,received={},count=0,window=window},{__index=M})
+  return setmetatable({engine=engine,received={},count=0,window=window,rngCalls={}},{__index=M})
 end
 
 function M:write(value)
@@ -34,14 +34,14 @@ function M:open()
     assert(i<9999,'Cannot allocate multiplayer trace folder')
   end
   self.file=assert(io.open(self.path..'/commands.jsonl','w'))
-  self.count=0; self.events=0
+  self.count=0; self.events=0; self.gaps=0; self.rngCalls={}; self.lastResult=nil
   local environmentHash=store.settings().environmentHash
   validation.hash(environmentHash,'diagnostic environment hash')
   self.network=self.engine:networkState()
   self:write({kind='header',format=self.window and 6 or 5,window=self.window,
     variant=native.profile.name,executable=native.profile.sha256,
     environmentHash=environmentHash,
-    network=self.network,
+    network=self.network,rngAttribution=true,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
   if self.network.syncStatus~=0 then self:gap('capture began during native synchronization') end
   if self.window and self.engine:tick()~=self.window.startTick then
@@ -52,6 +52,7 @@ end
 
 function M:gap(reason,details)
   self.incomplete=true
+  self.gaps=(self.gaps or 0)+1
   self:record({kind='gap',time=self.engine:tick(),reason=reason,details=details})
 end
 
@@ -75,10 +76,60 @@ function M:immediateCommand(source)
   self:checkNetwork()
   local slot=validation.integer(core.readInteger(self.engine.base+0x2d824),0,199,'immediate ring slot')
   local address=self.engine.base+0x3c67c+slot*1272
+  local size=validation.integer(core.readInteger(self.engine.base+0x2d830),0,1260,'immediate payload size')
   self:gap('immediate command is outside timed replay coverage',{
     source=source,category=core.readByte(address+8),scheduledTime=core.readInteger(address),
     player=core.readInteger(self.engine.base+self.engine.sites.actorOffset),
-    size=core.readInteger(self.engine.base+0x2d830)})
+    size=size,handle=core.readInteger(address+4),
+    data=utils.tableToHex(core.readBytes(address+10,size))})
+end
+
+function M:rngCall(stream,stack)
+  if not self.file then return end
+  local address=core.readInteger(stack)
+  if address<0 then address=address+4294967296 end
+  -- Scope gates relocate CALLs into allocated code. Compare their native return
+  -- addresses, not allocation addresses that can differ between processes.
+  address=(self.rngReturnAddresses or {})[address] or address
+  local key=stream..':'..address
+  local entry=self.rngCalls[key]
+  if not entry then
+    -- Bound diagnostic memory even if another extension generates many callers.
+    assert(self.rngCallerCount==nil or self.rngCallerCount<512,'Too many RNG diagnostic callers')
+    entry={stream=stream,returnAddress=address,count=0}
+    self.rngCalls[key]=entry
+    self.rngCallerCount=(self.rngCallerCount or 0)+1
+  end
+  entry.count=entry.count+1
+end
+
+function M:rngEvidence()
+  local entries={}
+  for _,entry in pairs(self.rngCalls) do entries[#entries+1]=entry end
+  table.sort(entries,function(a,b)
+    return a.stream<b.stream or (a.stream==b.stream and a.returnAddress<b.returnAddress)
+  end)
+  self.rngCalls={}; self.rngCallerCount=0
+  return entries
+end
+
+function M:statusLines()
+  if self.failed then return {'Test capture stopped: '..tostring(self.failureReason or 'error'):match('^[^\n]+'),
+    'Multiplayer replay playback is not available.'} end
+  if self.file then
+    local ending=self.window and tostring(self.window.endTick) or 'match exit'
+    return {'Test capture active: tick '..self.engine:tick()..' / '..ending,
+      self.count..' commands; '..(self.gaps or 0)..' uncovered network events.',
+      'Saved automatically. This is not a playable replay.'}
+  end
+  if self.lastResult then
+    return {'Test capture saved at tick '..tostring(self.lastResult.lastTick or '?')..'.',
+      self.lastResult.commands..' commands; '..self.lastResult.gaps..' uncovered network events.',
+      'Capture ended; further actions are not being saved.',
+      'This is not a playable multiplayer replay.'}
+  end
+  return {'Waiting for multiplayer test capture'..(self.window and (' at tick '..self.window.startTick) or '')..'.',
+    'Multiplayer replay playback is not available.'}
 end
 
 function M:systemMessage(source)
@@ -107,7 +158,7 @@ function M:onTick()
   self:open()
   self.lastTick=now
   self:record({kind='checkpoint',time=now,rng=self.engine:rngState(),resources=self.engine:resourceState(),
-    rngHash=sha.sha256(self.engine:rngData())})
+    rngHash=sha.sha256(self.engine:rngData()),rngCalls=self:rngEvidence()})
   if self.window and now==self.window.endTick then self:finishWindow() end
 end
 
@@ -168,12 +219,14 @@ function M:stop(reason)
         or (self.window and self.lastTick~=self.window.endTick)
       self:write({kind='end',status=incomplete and 'incomplete' or 'complete',lastTick=self.lastTick,
         commands=self.count,events=self.events,reason=reason})
+      self.lastResult={path=self.path,lastTick=self.lastTick,commands=self.count,gaps=self.gaps or 0}
     end)
     self.file=nil
     local closed,closeError=f:close()
     assert(ok and closed,err or closeError)
   end
   self.received={}; self.executing=nil; self.failed=false; self.incomplete=false; self.path=nil
+  self.rngCalls={}; self.rngCallerCount=0; self.failureReason=nil
   self.lastTick=nil
   self.network=nil
   self.closed=false
@@ -205,7 +258,7 @@ function M:observe(event,...)
     self[event](self,unpack(args))
   end)
   if not ok then
-    self.failed=true; self.executing=nil
+    self.failed=true; self.executing=nil; self.failureReason=tostring(reason)
     local f=self.file; self.file=nil
     if f then pcall(f.close,f) end
     if self.path then pcall(store.write,self.path..'/error.txt',tostring(reason)) end

@@ -2,6 +2,8 @@
 import argparse
 import itertools
 import json
+import hashlib
+from collections import Counter
 from pathlib import Path
 
 
@@ -185,11 +187,86 @@ def compare(left, right):
     return dict(status='different' if difference else 'matched', events=count, firstDifference=difference)
 
 
+def inspect_trace(path):
+    """Summarize evidence past coverage gaps; never returns a validation pass."""
+    result = {'commands': 0, 'checkpoints': 0, 'gaps': 0, 'lastCheckpoint': None}
+    commands, resources = hashlib.sha256(), hashlib.sha256()
+    rng_streams = [hashlib.sha256(), hashlib.sha256()]
+    callers, categories, gaps = Counter(), Counter(), Counter()
+    def digest(target, value):
+        target.update(json.dumps(value, separators=(',', ':'), sort_keys=True).encode())
+        target.update(b'\n')
+    try:
+        with Path(path).open(encoding='utf-8') as stream:
+            records = rows(stream)
+            header = next(records)
+            if header.get('kind') != 'header':
+                raise ValueError('Missing header')
+            result['localPlayer'] = header.get('localPlayer')
+            result['rngAttribution'] = header.get('rngAttribution', False)
+            ended = False
+            for record in records:
+                if ended:
+                    raise ValueError('Data follows trace completion')
+                kind = record.get('kind')
+                if kind == 'command':
+                    result['commands'] += 1
+                    categories[(record['player'], record['category'])] += 1
+                    digest(commands, [record.get(k) for k in
+                        ('time', 'scheduledTime', 'player', 'category', 'size', 'data')])
+                elif kind == 'checkpoint':
+                    result['checkpoints'] += 1
+                    result['lastCheckpoint'] = record['time']
+                    digest(resources, [record['time'], record['resources']])
+                    rng = record['rng']
+                    if not isinstance(rng, list) or len(rng) != 4:
+                        raise ValueError('Invalid RNG state')
+                    for target, value, index in ((rng_streams[0], rng[0], rng[3]),
+                                                  (rng_streams[1], rng[1], rng[2])):
+                        digest(target, [record['time'], value, index])
+                    entries = record.get('rngCalls', [])
+                    if not isinstance(entries, list) or len(entries) > 512:
+                        raise ValueError('Invalid RNG caller evidence')
+                    seen = set()
+                    for entry in entries:
+                        integer(entry.get('stream'), 1, 2)
+                        integer(entry.get('returnAddress'), 0, 4294967295)
+                        integer(entry.get('count'), 1, 2147483647)
+                        key = (entry['stream'], entry['returnAddress'])
+                        if key in seen:
+                            raise ValueError('Repeated RNG caller in checkpoint')
+                        seen.add(key)
+                        callers[key] += entry['count']
+                elif kind == 'gap':
+                    result['gaps'] += 1
+                    gaps[(record.get('reason', ''), (record.get('details') or {}).get('category'))] += 1
+                elif kind == 'end':
+                    result['footer'] = record
+                    ended = True
+                elif kind != 'untracked':
+                    raise ValueError('Unknown trace record')
+            if not ended:
+                result['inspectionError'] = 'Trace has no completion record'
+    except (OSError, ValueError, TypeError, KeyError, StopIteration, AttributeError) as error:
+        result['inspectionError'] = str(error) or 'Empty trace'
+    result['timedCommandDigest'] = commands.hexdigest()
+    result['resourceCheckpointDigest'] = resources.hexdigest()
+    result['rngStreamDigests'] = [s.hexdigest() for s in rng_streams]
+    result['commandCategories'] = [dict(player=p, category=c, count=n) for (p, c), n in sorted(categories.items())]
+    result['gapCategories'] = [dict(reason=r, category=c, count=n) for (r, c), n in gaps.items()]
+    result['rngCallers'] = [dict(stream=s, returnAddress=f'0x{a:08x}', count=n) for (s, a), n in sorted(callers.items())]
+    return result
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('left', type=Path)
     parser.add_argument('right', type=Path)
+    parser.add_argument('--inspect', action='store_true',
+                        help='Also summarize commands, gaps and RNG callers; does not relax validation or change exit codes')
     args = parser.parse_args()
     result = compare(args.left, args.right)
+    if args.inspect:
+        result['observations'] = {'left': inspect_trace(args.left), 'right': inspect_trace(args.right)}
     print(json.dumps(result, indent=2))
     raise SystemExit({'matched': 0, 'different': 1, 'incomplete': 2}[result['status']])

@@ -10,7 +10,7 @@ class UIFlowTests(unittest.TestCase):
         test_browser.BrowserTests.setUp(self)
         self.check('''
 local nextId=300
-controls={}; dialogs={}; shown=-1
+controls={}; dialogs={}; renders={}; texts={}; shown=-1
 ui={
  modal=function(_,items,count,width,height,render)
   assert(count==#items)
@@ -20,9 +20,10 @@ ui={
     if i~=j then assert(a.x+a.width<=b.x or b.x+b.width<=a.x or a.y+a.height<=b.y or b.y+b.height<=a.y) end
    end
   end
-  local id=nextId; nextId=nextId+1; dialogs[id]=items; return id
+  local id=nextId; nextId=nextId+1; dialogs[id]=items; renders[id]=render; return id
  end,
- installInput=function(_,predicate,handler) input=handler end,
+ text=function(_,value) texts[#texts+1]=value end,
+ installInput=function(_,predicate,handler) input=handler; inputAllowed=predicate end,
  extendPause=function(_,label,action,predicate) pauseAction=action; pauseVisible=predicate end,
  activeDialog=function() return shown end,
  show=function(_,id) shown=id end,
@@ -69,4 +70,21 @@ click('Save name'); assert(shown==library and menu.browser.selected.displayName=
 click('Play'); assert(restarted=='one' and not played and shown==library)
 entries[1].different=false; menu.browser:refresh(); click('Play')
 assert(played=='one' and shown==-1)
+''')
+
+    def test_multiplayer_pause_explains_capture_without_opening_save_or_library(self):
+        self.check('''
+recorder.engine.singlePlayer=function() return false end
+recorder.status='recording'; recorder.observedTick=true
+recorder.saveCopy=function() error('MP must not use SP snapshot saving') end
+assert(pauseVisible() and not inputAllowed())
+pauseAction(); assert(shown==menu.statusDialog and inputAllowed())
+renders[shown](0,0)
+assert(texts[2]=='Multiplayer replay recording is not available.')
+recorder.engine.trace={statusLines=function() return {'Test capture saved.','Further actions are not being saved.'} end}
+texts={}; renders[shown](0,0)
+assert(texts[2]=='Test capture saved.' and texts[3]=='Further actions are not being saved.')
+input(0x102,27); assert(shown==5 and not inputAllowed())
+browse(); assert(shown==5)
+pauseAction(); click('Back'); assert(shown==5)
 ''')

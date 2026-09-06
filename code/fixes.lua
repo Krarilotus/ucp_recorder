@@ -15,14 +15,16 @@ function M.verify()
 end
 
 function M.install(sites,enabled,mode,seed)
+  local returnAddresses={}
   for _,site in ipairs(sites) do
     if site.kind~='seed' or seed~=nil then
       local size=#emitter.build(site,enabled,mode,seed,0)
       local target=core.allocateCode(size)
-      core.writeCode(target,emitter.build(site,enabled,mode,seed,target))
+      core.writeCode(target,emitter.build(site,enabled,mode,seed,target,returnAddresses))
       core.writeCode(site.address,emitter.jump(site.address,target,#site.bytes))
     end
   end
+  return returnAddresses
 end
 
 function M.installTick(site,enabled,mode,halt,callback,originalCallback)

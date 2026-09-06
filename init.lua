@@ -16,11 +16,15 @@ function module:enable(config)
   require('code/sessions').captureSettings()
   local engine=Engine.new(sites)
   if config.multiplayerDiagnostics then engine.trace=require('code/multiplayer-trace').new(engine,config) end
-  fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
+  local rngReturnAddresses=fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
+  if engine.trace then engine.trace.rngReturnAddresses=rngReturnAddresses end
   local recorder=Session:new(engine,config)
   self.recorder=recorder
   engine:install(recorder)
-  if engine.trace then require('code/network-observer').install(engine.trace) end
+  if engine.trace then
+    require('code/network-observer').install(engine.trace)
+    require('code/rng-observer').install(engine.trace)
+  end
   local ui=require('code/ui')
   ui.createButtons(recorder,uiSites)
 

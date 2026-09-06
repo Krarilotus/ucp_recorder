@@ -12,7 +12,7 @@ function M.jump(from,to,size)
   return bytes
 end
 
-function M.build(site,enabled,mode,seed,origin)
+function M.build(site,enabled,mode,seed,origin,returnAddresses)
   local out,labels,refs={},{},{}
   local function emit(...) for _,value in ipairs({...}) do out[#out+1]=value end end
   local function rel(op,target)
@@ -51,7 +51,9 @@ function M.build(site,enabled,mode,seed,origin)
     rel({0xe8},site.originalCallback)
     emit(0x61,0x9d)
   end
-  if site.kind=='call' then rel({0xe8},site.target)
+  if site.kind=='call' then
+    rel({0xe8},site.target)
+    if returnAddresses then returnAddresses[origin+#out]=site.address+#site.bytes end
   elseif site.kind=='tail' then rel({0xe9},site.target)
   elseif site.kind=='branch' then
     rel({0x0f,site.condition},site.target)

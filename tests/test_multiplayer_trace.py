@@ -11,6 +11,80 @@ class MultiplayerTraceTests(unittest.TestCase):
     check = test_engine.EngineTests.check
     command_hooks = test_engine.EngineTests.command_hooks
 
+    def test_rng_attribution_is_bounded_sorted_and_does_not_consume_randomness(self):
+        self.check('''
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+memory[9000]=0x600005; memory[9004]=0x45ce58
+engine.trace.rngReturnAddresses={[0x600005]=0x471770}
+engine.trace:observe('rngCall',1,9000)
+engine.trace:observe('rngCall',1,9000)
+engine.trace:observe('rngCall',2,9004)
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+local calls=traceRows[#traceRows].rngCalls
+assert(#calls==2 and calls[1].stream==1 and calls[1].returnAddress==0x471770 and calls[1].count==2)
+assert(calls[2].stream==2 and calls[2].count==1)
+memory[0x1fe7da8]=192; engine.trace:observe('onTick')
+assert(#traceRows[#traceRows].rngCalls==0 and calls[1].count==2)
+for i=1,513 do memory[9000]=i; engine.trace:observe('rngCall',1,9000) end
+assert(engine.trace.failed and engine.trace.failureReason:find('Too many RNG'))
+assert(before().EDX==28) -- failure cannot suppress native gameplay
+''')
+
+    def test_rng_observer_filters_other_objects_and_singleplayer_and_preserves_registers(self):
+        self.check('''
+local read=core.readBytes
+core.readBytes=function(a,n)
+ if a==0x46a800 then return {139,129,76,156,0,0} end
+ if a==0x46a7d0 then return {139,129,72,156,0,0} end
+ return read(a,n)
+end
+require('code/rng-observer').install(engine.trace)
+local regs={ECX=123,ESP=9000,EAX=42,EFLAGS=0xa83}
+local get=core.readInteger
+core.readInteger=function(a) assert(a~=9000,'unexpected RNG stack read'); return get(a) end
+assert(callbacks[0x46a800](regs)==regs)
+regs.ECX=engine.rng; memory[engine.base+0x618]=0
+assert(callbacks[0x46a800](regs)==regs)
+core.readInteger=get; memory[engine.base+0x618]=1
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+memory[9000]=0x471770
+assert(callbacks[0x46a800](regs)==regs)
+assert(callbacks[0x46a7d0](regs)==regs)
+assert(regs.EAX==42 and regs.EFLAGS==0xa83 and regs.ESP==9000 and regs.ECX==engine.rng)
+assert(#engine.trace:rngEvidence()==2)
+''')
+
+    def test_immediate_payload_is_preserved_without_claiming_replay_coverage(self):
+        self.check('''
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+memory[engine.base+0x2d830]=3; memory[address+4]=103
+bytes[address+10]=0; bytes[address+11]=127; bytes[address+12]=255
+engine.trace:observe('immediateCommand','remoteImmediate')
+local event=traceRows[#traceRows]
+assert(event.kind=='gap' and event.details.handle==103 and event.details.data=='007FFF')
+memory[engine.base+0x2d830]=1261
+engine.trace:observe('immediateCommand','remoteImmediate')
+assert(engine.trace.failed and before().EDX==28)
+''')
+
+    def test_capture_status_survives_sealing_and_reports_failure(self):
+        self.check('''
+engine.trace=require('code/multiplayer-trace').new(engine,{multiplayerDiagnosticsStartTick=64,multiplayerDiagnosticsEndTick=128})
+assert(engine.trace:statusLines()[1]:find('Waiting'))
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+assert(engine.trace:statusLines()[1]:find('active'))
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+assert(engine.trace.closed and engine.trace.lastResult.lastTick==128)
+assert(engine.trace:statusLines()[3]:find('not being saved'))
+engine.trace:observe('stop','mission exit')
+assert(engine.trace:statusLines()[1]:find('saved'))
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+assert(not engine.trace.lastResult and engine.trace:statusLines()[1]:find('active'))
+engine.trace.file.write=function() return nil,'disk full' end
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+assert(engine.trace:statusLines()[1]:find('stopped'))
+''')
+
     def setUp(self):
         test_engine.EngineTests.setUp(self)
         self.command_hooks('record')
@@ -338,6 +412,20 @@ assert(recorder.mode=='none' and not recorder.error)
 
 
 class CompareTraceTests(unittest.TestCase):
+    def test_inspection_reports_evidence_after_gaps_without_relaxing_comparison(self):
+        a = self.trace()
+        a.insert(1, dict(kind='gap', time=10, reason='uncovered', details={'category': 12}))
+        a.insert(3, dict(kind='checkpoint', time=64, resources=[0]*200, rng=[1,2,3,4],
+                        rngCalls=[dict(stream=1, returnAddress=0x471770, count=3)]))
+        self.assertEqual(self.compare(a, a)['status'], 'incomplete')
+        result = self.module.inspect_trace(self.root/'a.jsonl')
+        self.assertEqual(result['commands'], 1)
+        self.assertEqual(result['gaps'], 1)
+        self.assertEqual(result['rngCallers'], [dict(stream=1, returnAddress='0x00471770', count=3)])
+        a[3]['rngCalls'] *= 2
+        self.compare(a, a)
+        self.assertIn('Repeated RNG', self.module.inspect_trace(self.root/'a.jsonl')['inspectionError'])
+
     def setUp(self):
         module_path = Path(__file__).resolve().parents[1] / 'tools/compare_multiplayer.py'
         spec = importlib.util.spec_from_file_location('compare_multiplayer', module_path)

@@ -33,7 +33,9 @@ function M.createButtons(recorder,sites)
     ui:text('Save replay as...',x+24,y+24)
     ui:text(browser.message:sub(1,65),x+24,y+124)
   end)
-  ui:installInput(function() return recorder.engine:singlePlayer() end,function(message,key)
+  ui:installInput(function()
+    return recorder.engine:singlePlayer() or ui:activeDialog()==M.statusDialog
+  end,function(message,key)
     if ui:activeDialog()==nameDialog and editor then
       local action=editor:input(message,key)
       if action=='save' then saveName() elseif action=='cancel' then cancelName() end
@@ -42,9 +44,12 @@ function M.createButtons(recorder,sites)
     end
   end)
   ui:extendPause(function()
+    if not recorder.engine:singlePlayer() then return 'Replay status' end
     return recorder.status=='recording' and 'Save replay as...' or 'Replay status'
   end,function()
-    if recorder.status=='recording' and recorder.observedTick then
+    if not recorder.engine:singlePlayer() then
+      ui:show(M.statusDialog)
+    elseif recorder.status=='recording' and recorder.observedTick then
       openName(require('code/sessions').title(recorder.manifest),function(name)
         local copy=recorder:saveCopy(name)
         browser.message='Saved: '..require('code/sessions').title(copy)
@@ -55,11 +60,19 @@ function M.createButtons(recorder,sites)
         or ('Replay '..recorder.status..'. Leave the mission to return to the library.')
       ui:show(M.statusDialog)
     end
-  end,function() return recorder.engine:singlePlayer() and (recorder.mode~='none' or recorder.status=='error') end)
+  end,function()
+    return not recorder.engine:singlePlayer() or recorder.mode~='none' or recorder.status=='error'
+  end)
   M.statusDialog=ui:modal({
-    {x=24,y=130,width=150,height=30,label='Back',action=function() ui:show(5) end}
-  },1,600,200,function(x,y)
+    {x=24,y=186,width=150,height=30,label='Back',action=function() ui:show(5) end}
+  },1,600,240,function(x,y)
     ui:text('Replay status',x+24,y+24)
+    if not recorder.engine:singlePlayer() then
+      local lines=recorder.engine.trace and recorder.engine.trace:statusLines()
+        or {'Multiplayer replay recording is not available.', 'Test capture is disabled for this launch.'}
+      for i,line in ipairs(lines) do ui:text(line:sub(1,70),x+24,y+48+i*26) end
+      return
+    end
     ui:text(browser.message:sub(1,70),x+24,y+70)
     if recorder.status=='recording' then ui:text('Automatic recording continues until you leave the match.',x+24,y+98) end
   end)

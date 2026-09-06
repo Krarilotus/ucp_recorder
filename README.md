@@ -4,11 +4,16 @@ Work in progress: recording and playback of single-player Stronghold Crusader an
 
 Version 0.17.0 records new single-player Skirmishes automatically, saves them on normal mission exit, and adds **Save replay as...** to the in-game pause menu. Named copies preserve the match so far while recording continues. The lobby has **Auto: on/off** and **Replays** buttons; the library supports naming and automatically chooses the recorded-settings restart when Play needs it. Buttons use the game's original interface skin, gold font and red modal frames.
 
-Development 0.18.0 Crusader playback completed twice with two AIs. A separate Automarket match replayed 69,573 ticks and 13 commands with RNG/resource checkpoints matched; native named-save controls were also exercised. **Extreme gameplay, settings restart, the exact latest published build and two-peer multiplayer still need live verification.** Multiplayer recording/playback remains unsupported. See the [library flow](docs/replay-library.md), [dispatch evidence](docs/replay-dispatch.md) and [live evidence and remaining gates](docs/live-validation-0.18.md).
+Development 0.18.0 Crusader playback completed twice with two AIs. A separate Automarket match replayed 69,573 ticks and 13 commands with RNG/resource checkpoints matched; native named-save controls were also exercised. A published 0.19.0 two-peer Ascension test captured 63 identical timed commands and 241 matching resource checkpoints, but RNG stream 1 differed and immediate messages left coverage incomplete. **Extreme gameplay, settings restart and full multiplayer replay still need live verification and engineering.** Multiplayer recording/playback remains unsupported. See the [library flow](docs/replay-library.md), [dispatch evidence](docs/replay-dispatch.md) and [multiplayer findings](docs/multiplayer-findings.md).
 
 Automarket 1.1.0 has an experimental replay adapter for its settings commits and native custom save section. Use protocol 1.0.0 and map-extensions 1.0.0, with **recorder after protocol in the extension order**. The normal weekly trades run in the simulation; they are not replayed as extra trades. Other custom protocols remain unsupported. See [Automarket replay notes](docs/automarket-replay.md).
 
 Optional **Multiplayer diagnostics** logs actual command execution and periodic simulation evidence for comparing two peers. Version 0.19.0 adds shared start/end ticks so logs can finish before either player disconnects. Diagnostics are disabled by default and do not enable multiplayer replay. See [multiplayer trace instructions](docs/multiplayer-diagnostics.md) and the [harder test matrix](docs/multiplayer-test-matrix.md).
+
+Version 0.20.0 adds **Replay status** to the multiplayer pause menu, including
+whether test capture is active, saved or failed. Captures include RNG caller
+counts and immediate-message payloads for investigation. The comparison tool's
+`--inspect` option summarizes this evidence without relaxing its pass criteria.
 
 ## Testing this build
 
