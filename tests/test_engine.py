@@ -172,14 +172,38 @@ assert(events[1]=='locallyQueuedCommand' and not engine.received[0])
 assert(not recorder.error and #recorder.commands==0)
 ''')
 
-    def test_invalid_local_payload_stops_capture_before_dispatch(self):
+    def test_invalid_local_payload_stops_capture_without_suppressing_live_dispatch(self):
         self.command_hooks('record')
         self.check('''
 memory[engine.base+0x2d830]=1261
 local registers={ESI=engine.base,EDX=123}
 callbacks[engine.sites.localTimed.address](registers)
 assert(registers.EDX==123 and recorder.status=='error' and not engine.received[0])
-assert(before().EDX==0 and #recorder.commands==0)
+assert(before().EDX==34 and #recorder.commands==0)
+''')
+
+    def test_recording_failure_releases_subsequent_trade_troop_and_ally_commands(self):
+        self.command_hooks('record')
+        self.check('''
+local Session=require('code/session-recorder')
+recorder.guard=Session.guard; recorder.halt=core.allocate(4,true); recorder.engine=engine
+recorder.manifest.id='failed-test'
+require('code/sessions').write=function() end
+require('code/sessions').save=function() end
+bytes[address+8]=100 -- deliberately unsupported live command
+callbacks[engine.sites.localTimed.address]({ESI=engine.base})
+assert(before().EDX==100 and recorder.status=='error' and not recorder.active)
+assert(memory[engine.scope]==0 and memory[recorder.halt]==0)
+assert(memory[engine.sites.paused]==1)
+local firstError=recorder.error
+memory[engine.sites.paused]=0 -- ordinary native unpause
+for _,category in ipairs({15,17,28,34,102,113}) do
+ bytes[address+8]=category
+ callbacks[engine.sites.localTimed.address]({ESI=engine.base})
+ assert(before().EDX==category); after()
+end
+assert(#recorder.commands==0 and recorder.error==firstError)
+assert(not next(engine.received) and not engine.executing)
 ''')
 
     def test_invalid_captured_size_cannot_reach_native_copy(self):

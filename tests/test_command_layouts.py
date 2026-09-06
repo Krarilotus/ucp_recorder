@@ -6,6 +6,21 @@ import test_session_files as file_fixture
 class CommandLayoutTests(unittest.TestCase):
     setUp = recorder_fixture.RecorderTests.setUp
 
+    def test_rally_points_use_five_byte_native_layout_on_both_variants(self):
+        self.lua.execute('''
+local validate=require('code/validation').sessionCommand
+for _,variant in ipairs({'SHC','Extreme'}) do
+ local m={player=1,variant=variant}
+ local c={commandCategory=102,player=1,time=10,size=5,data='280A001400'}
+ assert(validate(c,m)==c) -- cathedral category, x=10, y=20
+ for _,size in ipairs({0,1,4,6,1260}) do
+  c.size=size; c.data=string.rep('00',size)
+  local ok,err=pcall(validate,c,m)
+  assert(not ok and err:find('payload size',1,true))
+ end
+end
+''')
+
     def test_native_sizes_reject_truncation_extension_and_immediate_chat(self):
         self.lua.execute('''
 local validate=require('code/validation').sessionCommand

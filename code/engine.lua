@@ -338,7 +338,8 @@ function M:install(recorder)
     return registers
   end,self.sites.copySize.address,6)
   -- This instruction precedes protocol's dispatch hook. Leave its hook intact.
-  -- On failure use native category 0 (the no-op), preventing the bad dispatch.
+  -- Failed playback must not dispatch file-controlled commands. A recording
+  -- failure detaches capture; the live player's native command still executes.
   core.writeCode(self.sites.execute.address,{0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90})
   core.detourCode(function(registers)
     local category=core.readByte(registers.ESI+registers.ECX+0x3c684)
@@ -349,7 +350,7 @@ function M:install(recorder)
         assert(recorder.status=='playing' or recorder.status=='recording','Replay session is stopped')
         self:beforeCommand(recorder)
       end)
-      if not ok then registers.EDX=0 end
+      if not ok and recorder.mode=='play' then registers.EDX=0 end
     end
     return registers
   end,self.sites.execute.address,8)

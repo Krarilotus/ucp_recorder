@@ -24,7 +24,7 @@ ui={
  end,
  text=function(_,value) texts[#texts+1]=value end,
  installInput=function(_,predicate,handler) input=handler; inputAllowed=predicate end,
- extendPause=function(_,label,action,predicate) pauseAction=action; pauseVisible=predicate end,
+ extendPause=function(_,label,action,predicate) pauseLabel=label; pauseAction=action; pauseVisible=predicate end,
  activeDialog=function() return shown end,
  show=function(_,id) shown=id end,
  close=function() shown=-1 end,
@@ -45,6 +45,17 @@ function browse()
  for _,item in pairs(controls) do if item.label=='Replays' then return item.action() end end
  error('Replay entry missing')
 end
+''')
+
+    def test_failure_details_distinguish_stopped_capture_from_failed_playback(self):
+        self.check('''
+recorder.status='error'; recorder.error='capture failed'; recorder.mode='record'
+assert(pauseLabel()=='Replay failed - details')
+pauseAction(); renders[shown](0,0)
+assert(texts[3]=='Recording stopped. This match is no longer being recorded.')
+assert(texts[4]=='Resume the game to continue playing normally.')
+recorder.mode='play'; texts={}; pauseAction(); renders[shown](0,0)
+assert(texts[3]=='Playback failed. Leave the mission to return to the library.')
 ''')
 
     def test_pause_save_copy_cancel_and_confirmation_keep_capture_active(self):

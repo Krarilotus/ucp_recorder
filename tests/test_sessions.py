@@ -6,6 +6,23 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_failed_recording_can_resume_normal_game_but_never_seal_as_complete(self):
+        self.check('''
+local r=session(); r:beginMatch(); r:prepareRecording(); now=1; r:onTick()
+local closed=0
+for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do
+ r[key].close=function() closed=closed+1; error('close also failed') end
+end
+assert(not r:guard(function() error('capture failed') end))
+assert(r.status=='error' and r.mode=='record' and not r.active and not scoped)
+assert(memory[r.halt]==0 and paused and savedManifest.status=='failed' and closed==3)
+local firstError=r.error
+paused=false; now=100; r:onTick()
+assert(not paused and r.manifest.lastTick==1)
+assert(not r:guard(function() error('later failure') end) and r.error==firstError)
+r:reset(); assert(savedManifest.status=='failed' and r.mode=='none')
+''')
+
     def test_playback_report_replaces_success_on_failure_and_interruption(self):
         self.check('''
 local r=session(); r.mode='play'; r.status='playing'; r.active=true

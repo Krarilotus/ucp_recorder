@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.28.0
+
+- Record and replay native rally-point commands, including cathedral/monk,
+  barracks, mercenary and guild assembly points, on Crusader and Extreme.
+  Validate their five-byte timed payload instead of stopping capture.
+- Stop a failed recording without disabling normal single-player controls.
+  Pause once, mark the capture failed and detach recording hooks from dispatch;
+  the live command still executes and ordinary unpause resumes the match.
+  Failed playback continues to block recorded commands and simulation.
+- Label the pause-menu entry `Replay failed - details` after an error and explain
+  whether the player can resume an unrecorded match or must leave failed playback.
+- Keep simulation profile `recorder-sp-v10`, including the church wedding RNG fix
+  from 0.27.0. Add regression tests for rally-point layouts, resumed command
+  dispatch, failed-capture lifecycle and the failure status menu.
+
 ## 0.27.0
 
 - Prevent the chapel, church and cathedral wedding announcement from advancing

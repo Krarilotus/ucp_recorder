@@ -42,7 +42,7 @@ function M.sessionCommand(command, manifest)
   else
     local expected=payloadSize(command.commandCategory,manifest.variant)
     assert(expected,
-      'Unsupported replay command category '..command.commandCategory..' (immediate, save/load and network commands are excluded)')
+      'Unsupported replay command category '..command.commandCategory..' (not in the verified timed-command layouts)')
     assert(command.size==expected,'Replay command payload size differs from the native '..manifest.variant..' layout')
   end
   assert(command.player==manifest.player,'Replay command uses a different player slot')

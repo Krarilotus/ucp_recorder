@@ -33,9 +33,19 @@ function Session:guard(callback)
   if not ok then
     if self.status=='error' and (self.active or self.mode~='none') then return false end -- retain the first session failure
     self.status='error'; self.error=tostring(reason)
-    local stopSimulation=self.engine:singlePlayer() and (self.active or self.mode=='play')
+    local recordingFailed=self.mode=='record'
+    local pauseGame=self.engine:singlePlayer() and (self.active or self.mode=='play')
+    local stopSimulation=pauseGame and not recordingFailed
     core.writeInteger(self.halt,stopSimulation and 1 or 0)
-    if stopSimulation then self.engine:pause() end
+    if pauseGame then self.engine:pause() end
+    if recordingFailed then
+      -- A capture failure invalidates the recording, not the player's match.
+      -- Keep the first error visible, but detach capture before native dispatch
+      -- continues. Ordinary unpause must restore normal commands and ticking.
+      self.active=false; self.capturePending=nil
+      self.engine:setScope(false)
+      self.engine:resetCommands()
+    end
     if self.mode=='play' then pcall(self.engine.abortPlayback,self.engine) end
     print('Replay stopped: ' .. self.error)
     if self.manifest then

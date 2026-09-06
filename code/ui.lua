@@ -45,6 +45,7 @@ function M.createButtons(recorder,sites)
   end)
   ui:extendPause(function()
     if not recorder.engine:singlePlayer() then return 'Replay status' end
+    if recorder.status=='error' then return 'Replay failed - details' end
     return recorder.status=='recording' and 'Save replay as...' or 'Replay status'
   end,function()
     if not recorder.engine:singlePlayer() then
@@ -74,6 +75,12 @@ function M.createButtons(recorder,sites)
       return
     end
     ui:text(browser.message:sub(1,70),x+24,y+70)
+    if recorder.status=='error' and recorder.mode=='record' then
+      ui:text('Recording stopped. This match is no longer being recorded.',x+24,y+98)
+      ui:text('Resume the game to continue playing normally.',x+24,y+124)
+    elseif recorder.status=='error' and recorder.mode=='play' then
+      ui:text('Playback failed. Leave the mission to return to the library.',x+24,y+98)
+    end
     if recorder.status=='recording' then ui:text('Automatic recording continues until you leave the match.',x+24,y+98) end
   end)
   local dialog
