@@ -41,7 +41,7 @@ function M:open()
   self:write({kind='header',format=self.window and 6 or 5,window=self.window,
     variant=native.profile.name,executable=native.profile.sha256,
     environmentHash=environmentHash,
-    network=self.network,rngAttribution=true,
+    network=self.network,rngAttribution=true,immediatePayloadSource='native-fixed-v1',
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
   if self.network.syncStatus~=0 then self:gap('capture began during native synchronization') end
   if self.window and self.engine:tick()~=self.window.startTick then
@@ -76,12 +76,14 @@ function M:immediateCommand(source)
   self:checkNetwork()
   local slot=validation.integer(core.readInteger(self.engine.base+0x2d824),0,199,'immediate ring slot')
   local address=self.engine.base+0x3c67c+slot*1272
-  local size=validation.integer(core.readInteger(self.engine.base+0x2d830),0,1260,'immediate payload size')
+  -- Immediate serialization/receive-copy targets the 61,000-byte fixed buffer.
+  -- The ring holds the command header, but its payload is unused on this path.
+  local size=validation.integer(core.readInteger(self.engine.base+0x2d830),0,61000,'immediate payload size')
   self:gap('immediate command is outside timed replay coverage',{
     source=source,category=core.readByte(address+8),scheduledTime=core.readInteger(address),
     player=core.readInteger(self.engine.base+self.engine.sites.actorOffset),
     size=size,handle=core.readInteger(address+4),
-    data=utils.tableToHex(core.readBytes(address+10,size))})
+    data=utils.tableToHex(core.readBytes(self.engine.base+0x2d834,size))})
 end
 
 function M:rngCall(stream,stack)

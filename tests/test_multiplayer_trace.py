@@ -58,13 +58,35 @@ assert(#engine.trace:rngEvidence()==2)
         self.check('''
 memory[0x1fe7da8]=64; engine.trace:observe('onTick')
 memory[engine.base+0x2d830]=3; memory[address+4]=103
-bytes[address+10]=0; bytes[address+11]=127; bytes[address+12]=255
+bytes[address+10]=99; bytes[address+11]=98; bytes[address+12]=97
+bytes[engine.base+0x2d834]=0; bytes[engine.base+0x2d835]=127; bytes[engine.base+0x2d836]=255
 engine.trace:observe('immediateCommand','remoteImmediate')
 local event=traceRows[#traceRows]
 assert(event.kind=='gap' and event.details.handle==103 and event.details.data=='007FFF')
-memory[engine.base+0x2d830]=1261
+assert(traceRows[1].immediatePayloadSource=='native-fixed-v1')
+memory[engine.base+0x2d830]=61001
 engine.trace:observe('immediateCommand','remoteImmediate')
 assert(engine.trace.failed and before().EDX==28)
+''')
+
+    def test_immediate_fixed_buffer_capacity_is_independent_of_timed_ring_capacity(self):
+        self.check('''
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+local read=core.readBytes
+core.readBytes=function(a,n)
+ assert(a==engine.base+0x2d834 and n<=61000)
+ local result={}; for i=1,n do result[i]=(i-1)%256 end; return result
+end
+for _,source in ipairs({'localImmediate','remoteImmediate'}) do
+ for _,size in ipairs({0,1260,1261,61000}) do
+  memory[engine.base+0x2d830]=size
+  engine.trace:observe('immediateCommand',source)
+  local event=traceRows[#traceRows]
+  assert(not engine.trace.failed and event.kind=='gap' and #event.details.data==size*2)
+  if size>0 then assert(event.details.data:sub(1,8)=='00010203') end
+ end
+end
+core.readBytes=read
 ''')
 
     def test_capture_status_survives_sealing_and_reports_failure(self):
@@ -412,6 +434,93 @@ assert(recorder.mode=='none' and not recorder.error)
 
 
 class CompareTraceTests(unittest.TestCase):
+    def sync_pair(self):
+        import struct
+        a, b = self.network_trace(), self.network_trace()
+        for trace, local in ((a,1),(b,2)):
+            trace[0].update(immediatePayloadSource='native-fixed-v1', localPlayer=local)
+            trace[0]['network']['localPlayer']=local
+            for slot in range(2,8):
+                trace[0]['network']['handles'][slot]=-1
+                trace[0]['network']['roster'][slot].update(kind='ai',ai=4)
+            for player in (1,2):
+                trace.insert(-1,dict(kind='gap',sequence=len(trace)-1,time=65+local+player,
+                    reason='immediate command is outside timed replay coverage',
+                    details=dict(category=12,player=player,handle=100+player,size=10,scheduledTime=0,
+                        source='localImmediate' if player==local else 'remoteImmediate',
+                        data=struct.pack('<hIi',-2,0xdeadbeef,64).hex())))
+            trace[-1].update(events=3,status='incomplete')
+        return a,b
+
+    def inspect_sync(self,a,b):
+        self.assertEqual(self.compare(a,b)['status'],'incomplete')
+        return self.module.inspect_native_sync(self.root/'a.jsonl',self.root/'b.jsonl')
+
+    def test_native_sync_compares_advertised_ticks_despite_different_arrival_ticks(self):
+        a,b=self.sync_pair()
+        result=self.inspect_sync(a,b)
+        self.assertNotIn('inspectionError',result)
+        self.assertEqual(result['sharedAdvertisements'],2)
+        self.assertEqual(result['sameHashTicks'],1)
+        self.assertEqual(result['receiptHashDifferences'],0)
+
+    def test_native_sync_distinguishes_advertised_desync_from_changed_receipt(self):
+        import struct
+        a,b=self.sync_pair()
+        b[3]['details']['data']=struct.pack('<hIi',7,123,64).hex()
+        result=self.inspect_sync(a,b)
+        self.assertEqual(result['receiptHashDifferences'],1)
+        self.assertEqual(result['allPlayerHashTicks'],0)
+        a[3]['details']['data']=b[3]['details']['data']
+        result=self.inspect_sync(a,b)
+        self.assertEqual(result['differentHashTicks'],1)
+        self.assertEqual(result['firstAdvertisedDifference']['matchTick'],64)
+
+    def test_native_sync_requires_all_humans_and_nonzero_hash_evidence(self):
+        import struct
+        a,b=self.sync_pair()
+        b.pop(3); b[-1]['events']=2
+        result=self.inspect_sync(a,b)
+        self.assertEqual(result['unpairedAdvertisements'],1)
+        self.assertEqual(result['allPlayerHashTicks'],0)
+        a,b=self.sync_pair()
+        for trace in (a,b): trace[3]['details']['data']=struct.pack('<hIi',0,0,64).hex()
+        self.assertEqual(self.inspect_sync(a,b)['allPlayerHashTicks'],0)
+
+    def test_native_sync_rejects_legacy_malformed_or_ambiguous_evidence(self):
+        for change in ('legacy','payload','size','actor','handle','time','footer','sequence','settings','same peer'):
+            with self.subTest(change=change):
+                a,b=self.sync_pair()
+                if change=='legacy': del b[0]['immediatePayloadSource']
+                elif change=='payload': b[2]['details']['data']='xx'*10
+                elif change=='size': b[2]['details']['size']=9
+                elif change=='actor': b[2]['details']['player']=9
+                elif change=='handle': b[2]['details']['handle']=999
+                elif change=='time': b[2]['details']['scheduledTime']=1
+                elif change=='footer': b.pop()
+                elif change=='sequence': b[2]['sequence']=99
+                elif change=='settings': b[0]['environmentHash']='c'*64
+                else: b[0]['localPlayer']=1; b[0]['network']['localPlayer']=1
+                self.assertIn('inspectionError',self.inspect_sync(a,b))
+
+    def test_native_sync_conflicting_repeat_is_not_silently_overwritten(self):
+        import struct
+        a,b=self.sync_pair()
+        extra=json.loads(json.dumps(b[2])); extra['sequence']=4
+        extra['details']['data']=struct.pack('<hIi',0,5,64).hex()
+        b.insert(-1,extra); b[-1]['events']=4
+        self.assertIn('conflicting hashes',self.inspect_sync(a,b)['inspectionError'])
+
+    def test_large_immediate_line_can_be_inspected_but_reader_stays_bounded(self):
+        a=self.trace()
+        a.insert(-1,dict(kind='gap',time=10,reason='large fixed buffer',
+                        details=dict(category=117,data='AB'*61000,size=61000)))
+        self.compare(a,a)
+        self.assertNotIn('inspectionError',self.module.inspect_trace(self.root/'a.jsonl'))
+        a[2]['details']['data']='AB'*70000
+        self.compare(a,a)
+        self.assertIn('Oversized trace line',self.module.inspect_trace(self.root/'a.jsonl')['inspectionError'])
+
     def test_inspection_reports_evidence_after_gaps_without_relaxing_comparison(self):
         a = self.trace()
         a.insert(1, dict(kind='gap', time=10, reason='uncovered', details={'category': 12}))

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.21.0
+
+- Correct multiplayer immediate-message diagnostics to read the game's fixed
+  payload buffer. Version 0.20.0 read the unused timed-command payload instead;
+  its immediate-message payload bytes must not be used as network evidence.
+- Support the fixed buffer's 61,000-byte capacity without changing the smaller
+  timed replay limit. Keep malformed sizes isolated from native gameplay.
+- Add native synchronization inspection to `--inspect`: decode command 12's
+  lag, hash and advertised match tick, compare receipts, and compare all human
+  players' advertised hashes at common ticks. Reject legacy payload evidence
+  and retain the strict comparator's existing incomplete result and exit code.
+- Verify both local and received immediate paths against the original SHC and
+  Extreme instructions, including ring endpoints and maximum fixed payloads.
+
+Multiplayer playback remains unavailable. Matching native advertised hashes
+provide additional evidence, not proof of a complete or desync-free replay.
+
 ## 0.20.0
 
 - Show Replay status in the multiplayer pause menu. Distinguish waiting, active,

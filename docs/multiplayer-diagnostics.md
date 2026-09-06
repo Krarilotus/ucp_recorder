@@ -82,8 +82,10 @@ work. See the [native network-flow contribution](https://github.com/sourcehold/O
 The source investigation also confirms that the wire timestamp uses three bytes,
 while command-ring ticks use four. A replay file must not silently equate these
 formats. The reviewed RedirectPlay source forwards reliable flags but omits the
-ReceiveData size output; its exact correspondence to the shipped DLL remains
-unverified. Neither replacing transport nor recording raw packets alone closes
+ReceiveData size output; the omission was also confirmed in the shipped Steam
+1.2.3 DLL. A separate [RedirectPlay fix](https://github.com/gynt/RedirectPlay/pull/1)
+has buffer/queue contract tests but still needs a live Steam test. Neither
+replacing transport nor recording raw packets alone closes
 the replay ownership and resync gaps.
 
 ## Format 5: DirectPlay system-message coverage

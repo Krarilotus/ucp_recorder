@@ -47,10 +47,50 @@ return addresses remain raw: investigate their code mappings before treating
 an address difference as a different caller. Tail calls retain their caller's
 return address, so attribution does not uniquely identify the tail-call site.
 
-Immediate-command gaps now retain the declared payload (bounded to 1260 bytes)
-and sender handle. They remain gaps: their effects, transport phases and replay
-semantics are not implemented. System-message pointer fields are not dereferenced.
+Version 0.20.0 attempted to retain immediate payloads but read the unused timed
+ring payload. Those bytes are invalid evidence. Version 0.21.0 reads the native
+fixed buffer at synchrony base + `0x2D834`, with capacity 61,000 bytes. The command
+header still comes from the ring. Both local transmission and remote receive-copy
+use this separate buffer; the timed replay limit remains 1260 bytes. Headers now
+identify corrected evidence with `immediatePayloadSource: native-fixed-v1`.
+Immediate events remain gaps. System-message pointer fields are not dereferenced.
 Formats 5/6 retain their strict validation semantics; attribution is supplemental.
+
+## Native immediate handlers and synchronization inspection (0.21.0)
+
+The original SHC function table at `0xB38E10` maps command 12 to `0x480B10`
+(`CommandCheckSync`). It declares ten bytes and sets scheduled time to zero.
+The payload is little-endian signed 16-bit lag, unsigned 32-bit world hash, and
+signed 32-bit advertised match tick. Sending selects the local player's fields;
+execution selects the resolved protocol invoker. This is active synchronization
+traffic. The old category enum's lobby/AIV description is misleading here.
+
+Command 117 maps to `0x4863A0` and transfers 136 bytes: two four-byte parameters
+followed by two 64-byte pixel planes. Execution updates the player's face bitmap
+and its dirty marker. This explains the observed player-dependent traffic but
+does not establish a complete replay strategy for immediate commands or resync.
+
+`--inspect` now includes `nativeSync`. It requires corrected payload headers,
+valid ten-byte messages and sender/roster consistency. It compares copies of the
+same sender's advertisement by advertised tick, allowing different arrival ticks.
+It reports receipt hash differences separately from different players advertising
+different world hashes at a common tick. All human slots must be represented in
+both files for an all-player hash comparison. Zero hashes and ticks below ten
+are excluded from that comparison, following the native check's readiness rules.
+Missing advertisements stay visible; conflicting repeats, malformed data, old
+payloads and incomplete file sequences produce inspection errors.
+
+Native hashes are partial checksums, not full-world cryptographic evidence. A
+match in this supplemental inspection cannot turn incomplete strict comparison
+into a pass. Hash generation is spread across native phases; this inspection
+does not replace their execution or make multiplayer playback available.
+
+The original-executable tests execute 20 local/remote immediate paths per variant
+with the actual Lua payload reader: ring slots 0/199, zero-byte, ten-byte,
+136-byte, 1261-byte and 61,000-byte payloads. Transport, memory helper bodies and
+a synthetic command callback are stand-ins; native queueing, fixed/ring address
+selection, actor translation and dispatch branches run original instructions.
+These checks do not exercise the live UCP detour bridge or a Steam connection.
 
 Run `python compare_multiplayer.py A/commands.jsonl B/commands.jsonl --inspect`
 to include command/category counts, coverage gaps, resource/command digests and

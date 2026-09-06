@@ -96,6 +96,8 @@ def check(folder):
         from check_network_native import check_system_branch
         network=lua.execute((root/'code/network-sites.lua').read_text())[name]
         check_system_branch(reader,name,network['systemMessage'])
+        from check_immediate_native import check_immediate
+        check_immediate(reader,name)
         from check_rng_observer_native import check_rng_observer
         check_rng_observer(reader,lua,native,root,name)
         from check_dispatch_native import check_dispatch

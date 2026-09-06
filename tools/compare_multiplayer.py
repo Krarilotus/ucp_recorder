@@ -3,6 +3,7 @@ import argparse
 import itertools
 import json
 import hashlib
+import struct
 from collections import Counter
 from pathlib import Path
 
@@ -47,8 +48,10 @@ def network_state(header):
 
 
 def rows(stream):
-    while line := stream.readline(65537):
-        if len(line) > 65536:
+    # A fixed-buffer immediate message can contain 61,000 bytes encoded as hex.
+    # Keep a bounded line reader while allowing that evidence plus JSON fields.
+    while line := stream.readline(131073):
+        if len(line) > 131072:
             raise ValueError('Oversized trace line')
         value = json.loads(line)
         if not isinstance(value, dict):
@@ -258,6 +261,97 @@ def inspect_trace(path):
     return result
 
 
+def native_sync_packets(path):
+    """Decode command 12 evidence, never execute it or infer replay coverage."""
+    packets = {}
+    with Path(path).open(encoding='utf-8') as stream:
+        records = rows(stream)
+        header = next(records)
+        if header.get('kind') != 'header' or header.get('immediatePayloadSource') != 'native-fixed-v1':
+            raise ValueError('Native sync inspection requires corrected fixed-buffer evidence (0.21.0+)')
+        state = network_state(header)
+        ended, sequence, count = False, 0, 0
+        for record in records:
+            if ended:
+                raise ValueError('Data follows trace completion')
+            if record.get('kind') == 'end':
+                if record.get('events') != sequence:
+                    raise ValueError('Incomplete sync evidence sequence')
+                ended = True
+                continue
+            sequence += 1
+            if record.get('sequence') != sequence:
+                raise ValueError('Incomplete sync evidence sequence')
+            details = record.get('details') or {}
+            if record.get('kind') != 'gap' or details.get('category') != 12:
+                continue
+            if details.get('source') not in ('localImmediate', 'remoteImmediate'):
+                raise ValueError('Unknown native sync dispatch source')
+            player = details.get('player')
+            integer(player, 1, 8)
+            if state['roster'][player-1]['kind'] != 'human' or details.get('handle') != state['handles'][player-1]:
+                raise ValueError('Native sync sender does not match player roster')
+            data = details.get('data')
+            if (details.get('size') != 10 or details.get('scheduledTime') != 0 or
+                    not isinstance(data, str) or len(data) != 20 or
+                    any(c not in '0123456789abcdefABCDEF' for c in data)):
+                raise ValueError('Malformed native sync payload')
+            lag, world_hash, match_tick = struct.unpack('<hIi', bytes.fromhex(data))
+            integer(match_tick, 0, 2147483647)
+            integer(record.get('time'), 0, 2147483647)
+            key = (player, match_tick)
+            if key in packets and packets[key]['hash'] != world_hash:
+                raise ValueError('One sender advertised conflicting hashes for the same match tick')
+            packets[key] = dict(hash=world_hash, lag=lag, observedTick=record['time'])
+            count += 1
+        if not ended:
+            raise ValueError('Sync evidence has no completion record')
+    return header, packets, count
+
+
+def inspect_native_sync(left, right):
+    result = {'purpose': 'Native advertised-hash evidence only; not replay validation'}
+    try:
+        ah, a, ac = native_sync_packets(left)
+        bh, b, bc = native_sync_packets(right)
+        for key in ('variant', 'executable', 'environmentHash', 'window'):
+            if ah.get(key) != bh.get(key):
+                raise ValueError('Sync evidence requires matching executable, settings and capture window')
+        if ah['network']['roster'] != bh['network']['roster']:
+            raise ValueError('Sync evidence requires matching player rosters')
+        if ah['localPlayer'] == bh['localPlayer']:
+            raise ValueError('Select traces from two different players')
+        common = a.keys() & b.keys()
+        missing = a.keys() ^ b.keys()
+        disagreements = sorted((key for key in common if a[key]['hash'] != b[key]['hash']),
+                               key=lambda key: (key[1], key[0]))
+        result.update(leftPackets=ac, rightPackets=bc, sharedAdvertisements=len(common),
+                      unpairedAdvertisements=len(missing), receiptHashDifferences=len(disagreements))
+        if disagreements:
+            player, tick = disagreements[0]
+            result['firstReceiptDifference'] = dict(player=player, matchTick=tick,
+                left=f'{a[(player,tick)]["hash"]:08x}', right=f'{b[(player,tick)]["hash"]:08x}')
+        # Only common advertisements with identical received hashes can be used
+        # to compare different senders. Arrival ticks and lag are peer-local.
+        by_tick = {}
+        for player, tick in common:
+            value = a[(player,tick)]['hash']
+            if value and tick >= 10 and value == b[(player,tick)]['hash']:
+                by_tick.setdefault(tick, {})[player] = value
+        humans = {p['slot'] for p in ah['network']['roster'] if p['kind'] == 'human'}
+        complete = {tick: values for tick, values in by_tick.items() if set(values) == humans}
+        different = sorted(tick for tick, values in complete.items() if len(set(values.values())) > 1)
+        result.update(allPlayerHashTicks=len(complete), differentHashTicks=len(different),
+                      sameHashTicks=len(complete)-len(different))
+        if different:
+            tick = different[0]
+            result['firstAdvertisedDifference'] = dict(matchTick=tick,
+                hashes={str(p): f'{v:08x}' for p,v in sorted(complete[tick].items())})
+    except (OSError, ValueError, TypeError, KeyError, StopIteration, AttributeError) as error:
+        result['inspectionError'] = str(error) or 'Empty sync evidence'
+    return result
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('left', type=Path)
@@ -268,5 +362,6 @@ if __name__ == '__main__':
     result = compare(args.left, args.right)
     if args.inspect:
         result['observations'] = {'left': inspect_trace(args.left), 'right': inspect_trace(args.right)}
+        result['nativeSync'] = inspect_native_sync(args.left, args.right)
     print(json.dumps(result, indent=2))
     raise SystemExit({'matched': 0, 'different': 1, 'incomplete': 2}[result['status']])
