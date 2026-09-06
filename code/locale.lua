@@ -42,7 +42,10 @@ local de={
 function M.language()
  local lang=os.getenv('UCP_GUI_LANGUAGE')
  if not lang or lang=='' then
-  local v=rawget(_G,'version') or (rawget(_G,'data') or {}).version
+  -- UCP's global version is its semantic-version utility. The game-language
+  -- provider lives in data.version; the utility must not shadow that provider.
+  local v=(rawget(_G,'data') or {}).version
+  if type(v)~='table' or type(v.getGameLanguage)~='function' then v=rawget(_G,'version') end
   if type(v)=='table' and type(v.getGameLanguage)=='function' then
    local ok,value=pcall(v.getGameLanguage); if ok then lang=value end
   end

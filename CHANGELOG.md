@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.31.2
+
+- Fix replay menus staying English in a German game when launched without a GUI
+  language override. Read the game-language provider from UCP's `data.version`;
+  the unrelated global version utility no longer hides it.
+
 ## 0.31.1
 
 - Fix startup with RNG diagnostics enabled: remove the unavailable host-only

@@ -6,6 +6,19 @@ class LocaleTests(unittest.TestCase):
     setUp=fixture.RecorderTests.setUp
     check=fixture.RecorderTests.check
 
+    def test_ucp_version_utility_does_not_shadow_game_language(self):
+        self.check('''
+local l=require('code/locale')
+os.getenv=function() return nil end
+version={parse=function() error('semantic version utility is unrelated') end}
+data={version={getGameLanguage=function() return 'german' end}}
+assert(l.language()=='de' and l.text('Auto: on')=='Auto: ein')
+version.getGameLanguage=function() return 'english' end
+assert(l.language()=='de')
+os.getenv=function() return 'en' end
+assert(l.language()=='en')
+''')
+
     def test_launcher_language_precedes_game_language_with_fallback(self):
         self.check('''
 local l=require('code/locale')
