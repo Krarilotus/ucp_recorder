@@ -58,6 +58,15 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install lupa==2.6 unicorn==2.1.4
       - run: python -m unittest discover -s tests -v
+      - name: Configure recorded-settings framework checks when provided
+        if: hashFiles('tests/framework-settings/CMakeLists.txt') != ''
+        run: cmake -S tests/framework-settings -B build-framework-settings
+      - name: Build recorded-settings framework checks
+        if: hashFiles('tests/framework-settings/CMakeLists.txt') != ''
+        run: cmake --build build-framework-settings --config Release
+      - name: Verify recorded settings through the production framework
+        if: hashFiles('tests/framework-settings/CMakeLists.txt') != ''
+        run: ctest --test-dir build-framework-settings -C Release --output-on-failure
   package:
     needs: [discover, verify]
     if: needs.discover.outputs.count != '0'
