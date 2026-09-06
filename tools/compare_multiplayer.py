@@ -22,6 +22,8 @@ def network_state(header):
     state = header.get('network')
     if not isinstance(state, dict) or state.get('mode') not in (1, 2) or state.get('syncStatus') != 0:
         raise ValueError('Missing network context or capture began during synchronization')
+    integer(state['mode'], 1, 2)
+    integer(state['syncStatus'], 0, 0)
     roster, handles = state.get('roster'), state.get('handles')
     if not isinstance(roster, list) or len(roster) != 8 or not isinstance(handles, list) or len(handles) != 8:
         raise ValueError('Missing eight-slot player roster')
@@ -71,6 +73,36 @@ def capture_window(header):
     if first % 64 or last % 64 or header.get('firstTick') != first:
         raise ValueError('Invalid or missed diagnostic start boundary')
     return dict(startTick=first, endTick=last)
+
+
+def peer_pair(ah, bh):
+    """Shared identity boundary for strict comparison and supplemental analyses."""
+    for header in (ah, bh):
+        if header.get('kind') != 'header':
+            raise ValueError('Missing trace header')
+        integer(header.get('format'), 1, 6)
+        integer(header.get('localPlayer'), 1, 8)
+        if header.get('variant') not in ('SHC', 'Extreme'):
+            raise ValueError('Unknown game variant')
+        if not isinstance(header.get('executable'), str) or not header['executable']:
+            raise ValueError('Missing executable identity')
+        if header['format'] >= 3:
+            hash_value(header.get('environmentHash'))
+        integer(header.get('firstTick', 0), 0, 2147483647)
+    if any(ah.get(key) != bh.get(key) for key in ('variant', 'executable', 'format', 'firstTick')):
+        raise ValueError('Traces require the same executable, variant, format and starting boundary')
+    if ah['localPlayer'] == bh['localPlayer']:
+        raise ValueError('Select traces from two different players')
+    if ah['format'] >= 3 and ah['environmentHash'] != bh['environmentHash']:
+        raise ValueError('Traces require the same resolved UCP settings, extension order/versions and framework')
+    an = network_state(ah) if ah['format'] >= 4 else None
+    bn = network_state(bh) if bh['format'] >= 4 else None
+    aw, bw = capture_window(ah), capture_window(bh)
+    if aw != bw:
+        raise ValueError('Traces require the same diagnostic window')
+    if an and (an['roster'] != bn['roster'] or an['mode'] != bn['mode']):
+        raise ValueError('Traces require the same logical player roster and game mode')
+    return an, bn, aw
 
 
 def evidence(records, format_version, first_tick=0, network=None, window=None):
@@ -144,24 +176,9 @@ def compare(left, right):
         with Path(left).open(encoding='utf-8') as a, Path(right).open(encoding='utf-8') as b:
             ar, br = rows(a), rows(b)
             ah, bh = next(ar), next(br)
-            for header in (ah, bh):
-                if header.get('kind') != 'header' or header.get('format') not in (1, 2, 3, 4, 5, 6):
-                    raise ValueError('Unsupported trace format')
-                if header['format'] >= 3:
-                    hash_value(header.get('environmentHash'))
-            if any(ah.get(key) != bh.get(key) for key in ('variant', 'executable', 'format')):
-                raise ValueError('Traces require the same game executable, variant and format')
-            if ah['format'] >= 3 and ah['environmentHash'] != bh['environmentHash']:
-                raise ValueError('Traces require the same resolved UCP settings, extension order/versions and framework')
-            an = network_state(ah) if ah['format'] >= 4 else None
-            bn = network_state(bh) if bh['format'] >= 4 else None
-            aw, bw = capture_window(ah), capture_window(bh)
-            if aw != bw:
-                raise ValueError('Traces require the same diagnostic window')
-            if an and (an['roster'] != bn['roster'] or an['mode'] != bn['mode']):
-                raise ValueError('Traces require the same logical player roster and game mode')
-            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0), an, aw),
-                                               evidence(br, bh['format'], bh.get('firstTick', 0), bn, bw)):
+            an, bn, window = peer_pair(ah, bh)
+            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0), an, window),
+                                               evidence(br, bh['format'], bh.get('firstTick', 0), bn, window)):
                 count += 1
                 if difference:
                     continue  # Still validate both complete streams before reporting.
@@ -185,7 +202,7 @@ def compare(left, right):
                     else:
                         difference.update(left=av[key], right=bv[key])
                     break
-    except (OSError, ValueError, KeyError, StopIteration) as error:
+    except (OSError, ValueError, TypeError, KeyError, StopIteration, AttributeError) as error:
         return dict(status='incomplete', reason=str(error) or 'Empty trace', firstDifference=difference)
     return dict(status='different' if difference else 'matched', events=count, firstDifference=difference)
 
@@ -227,19 +244,7 @@ def inspect_trace(path):
                     for target, value, index in ((rng_streams[0], rng[0], rng[3]),
                                                   (rng_streams[1], rng[1], rng[2])):
                         digest(target, [record['time'], value, index])
-                    entries = record.get('rngCalls', [])
-                    if not isinstance(entries, list) or len(entries) > 512:
-                        raise ValueError('Invalid RNG caller evidence')
-                    seen = set()
-                    for entry in entries:
-                        integer(entry.get('stream'), 1, 2)
-                        integer(entry.get('returnAddress'), 0, 4294967295)
-                        integer(entry.get('count'), 1, 2147483647)
-                        key = (entry['stream'], entry['returnAddress'])
-                        if key in seen:
-                            raise ValueError('Repeated RNG caller in checkpoint')
-                        seen.add(key)
-                        callers[key] += entry['count']
+                    callers.update(rng_call_counts(record.get('rngCalls', [])))
                 elif kind == 'gap':
                     result['gaps'] += 1
                     gaps[(record.get('reason', ''), (record.get('details') or {}).get('category'))] += 1
@@ -269,13 +274,14 @@ def native_sync_packets(path):
         header = next(records)
         if header.get('kind') != 'header' or header.get('immediatePayloadSource') != 'native-fixed-v1':
             raise ValueError('Native sync inspection requires corrected fixed-buffer evidence (0.21.0+)')
+        integer(header.get('format'), 5, 6)
         state = network_state(header)
         ended, sequence, count = False, 0, 0
         for record in records:
             if ended:
                 raise ValueError('Data follows trace completion')
             if record.get('kind') == 'end':
-                if record.get('events') != sequence:
+                if record.get('events') != sequence or record.get('status') not in ('complete', 'incomplete'):
                     raise ValueError('Incomplete sync evidence sequence')
                 ended = True
                 continue
@@ -314,13 +320,7 @@ def inspect_native_sync(left, right):
     try:
         ah, a, ac = native_sync_packets(left)
         bh, b, bc = native_sync_packets(right)
-        for key in ('variant', 'executable', 'environmentHash', 'window'):
-            if ah.get(key) != bh.get(key):
-                raise ValueError('Sync evidence requires matching executable, settings and capture window')
-        if ah['network']['roster'] != bh['network']['roster']:
-            raise ValueError('Sync evidence requires matching player rosters')
-        if ah['localPlayer'] == bh['localPlayer']:
-            raise ValueError('Select traces from two different players')
+        peer_pair(ah, bh)
         common = a.keys() & b.keys()
         missing = a.keys() ^ b.keys()
         disagreements = sorted((key for key in common if a[key]['hash'] != b[key]['hash']),
@@ -352,6 +352,132 @@ def inspect_native_sync(left, right):
     return result
 
 
+def rng_call_counts(entries):
+    if not isinstance(entries, list) or len(entries) > 512:
+        raise ValueError('Missing or invalid RNG caller evidence')
+    result = {}
+    for entry in entries:
+        integer(entry.get('stream'), 1, 2)
+        integer(entry.get('returnAddress'), 0, 4294967295)
+        integer(entry.get('count'), 1, 2147483647)
+        key = entry['stream'], entry['returnAddress']
+        if key in result:
+            raise ValueError('Repeated RNG caller in checkpoint')
+        result[key] = entry['count']
+    return result
+
+
+def rng_checkpoints(records, header):
+    """Validate interval boundaries even when timed-replay coverage has gaps."""
+    if header.get('rngAttribution') is not True or header['format'] < 5:
+        raise ValueError('RNG interval inspection requires caller attribution (0.20.0+)')
+    window = capture_window(header)
+    next_tick = (header['firstTick'] + 63) // 64 * 64
+    sequence, commands, gaps, checkpoints = 0, 0, 0, 0
+    previous = header['firstTick']
+    previous_kind = None
+    for record in records:
+        kind = record.get('kind')
+        if kind == 'end':
+            if (record.get('events') != sequence or record.get('commands') != commands
+                    or record.get('status') not in ('complete', 'incomplete') or not checkpoints):
+                raise ValueError('Incomplete RNG evidence footer')
+            if gaps and record['status'] == 'complete':
+                raise ValueError('RNG evidence footer omits coverage gaps')
+            if window and (record.get('lastTick') != window['endTick']
+                           or previous != window['endTick'] or previous_kind != 'checkpoint'):
+                raise ValueError('Missing RNG inspection end checkpoint')
+            if next(records, None) is not None:
+                raise ValueError('Data follows trace completion')
+            return
+        sequence += 1
+        if record.get('sequence') != sequence:
+            raise ValueError('Incomplete RNG evidence sequence')
+        integer(record.get('time'), previous, window['endTick'] if window else 2147483647)
+        previous, previous_kind = record['time'], kind
+        if kind == 'checkpoint':
+            if record['time'] != next_tick:
+                raise ValueError('Missing, repeated or invalid RNG checkpoint boundary')
+            next_tick += 64
+            for field, length in (('rng', 4), ('resources', 200)):
+                values = record.get(field)
+                if not isinstance(values, list) or len(values) != length:
+                    raise ValueError('Missing ' + field + ' checkpoint evidence')
+                for value in values:
+                    integer(value, -2147483648, 2147483647)
+            hash_value(record.get('rngHash'))
+            counts = rng_call_counts(record.get('rngCalls'))
+            checkpoints += 1
+            yield record, counts
+        elif kind == 'command':
+            commands += 1
+            if previous > next_tick:
+                raise ValueError('Missing periodic RNG checkpoint')
+        elif kind == 'gap':
+            gaps += 1
+            if previous > next_tick:
+                raise ValueError('Missing periodic RNG checkpoint')
+            if record.get('reason') in ('player roster or identity changed', 'native synchronization phase changed'):
+                raise ValueError('RNG intervals span a player or synchronization transition')
+        else:
+            raise ValueError('Unknown RNG evidence event')
+    raise ValueError('RNG evidence has no completion record')
+
+
+def inspect_rng_intervals(left, right):
+    """Locate caller-count differences; counts alone do not establish causality."""
+    purpose = 'RNG interval observations only; not a desync cause or replay validation'
+    result = {'purpose': purpose, 'alignedIntervals': 0, 'differentCallerIntervals': 0,
+              'differentStateCheckpoints': 0, 'unpairedCheckpoints': 0}
+    totals, changed_intervals = Counter(), Counter()
+    try:
+        with Path(left).open(encoding='utf-8') as a, Path(right).open(encoding='utf-8') as b:
+            ar, br = rows(a), rows(b)
+            ah, bh = next(ar), next(br)
+            peer_pair(ah, bh)
+            previous = None
+            for av, bv in itertools.zip_longest(rng_checkpoints(ar, ah), rng_checkpoints(br, bh)):
+                if av is None or bv is None:
+                    result['unpairedCheckpoints'] += 1
+                    continue
+                ac, calls_a = av
+                bc, calls_b = bv
+                if ac['time'] != bc['time']:
+                    raise ValueError('RNG checkpoint timelines differ')
+                tick = ac['time']
+                state_fields = [key for key in ('rng', 'rngHash', 'resources') if ac[key] != bc[key]]
+                if state_fields:
+                    result['differentStateCheckpoints'] += 1
+                    result.setdefault('firstStateDifference', dict(time=tick, fields=state_fields,
+                        leftRng=ac['rng'], rightRng=bc['rng']))
+                # The first checkpoint starts the observation window. Its counters
+                # have no preceding full interval and must not be compared as one.
+                if previous is not None:
+                    result['alignedIntervals'] += 1
+                    differences = []
+                    for key in sorted(calls_a.keys() | calls_b.keys()):
+                        left_count, right_count = calls_a.get(key, 0), calls_b.get(key, 0)
+                        if left_count == right_count:
+                            continue
+                        stream, address = key
+                        differences.append(dict(stream=stream, returnAddress=f'0x{address:08x}',
+                                                left=left_count, right=right_count))
+                        totals[key] += right_count-left_count
+                        changed_intervals[key] += 1
+                    if differences:
+                        result['differentCallerIntervals'] += 1
+                        result.setdefault('firstCallerDifference', dict(afterTick=previous, throughTick=tick,
+                                                                       callers=differences))
+                previous = tick
+        result['callersWithDifferences'] = [dict(stream=s, returnAddress=f'0x{address:08x}',
+            rightMinusLeft=totals[(s,address)], differentIntervals=changed_intervals[(s,address)])
+            for s,address in sorted(changed_intervals)]
+    except (OSError, ValueError, TypeError, KeyError, StopIteration, AttributeError) as error:
+        # Do not leave apparently complete counts after discovering a corrupt EOF.
+        return dict(purpose=purpose, inspectionError=str(error) or 'Empty RNG evidence')
+    return result
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('left', type=Path)
@@ -363,5 +489,6 @@ if __name__ == '__main__':
     if args.inspect:
         result['observations'] = {'left': inspect_trace(args.left), 'right': inspect_trace(args.right)}
         result['nativeSync'] = inspect_native_sync(args.left, args.right)
+        result['rngIntervals'] = inspect_rng_intervals(args.left, args.right)
     print(json.dumps(result, indent=2))
     raise SystemExit({'matched': 0, 'different': 1, 'incomplete': 2}[result['status']])

@@ -436,9 +436,9 @@ assert(recorder.mode=='none' and not recorder.error)
 class CompareTraceTests(unittest.TestCase):
     def sync_pair(self):
         import struct
-        a, b = self.network_trace(), self.network_trace()
+        a, b = self.network_trace(), self.network_trace(2)
         for trace, local in ((a,1),(b,2)):
-            trace[0].update(immediatePayloadSource='native-fixed-v1', localPlayer=local)
+            trace[0].update(format=5, immediatePayloadSource='native-fixed-v1', localPlayer=local)
             trace[0]['network']['localPlayer']=local
             for slot in range(2,8):
                 trace[0]['network']['handles'][slot]=-1
@@ -515,10 +515,10 @@ class CompareTraceTests(unittest.TestCase):
         a=self.trace()
         a.insert(-1,dict(kind='gap',time=10,reason='large fixed buffer',
                         details=dict(category=117,data='AB'*61000,size=61000)))
-        self.compare(a,a)
+        self.compare(a,self.other_peer(a))
         self.assertNotIn('inspectionError',self.module.inspect_trace(self.root/'a.jsonl'))
         a[2]['details']['data']='AB'*70000
-        self.compare(a,a)
+        self.compare(a,self.other_peer(a))
         self.assertIn('Oversized trace line',self.module.inspect_trace(self.root/'a.jsonl')['inspectionError'])
 
     def test_inspection_reports_evidence_after_gaps_without_relaxing_comparison(self):
@@ -526,13 +526,13 @@ class CompareTraceTests(unittest.TestCase):
         a.insert(1, dict(kind='gap', time=10, reason='uncovered', details={'category': 12}))
         a.insert(3, dict(kind='checkpoint', time=64, resources=[0]*200, rng=[1,2,3,4],
                         rngCalls=[dict(stream=1, returnAddress=0x471770, count=3)]))
-        self.assertEqual(self.compare(a, a)['status'], 'incomplete')
+        self.assertEqual(self.compare(a, self.other_peer(a))['status'], 'incomplete')
         result = self.module.inspect_trace(self.root/'a.jsonl')
         self.assertEqual(result['commands'], 1)
         self.assertEqual(result['gaps'], 1)
         self.assertEqual(result['rngCallers'], [dict(stream=1, returnAddress='0x00471770', count=3)])
         a[3]['rngCalls'] *= 2
-        self.compare(a, a)
+        self.compare(a, self.other_peer(a))
         self.assertIn('Repeated RNG', self.module.inspect_trace(self.root/'a.jsonl')['inspectionError'])
 
     def setUp(self):
@@ -544,11 +544,17 @@ class CompareTraceTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
 
-    def trace(self):
-        return [dict(kind='header', format=1, variant='SHC', executable='a', localPlayer=1),
+    def trace(self, player=1):
+        return [dict(kind='header', format=1, variant='SHC', executable='a', localPlayer=player),
                 dict(kind='command', sequence=1, time=10, scheduledTime=10, player=3,
                      category=28, size=1, data='01', handle=123, slot=0, rng=[1, 2, 3, 4], resources=[0] * 200),
                 dict(kind='end', status='complete', commands=1)]
+
+    def other_peer(self, trace):
+        result = json.loads(json.dumps(trace))
+        result[0]['localPlayer'] = 2
+        if 'network' in result[0]: result[0]['network']['localPlayer'] = 2
+        return result
 
     def compare(self, a, b):
         paths = [self.root / 'a.jsonl', self.root / 'b.jsonl']
@@ -557,7 +563,7 @@ class CompareTraceTests(unittest.TestCase):
         return self.module.compare(*paths)
 
     def test_peer_local_identity_and_ring_slot_do_not_create_false_differences(self):
-        a, b = self.trace(), self.trace()
+        a, b = self.trace(), self.trace(2)
         b[0]['localPlayer'] = 3
         b[1].update(handle=456, slot=199)
         self.assertEqual(self.compare(a, b)['status'], 'matched')
@@ -566,7 +572,7 @@ class CompareTraceTests(unittest.TestCase):
         for key, value in [('time', 11), ('player', 2), ('data', 'FF'), ('rng', [1, 2, 3, 5]),
                            ('resources', [0] * 40 + [7] + [0] * 159)]:
             with self.subTest(key=key):
-                a, b = self.trace(), self.trace()
+                a, b = self.trace(), self.trace(2)
                 b[1][key] = value
                 result = self.compare(a, b)
                 self.assertEqual(result['status'], 'different')
@@ -577,7 +583,7 @@ class CompareTraceTests(unittest.TestCase):
 
     def test_missing_footer_untracked_invalid_payload_and_empty_trace_are_incomplete(self):
         for change in ('footer', 'untracked', 'data', 'empty', 'sequence'):
-            a, b = self.trace(), self.trace()
+            a, b = self.trace(), self.trace(2)
             if change == 'footer':
                 b.pop()
             elif change == 'untracked':
@@ -591,10 +597,11 @@ class CompareTraceTests(unittest.TestCase):
             self.assertEqual(self.compare(a, b)['status'], 'incomplete', change)
 
     def test_periodic_evidence_compares_without_any_commands(self):
-        a = [dict(kind='header', format=2, variant='SHC', executable='a', firstTick=64),
+        a = [dict(kind='header', format=2, variant='SHC', executable='a', firstTick=64, localPlayer=1),
              dict(kind='checkpoint', sequence=1, time=64, rng=[1, 2, 3, 4], resources=[0]*200),
              dict(kind='end', status='complete', events=1, commands=0)]
         b = json.loads(json.dumps(a))
+        b[0]['localPlayer'] = 2
         self.assertEqual(self.compare(a, b)['status'], 'matched')
         b[1]['rng'][3] = 5
         self.assertEqual(self.compare(a, b)['firstDifference']['field'], 'rng')
@@ -603,24 +610,24 @@ class CompareTraceTests(unittest.TestCase):
         a = self.trace()
         a[0].update(format=2, firstTick=0)
         a[-1].update(events=1)
-        self.assertEqual(self.compare(a, a)['status'], 'incomplete')
+        self.assertEqual(self.compare(a, self.other_peer(a))['status'], 'incomplete')
 
-    def full_trace(self):
+    def full_trace(self, player=1):
         return [dict(kind='header', format=3, variant='SHC', executable='a', firstTick=64,
-                     environmentHash='a'*64),
+                     environmentHash='a'*64, localPlayer=player),
                 dict(kind='checkpoint', sequence=1, time=64, rng=[1, 2, 3, 4],
                      resources=[0]*200, rngHash='b'*64),
                 dict(kind='end', status='complete', events=1, commands=0)]
 
     def test_full_rng_difference_is_found_with_matching_values_and_indices(self):
-        a, b = self.full_trace(), self.full_trace()
+        a, b = self.full_trace(), self.full_trace(2)
         self.assertEqual(self.compare(a, b)['status'], 'matched')
         b[1]['rngHash'] = 'c'*64
         self.assertEqual(self.compare(a, b)['firstDifference']['field'], 'rngHash')
 
     def test_different_environment_or_missing_full_rng_cannot_match(self):
         for change in ('environment', 'header hash', 'state hash', 'invalid hash'):
-            a, b = self.full_trace(), self.full_trace()
+            a, b = self.full_trace(), self.full_trace(2)
             if change == 'environment':
                 b[0]['environmentHash'] = 'c'*64
             elif change == 'header hash':
@@ -631,15 +638,15 @@ class CompareTraceTests(unittest.TestCase):
                 b[1]['rngHash'] = 'z'*64
             self.assertEqual(self.compare(a, b)['status'], 'incomplete', change)
 
-    def network_trace(self):
+    def network_trace(self, player=1):
         a = self.full_trace()
-        a[0].update(format=4, localPlayer=1, network=dict(mode=1, localPlayer=1, syncStatus=0,
+        a[0].update(format=4, localPlayer=player, network=dict(mode=1, localPlayer=player, syncStatus=0,
             handles=list(range(101,109)), roster=[dict(slot=i,kind='human',ai=0,variation=0) for i in range(1,9)]))
         return a
 
     def test_network_context_requires_unambiguous_roster_and_idle_sync(self):
         for change in ('missing', 'duplicate', 'system handle', 'classification', 'resync', 'local slot'):
-            a, b = self.network_trace(), self.network_trace()
+            a, b = self.network_trace(), self.network_trace(2)
             n = b[0]['network']
             if change == 'missing': del b[0]['network']
             elif change == 'duplicate': n['handles'][2] = n['handles'][1]
@@ -650,7 +657,7 @@ class CompareTraceTests(unittest.TestCase):
             self.assertEqual(self.compare(a,b)['status'],'incomplete',change)
 
     def test_logical_roster_compares_across_transport_handle_renumbering(self):
-        a, b = self.network_trace(), self.network_trace()
+        a, b = self.network_trace(), self.network_trace(2)
         for trace in (a,b):
             event=self.trace()[1]
             event.update(sequence=2,time=65,scheduledTime=65,handle=103)
@@ -662,17 +669,18 @@ class CompareTraceTests(unittest.TestCase):
         self.assertEqual(self.compare(a,b)['status'],'incomplete')
 
     def test_network_gaps_and_different_ai_rosters_cannot_report_match(self):
-        a, b = self.network_trace(), self.network_trace()
+        a, b = self.network_trace(), self.network_trace(2)
         b[0]['network']['handles'][7]=-1; b[0]['network']['roster'][7].update(kind='ai',ai=4)
         self.assertEqual(self.compare(a,b)['status'],'incomplete')
         a.insert(2,dict(kind='gap',sequence=2,time=65,reason='immediate command'))
         a[-1].update(events=2,status='incomplete')
-        result=self.compare(a,a)
+        b=json.loads(json.dumps(a)); b[0]['localPlayer']=2; b[0]['network']['localPlayer']=2
+        result=self.compare(a,b)
         self.assertEqual(result['status'],'incomplete')
         self.assertIn('immediate command',result['reason'])
 
     def test_system_aware_format_does_not_accept_older_coverage_or_system_gaps(self):
-        a,b=self.network_trace(),self.network_trace()
+        a,b=self.network_trace(),self.network_trace(2)
         a[0]['format']=5
         self.assertEqual(self.compare(a,b)['status'],'incomplete')
         b[0]['format']=5
@@ -680,20 +688,21 @@ class CompareTraceTests(unittest.TestCase):
         a.insert(2,dict(kind='gap',sequence=2,time=65,
             reason='DirectPlay system message is outside replay coverage',details=dict(messageType=0x101)))
         a[-1].update(events=2,status='incomplete')
-        result=self.compare(a,a)
+        b=json.loads(json.dumps(a)); b[0]['localPlayer']=2; b[0]['network']['localPlayer']=2
+        result=self.compare(a,b)
         self.assertEqual(result['status'],'incomplete')
         self.assertIn('DirectPlay system message',result['reason'])
 
-    def bounded_trace(self):
-        trace = self.network_trace()
+    def bounded_trace(self, player=1):
+        trace = self.network_trace(player)
         trace[0].update(format=6,window=dict(startTick=64,endTick=128))
-        trace.insert(2,dict(trace[1],sequence=2,time=128))
+        trace.insert(2,dict(json.loads(json.dumps(trace[1])),sequence=2,time=128))
         trace[-1].update(events=2,lastTick=128)
         return trace
 
     def test_bounded_comparison_requires_the_final_checkpoint_even_if_both_traces_agree(self):
         a=self.bounded_trace()
-        self.assertEqual(self.compare(a,a)['status'],'matched')
+        self.assertEqual(self.compare(a,self.bounded_trace(2))['status'],'matched')
         for change in ('early end','missing checkpoint','command after end checkpoint','outside window',
                        'wrong first tick','misaligned start','missing window','missing last tick'):
             with self.subTest(change=change):
@@ -709,7 +718,7 @@ class CompareTraceTests(unittest.TestCase):
                 elif change=='misaligned start': a[0]['window']['startTick']=65
                 elif change=='missing window': del a[0]['window']
                 else: del a[-1]['lastTick']
-                self.assertEqual(self.compare(a,a)['status'],'incomplete')
+                self.assertEqual(self.compare(a,self.other_peer(a))['status'],'incomplete')
 
     def test_bounded_peers_require_same_window_and_compare_ai_resources(self):
         a,b=self.bounded_trace(),self.bounded_trace()

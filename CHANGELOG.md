@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.22.0
+
+- Reject multiplayer comparisons that use the same logical player twice, omit
+  peer identity, or mix starting boundaries, game modes or incompatible headers.
+  Native synchronization inspection now applies the same pair checks.
+- Add `rngIntervals` to the comparison tool's `--inspect` output: locate the
+  first differing RNG caller-count interval separately from the first differing
+  RNG/resource checkpoint. Preserve differences even when later counts cancel.
+- Validate interval sequences and ending evidence; malformed or interrupted
+  captures cannot leave apparently complete interval statistics. Exclude the
+  first partial counter window and reject roster/resynchronization transitions.
+- These are offline evidence improvements. Native recording and menus are
+  unchanged; multiplayer playback remains unavailable. Caller-count differences
+  are investigative leads, not proof of which call caused a desync.
+
 ## 0.21.0
 
 - Correct multiplayer immediate-message diagnostics to read the game's fixed

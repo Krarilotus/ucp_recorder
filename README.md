@@ -14,6 +14,10 @@ Version 0.20.0 adds **Replay status** to the multiplayer pause menu, including
 whether test capture is active, saved or failed. Captures include RNG caller
 counts and immediate-message payloads for investigation. The comparison tool's
 `--inspect` option summarizes this evidence without relaxing its pass criteria.
+Version 0.22.0 rejects accidental same-player comparisons and adds RNG caller
+differences by checkpoint interval to `--inspect`. These observations can locate
+where to investigate; they do not establish a desync cause or a replay pass.
+See [paired capture analysis](docs/multiplayer-comparison.md) for interpretation.
 Version 0.21.0 corrects the immediate-message payload buffer and decodes native
 synchronization hash advertisements. Discard immediate payload bytes collected
 by 0.20.0; the timed-command and resource evidence is unaffected by this fix.
@@ -44,4 +48,4 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.21.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
+The builder creates `dist/recorder-0.22.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
