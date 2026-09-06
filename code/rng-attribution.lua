@@ -2,7 +2,6 @@
 local store=require('code/sessions')
 local platform=require('code/platform')
 local native=require('code/native')
-local bit=require('bit')
 local M={MAX_BYTES=64*1024*1024,MAX_CALLERS=512}
 
 function M.new(engine)
@@ -33,7 +32,7 @@ function M:begin(manifest,mode)
   self.file=assert(io.open(self.path..'/calls.jsonl','w'))
   self.bytes=0; self:clear(); self.failed=nil
   self.previousTick=self.engine:tick()
-  self:write({kind='header',format=1,mode=mode,replay=manifest.id,
+  self:write({kind='header',format=2,mode=mode,replay=manifest.id,
     variant=native.profile.name,executable=native.profile.sha256,
     firstTick=self.previousTick,rng=self.engine:rngState()})
 end
@@ -53,7 +52,9 @@ function M:rngCall(stream,stack)
   entry.count=entry.count+1; entry.lastTick=tick
   self.count=self.count+1
   -- A diagnostic ordering checksum, not a proof of equal simulation state.
-  self.order=bit.bxor(bit.rol(self.order,5),address,tick,stream)
+  -- UCP resolves require() inside the extension ZIP, not LuaJIT's host modules.
+  -- Keep intermediates below 2^53 so Lua numbers and integer Lua agree exactly.
+  self.order=(((self.order*33+address)*33+tick)*33+stream)%4294967296
 end
 
 function M:checkpoint()

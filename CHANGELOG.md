@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.31.1
+
+- Fix startup with RNG diagnostics enabled: remove the unavailable host-only
+  bit module dependency and use a portable arithmetic ordering checksum.
+- Compare only matching trace formats, and verify the collector under Lua 5.4
+  and LuaJIT with extension-only dependencies.
+
 ## 0.31.0
 
 - Match the native pause-menu font, centered button text, colors, hover blending
