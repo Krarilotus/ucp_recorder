@@ -24,6 +24,9 @@ recording. Some quoted scalar strings are converted to numbers or booleans by
 the existing bridge; strings containing a zero byte can be truncated. If a
 loaded extension has introduced an option that cannot survive that conversion,
 capture fails explicitly instead of promising an identical restart.
+Nonfinite numbers (`.nan` / infinity) are rejected with their option path before
+the JSON encoder can omit them. Correct the source option to its intended finite
+value; the recorder does not silently choose gameplay settings for the user.
 
 ## Library and restart behavior
 

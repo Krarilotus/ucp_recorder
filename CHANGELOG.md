@@ -12,6 +12,8 @@
 - Preserve literal nested option data through UCP's contents.value normalization.
   Round-trip the profile through the installed YAML bridge before capture and
   reject values it would silently coerce or truncate.
+- Reject nonfinite option values with their configuration path before JSON can
+  silently discard them.
 - Carry the launch profile and its checksum into named copies, validate it before
   playback, and recheck original settings, launch settings and environment after
   the helper has waited for the game to close. A failed restore cannot cause an

@@ -115,3 +115,13 @@ yaml.eval=function(text)
 end
 assert(not pcall(store.captureSettings))
 ''')
+
+    def test_nonfinite_option_reports_its_path_before_json_can_drop_it(self):
+        self.prepare()
+        self.lua.execute('''
+for _,number in ipairs({0/0,math.huge,-math.huge}) do
+ configFinal['recorder-0.25.0'].troops={Knight=number}
+ local ok,reason=pcall(store.captureSettings)
+ assert(not ok and reason:find('recorder-0.25.0/troops/Knight',1,true))
+end
+''')

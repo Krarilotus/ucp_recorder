@@ -1,6 +1,13 @@
 -- JSON is a YAML-compatible UCP configuration. Pin the actual loaded extensions
 -- and freeze their normalized options, rather than resolving version ranges again.
 local M={PROFILE='resolved-v1'}
+local function finiteOptions(value,path)
+  if type(value)=='number' then
+    assert(value==value and value~=math.huge and value~=-math.huge,'Replay option requires a finite number: '..path)
+  elseif type(value)=='table' then
+    for key,item in pairs(value) do finiteOptions(item,path..'/'..tostring(key)) end
+  end
+end
 local function equal(a,b)
   if type(a)~=type(b) then return false end
   if type(a)~='table' then return a==b end
@@ -23,6 +30,7 @@ function M.capture(extensions,config)
     local key=name..'-'..version
     local options=config[key] or {}
     assert(type(options)=='table','Invalid resolved extension options')
+    finiteOptions(options,key)
     -- One contents.value wrapper protects literal options named "contents" from
     -- the framework's recursive configuration normalization on the next launch.
     full[category][name]={config={contents={value=options}}}

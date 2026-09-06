@@ -48,4 +48,10 @@ for _,text in ipairs({'true','false','yes','off','123','0.125','part\0tail'}) do
  options['recorder-0.25.0'].runtimeString=text
  assert(not pcall(capture,extensions,options),'unrestorable string was silently accepted: '..text)
 end
+options['recorder-0.25.0'].runtimeString=nil
+for _,number in ipairs({0/0,math.huge,-math.huge}) do
+ options['recorder-0.25.0'].startTroops={Knight=number}
+ local ok,reason=pcall(capture,extensions,options)
+ assert(not ok and reason:find('recorder-0.25.0/startTroops/Knight',1,true))
+end
 print('PASS: actual UCP YAML bridge, JSON encoder, version matcher and option normalizer; exact versions, typed values and coercion rejection')
