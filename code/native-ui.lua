@@ -9,10 +9,7 @@ function M.verify()
   if modules and modules.ui then modules.ui:access() end
   local sites=assert(profiles[native.profile.name])
   for name,site in pairs(sites) do
-    local actual=core.readBytes(site.address,#site.bytes)
-    for i,value in ipairs(site.bytes) do
-      assert(actual[i]==value,'Recorder UI conflicts at '..name)
-    end
+    require('code/hook-check').verify(site,'Recorder UI conflicts at '..name)
   end
   return sites
 end

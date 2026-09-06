@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.26.0
+
+- Check Automarket compatibility and every enabled multiplayer diagnostic hook
+  family before installing recorder hooks. Keep the strict byte guards.
+- Write `ucp/recorder-startup.txt` with loaded extension versions/order, check
+  stages and the original failure. Also print it to the console/log. Reporting
+  failures cannot mask a launch error; configuration option values are not dumped.
+- Include addresses and expected/found bytes in session, UI, simulation and
+  diagnostic hook conflicts. Missing bytes remain failures.
+- Add a fresh-machine setup guide, PR-release download location, Ascension
+  dependency/order guidance, first replay check and troubleshooting for the
+  tester's 0.17.0 save conflict. That CALL-wrapper fix already shipped in 0.18.0.
+- Test both variants' save wrappers and strict tail/version rejection, report
+  failures and diagnostic preflight ordering. Multiplayer playback is unavailable.
+
 ## 0.25.0
 
 - Save a separate replay launch configuration with the exact loaded extension

@@ -6,10 +6,7 @@ local M={}
 function M.verify()
   local sites=assert(profiles[native.profile.name])
   for _,site in ipairs(sites) do
-    local actual=core.readBytes(site.address,#site.bytes)
-    for i,byte in ipairs(site.bytes) do
-      assert(actual[i]==byte,'Recorder simulation hook conflicts at '..site.name)
-    end
+    require('code/hook-check').verify(site,'Recorder simulation hook conflicts at '..site.name)
   end
   return sites
 end

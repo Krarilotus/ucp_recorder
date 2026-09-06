@@ -25,9 +25,8 @@ function M.verify()
       -- wrappers use JMP rel32. Keep the untouched sixth byte checked below.
       local wrappedSave=name=='save' and adapter.saveHookAvailable()
         and (actual[1]==0xE8 or actual[1]==0xE9)
-      for i, value in ipairs(site.bytes) do
-        assert((wrappedSave and i<=5) or actual[i]==value, 'Recorder session hook conflicts at ' .. name)
-      end
+      require('code/hook-check').verify(site,'Recorder session hook conflicts at '..name,
+        actual,wrappedSave and 5 or 0)
     end
   end
   return sites
