@@ -7,8 +7,16 @@ local utils=require('code/utils')
 local unpack=table.unpack or unpack
 local M={ROOT='ucp/replay-diagnostics'}
 
-function M.new(engine)
-  return setmetatable({engine=engine,received={},count=0},{__index=M})
+function M.new(engine,config)
+  config=config or {}
+  local last=validation.integer(config.multiplayerDiagnosticsEndTick or 0,0,2147483584,'diagnostic end tick')
+  local window
+  if last>0 then
+    local first=validation.integer(config.multiplayerDiagnosticsStartTick or 64,64,last-64,'diagnostic start tick')
+    assert(first%64==0 and last%64==0,'Diagnostic window ticks must be multiples of 64')
+    window={startTick=first,endTick=last}
+  end
+  return setmetatable({engine=engine,received={},count=0,window=window},{__index=M})
 end
 
 function M:write(value)
@@ -30,11 +38,15 @@ function M:open()
   local environmentHash=store.settings().environmentHash
   validation.hash(environmentHash,'diagnostic environment hash')
   self.network=self.engine:networkState()
-  self:write({kind='header',format=5,variant=native.profile.name,executable=native.profile.sha256,
+  self:write({kind='header',format=self.window and 6 or 5,window=self.window,
+    variant=native.profile.name,executable=native.profile.sha256,
     environmentHash=environmentHash,
     network=self.network,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
   if self.network.syncStatus~=0 then self:gap('capture began during native synchronization') end
+  if self.window and self.engine:tick()~=self.window.startTick then
+    self:gap('diagnostic start boundary missed')
+  end
   print('Multiplayer diagnostics: '..self.path)
 end
 
@@ -96,6 +108,14 @@ function M:onTick()
   self.lastTick=now
   self:record({kind='checkpoint',time=now,rng=self.engine:rngState(),resources=self.engine:resourceState(),
     rngHash=sha.sha256(self.engine:rngData())})
+  if self.window and now==self.window.endTick then self:finishWindow() end
+end
+
+function M:finishWindow()
+  local path=self.path
+  self:stop('diagnostic window ended')
+  self.closed=true -- Do not reopen because of later commands or peer departure.
+  print('Multiplayer diagnostic window saved: '..tostring(path))
 end
 
 function M:receivedCommand(address,size,origin)
@@ -144,7 +164,9 @@ function M:stop(reason)
   local f=self.file
   if f then
     local ok,err=pcall(function()
-      self:write({kind='end',status=(self.incomplete or self.executing) and 'incomplete' or 'complete',
+      local incomplete=self.incomplete or self.executing
+        or (self.window and self.lastTick~=self.window.endTick)
+      self:write({kind='end',status=incomplete and 'incomplete' or 'complete',lastTick=self.lastTick,
         commands=self.count,events=self.events,reason=reason})
     end)
     self.file=nil
@@ -154,15 +176,31 @@ function M:stop(reason)
   self.received={}; self.executing=nil; self.failed=false; self.incomplete=false; self.path=nil
   self.lastTick=nil
   self.network=nil
+  self.closed=false
 end
 
 function M:observe(event,...)
-  if self.failed and event~='stop' then return end
+  if (self.failed or self.closed) and event~='stop' then return end
   local args={...}
   local ok,reason=pcall(function()
     if event~='stop' and self.engine:singlePlayer() then
       if self.file or next(self.received) then self:stop('left multiplayer') end
       return
+    end
+    if self.window and event~='stop' then
+      local now=self.engine:tick()
+      if now>self.window.endTick then
+        self:open()
+        self:gap('diagnostic end boundary missed')
+        self:finishWindow()
+        return
+      end
+      -- Keep receipts from before the window: a queued command may execute
+      -- inside it. Only executed events/checkpoints define the capture window.
+      if event~='receivedCommand' and event~='locallyQueuedCommand' then
+        if now<self.window.startTick then return end
+        self:open()
+      end
     end
     self[event](self,unpack(args))
   end)

@@ -54,7 +54,21 @@ def rows(stream):
         yield value
 
 
-def evidence(records, format_version, first_tick=0, network=None):
+def capture_window(header):
+    if header['format'] < 6:
+        return None
+    window = header.get('window')
+    if not isinstance(window, dict):
+        raise ValueError('Missing diagnostic window')
+    first, last = window.get('startTick'), window.get('endTick')
+    integer(last, 128, 2147483584)
+    integer(first, 64, last - 64)
+    if first % 64 or last % 64 or header.get('firstTick') != first:
+        raise ValueError('Invalid or missed diagnostic start boundary')
+    return dict(startTick=first, endTick=last)
+
+
+def evidence(records, format_version, first_tick=0, network=None, window=None):
     count, command_count = 0, 0
     integer(first_tick, 0, 2147483647)
     previous_tick = first_tick
@@ -66,6 +80,11 @@ def evidence(records, format_version, first_tick=0, network=None):
             if (record.get('status') != 'complete' or record.get('commands') != command_count or not count
                     or (format_version >= 2 and record.get('events') != count)):
                 raise ValueError('Trace is incomplete or has no evidence')
+            if window and (record.get('lastTick') != window['endTick']
+                           or previous_tick != window['endTick']
+                           or next_checkpoint != window['endTick'] + 64
+                           or previous_kind != 'checkpoint'):
+                raise ValueError('Missing diagnostic end checkpoint')
             if next(records, None) is not None:
                 raise ValueError('Data follows trace completion')
             return
@@ -76,7 +95,10 @@ def evidence(records, format_version, first_tick=0, network=None):
         if record.get('sequence') != count:
             raise ValueError('Trace evidence sequence is incomplete')
         integer(record.get('time'), previous_tick, 2147483647)
+        if window and record['time'] > window['endTick']:
+            raise ValueError('Evidence outside diagnostic window')
         previous_tick = record['time']
+        previous_kind = record['kind']
         if record['kind'] == 'command':
             command_count += 1
             if format_version >= 2 and record['time'] > next_checkpoint:
@@ -118,7 +140,7 @@ def compare(left, right):
             ar, br = rows(a), rows(b)
             ah, bh = next(ar), next(br)
             for header in (ah, bh):
-                if header.get('kind') != 'header' or header.get('format') not in (1, 2, 3, 4, 5):
+                if header.get('kind') != 'header' or header.get('format') not in (1, 2, 3, 4, 5, 6):
                     raise ValueError('Unsupported trace format')
                 if header['format'] >= 3:
                     hash_value(header.get('environmentHash'))
@@ -128,10 +150,13 @@ def compare(left, right):
                 raise ValueError('Traces require the same resolved UCP settings, extension order/versions and framework')
             an = network_state(ah) if ah['format'] >= 4 else None
             bn = network_state(bh) if bh['format'] >= 4 else None
+            aw, bw = capture_window(ah), capture_window(bh)
+            if aw != bw:
+                raise ValueError('Traces require the same diagnostic window')
             if an and (an['roster'] != bn['roster'] or an['mode'] != bn['mode']):
                 raise ValueError('Traces require the same logical player roster and game mode')
-            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0), an),
-                                               evidence(br, bh['format'], bh.get('firstTick', 0), bn)):
+            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0), an, aw),
+                                               evidence(br, bh['format'], bh.get('firstTick', 0), bn, bw)):
                 count += 1
                 if difference:
                     continue  # Still validate both complete streams before reporting.

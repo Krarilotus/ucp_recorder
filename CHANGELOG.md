@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.19.0
+
+- Add optional shared start/end ticks for multiplayer diagnostic capture. Both peers can seal the same simulation interval automatically before either leaves the match, while gameplay continues.
+- Retain commands queued before the diagnostic window but executed inside it. Keep host/roster/synchronization gaps visible within the window, and do not reopen a sealed trace because of later commands or disconnection.
+- Add bounded trace format 6. Require matching windows and the complete sequence through the final RNG/resource checkpoint; early exits, missed boundaries and missing final checkpoints cannot pass comparison, even when both traces have the same omission.
+- Cover repeated native ring reuse, AI roster/resource evidence, paused end ticks, early exits, host events and footer write failure in automated tests. Update the live test matrix and document the completed 0.18.0 development SP/Automarket replay tests separately from pending two-peer and Extreme tests.
+
+Validation: 157 automated tests, original-executable checks for Crusader and Extreme, and ZIP packaging pass. Multiplayer replay remains disabled. Bounded diagnostics measure command/RNG/resource agreement over an explicit interval; they do not capture a replayable starting world or prove full-world determinism.
+
 ## 0.18.0
 
 - Capture locally generated timed commands directly from the native queue, including troop orders. These bypass the received-packet hook; previously the first order stopped recording with a missing-payload error.

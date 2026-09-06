@@ -1,15 +1,27 @@
-# Multiplayer diagnostics (0.15.0)
+# Multiplayer diagnostics (0.19.0)
 
 This stage observes execution and identity on each peer without changing the simulation scope, RNG seeds, pause flag, command ownership or dispatch decisions. Multiplayer recording/playback remains disabled. The existing single-player replay checks and isolation gates remain in effect.
 
 ## Collect and compare
 
 1. Use the same test build on both peers, with the usual multiplayer extensions and Graphics API Replacer where required. Enable `multiplayerDiagnostics: true` in recorder's UCP configuration (the option defaults to false). Keep recorder after protocol in extension order.
-2. Play a short match with commands from both players. Exit the match normally so the trace can write its completion record.
+2. For a comparable bounded test, configure the same `multiplayerDiagnosticsStartTick: 1024` and `multiplayerDiagnosticsEndTick: 8192` on both peers. These are absolute simulation ticks, not wall-clock seconds; both must be multiples of 64 and the end must be at least 64 ticks after the start. Play through the end tick with commands from both players and AIs in the match. Each trace seals automatically while gameplay continues. With the default end tick of zero, logging remains continuous until normal mission exit; a peer departure can mark that continuous trace incomplete.
 3. Each game writes `ucp/replay-diagnostics/TIMESTAMP-NNNN/commands.jsonl`. Copy the two files into separately named peer-A and peer-B folders to preserve their identity.
 4. Extract `tools/compare_multiplayer.py` from the module ZIP and run `python compare_multiplayer.py peer-A/commands.jsonl peer-B/commands.jsonl` with Python 3.10 or newer.
 
 Exit codes: 0 means the compared command/RNG/resource evidence matched; 1 means it differed; 2 means the evidence was incomplete or incompatible. The JSON result identifies the first execution sequence/field difference, or the player/resource and amounts for an economy difference. Keep both original traces for analysis.
+
+Bounded format 6 includes the requested window and requires every periodic
+checkpoint from the start through the end. The final event must be the end
+checkpoint, before that tick's native RNG advancement; the footer records that
+boundary. Commands that reach dispatch before that final checkpoint are included;
+events after sealing are outside the interval. Both peers must use the same
+window. A missed start/end, early exit, incomplete handler or missing checkpoint
+cannot become a successful comparison, even if both files omit the same data.
+Commands received before the window remain available when they execute inside it.
+After sealing, paused ticks, later commands and disconnection do not reopen the
+file. A new match/session resets the capture. The interval before the requested
+start and after its final checkpoint is explicitly outside this evidence.
 
 ## What is observed
 

@@ -226,6 +226,117 @@ assert(engine.trace.failed and before().EDX==28 and not recorder.error)
 ''')
 
 
+    def bounded(self, first=64, last=128):
+        self.check('''
+engine.trace=require('code/multiplayer-trace').new(engine,{
+ multiplayerDiagnosticsStartTick=%d,multiplayerDiagnosticsEndTick=%d})
+''' % (first,last))
+
+    def test_bounded_window_keeps_earlier_receipts_and_seals_before_departure(self):
+        self.bounded()
+        self.check('''
+memory[0x1fe7da8]=63; receive()
+engine.trace:observe('onTick'); assert(#traceRows==0)
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+assert(before().EDX==28); after()
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+assert(#traceRows==5 and traceRows[1].format==6)
+assert(traceRows[1].window.startTick==64 and traceRows[1].window.endTick==128)
+assert(traceRows[3].kind=='command' and traceRows[3].data=='01')
+assert(traceRows[5].status=='complete' and traceRows[5].lastTick==128)
+assert(engine.trace.closed and not engine.trace.file)
+-- Paused end boundary, later local orders, host departure and sync changes
+-- cannot append to or reopen the already sealed interval.
+engine.trace:observe('onTick'); receive(); assert(before().EDX==28); after()
+memory[engine.base+0x6ac]=999; memory[engine.base+0xb98]=2
+engine.trace:observe('systemMessage','systemMessage')
+memory[0x1fe7da8]=192; engine.trace:observe('onTick')
+assert(#traceRows==5 and not engine.trace.file and not engine.trace.failed)
+''')
+
+    def test_bounded_trace_rearms_only_after_session_reset(self):
+        self.bounded()
+        self.check('''
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+engine.trace:observe('stop','new match')
+memory[0x1fe7da8]=63; engine.trace:observe('onTick'); assert(#traceRows==4)
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+assert(#traceRows==6 and traceRows[5].kind=='header' and traceRows[6].sequence==1)
+''')
+
+    def test_early_exit_and_skipped_boundaries_are_incomplete(self):
+        for failure in ('early exit', 'late start', 'missed end'):
+            with self.subTest(failure=failure):
+                self.bounded()
+                self.check("traceRows={}")
+                if failure == 'late start':
+                    self.check("memory[0x1fe7da8]=65; engine.trace:observe('onTick')")
+                else:
+                    self.check("memory[0x1fe7da8]=64; engine.trace:observe('onTick')")
+                if failure == 'missed end':
+                    self.check("memory[0x1fe7da8]=129; engine.trace:observe('onTick')")
+                else:
+                    self.check("engine.trace:observe('stop','mission exit')")
+                self.check("assert(traceRows[#traceRows].status=='incomplete')")
+
+    def test_window_does_not_hide_system_events_at_its_start(self):
+        self.bounded()
+        self.check('''
+memory[0x1fe7da8]=64
+memory[engine.base+0x2d81c]=4; memory[engine.base+0xcd8]=0x101
+engine.trace:observe('systemMessage','systemMessage')
+assert(traceRows[2].kind=='gap' and traceRows[2].details.messageType==0x101)
+engine.trace:observe('onTick')
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+assert(traceRows[#traceRows].status=='incomplete')
+''')
+
+    def test_bounded_capture_handles_ring_reuse_and_ai_roster(self):
+        self.bounded()
+        self.check('''
+memory[engine.base+0x6a8+8*4]=-1; memory[engine.base+0x714+8*4]=4
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+for i=1,1200 do
+ memory[engine.base+0x2d824]=(i-1)%200
+ local ring=engine.base+0x3c67c+((i-1)%200)*1272
+ memory[ring]=64; memory[ring+4]=103; memory[ring+8]=28
+ memory[ring+10]=1
+ receive(); assert(before().EDX==28); after()
+end
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+assert(traceRows[1].network.roster[8].kind=='ai')
+assert(traceRows[#traceRows].status=='complete' and traceRows[#traceRows].commands==1200)
+assert(traceRows[#traceRows].events==1202)
+''')
+
+    def test_invalid_bounded_options_are_rejected_before_observation(self):
+        self.check('''
+for _,pair in ipairs({{0,128},{64,64},{65,128},{64,129},{64,-1},{64,2147483648}}) do
+ assert(not pcall(require('code/multiplayer-trace').new,engine,{
+  multiplayerDiagnosticsStartTick=pair[1],multiplayerDiagnosticsEndTick=pair[2]}))
+end
+assert(#traceRows==0)
+''')
+
+    def test_failure_writing_window_footer_does_not_change_native_dispatch(self):
+        self.bounded()
+        self.check('''
+memory[0x1fe7da8]=64; engine.trace:observe('onTick')
+local write=engine.trace.file.write
+local calls=0
+engine.trace.file.write=function(...)
+ calls=calls+1
+ if calls==2 then return nil,'disk full on footer' end
+ return write(...)
+end
+memory[0x1fe7da8]=128; engine.trace:observe('onTick')
+assert(engine.trace.failed and not engine.trace.file)
+assert(receive().EAX==1 and before().EDX==28)
+assert(recorder.mode=='none' and not recorder.error)
+''')
+
+
 class CompareTraceTests(unittest.TestCase):
     def setUp(self):
         module_path = Path(__file__).resolve().parents[1] / 'tools/compare_multiplayer.py'
@@ -375,3 +486,44 @@ class CompareTraceTests(unittest.TestCase):
         result=self.compare(a,a)
         self.assertEqual(result['status'],'incomplete')
         self.assertIn('DirectPlay system message',result['reason'])
+
+    def bounded_trace(self):
+        trace = self.network_trace()
+        trace[0].update(format=6,window=dict(startTick=64,endTick=128))
+        trace.insert(2,dict(trace[1],sequence=2,time=128))
+        trace[-1].update(events=2,lastTick=128)
+        return trace
+
+    def test_bounded_comparison_requires_the_final_checkpoint_even_if_both_traces_agree(self):
+        a=self.bounded_trace()
+        self.assertEqual(self.compare(a,a)['status'],'matched')
+        for change in ('early end','missing checkpoint','command after end checkpoint','outside window',
+                       'wrong first tick','misaligned start','missing window','missing last tick'):
+            with self.subTest(change=change):
+                a=self.bounded_trace()
+                if change=='early end': a[-1]['lastTick']=64
+                elif change=='missing checkpoint': del a[2]; a[-1]['events']=1
+                elif change=='command after end checkpoint':
+                    event=self.trace()[1]
+                    event.update(time=128,scheduledTime=128,sequence=3,handle=103)
+                    a.insert(3,event); a[-1].update(events=3,commands=1)
+                elif change=='outside window': a[2]['time']=192
+                elif change=='wrong first tick': a[0]['firstTick']=65
+                elif change=='misaligned start': a[0]['window']['startTick']=65
+                elif change=='missing window': del a[0]['window']
+                else: del a[-1]['lastTick']
+                self.assertEqual(self.compare(a,a)['status'],'incomplete')
+
+    def test_bounded_peers_require_same_window_and_compare_ai_resources(self):
+        a,b=self.bounded_trace(),self.bounded_trace()
+        for trace in (a,b):
+            trace[0]['network']['handles'][7]=-1
+            trace[0]['network']['roster'][7].update(kind='ai',ai=4)
+        b[0]['localPlayer']=3; b[0]['network']['localPlayer']=3
+        self.assertEqual(self.compare(a,b)['status'],'matched')
+        b[2]['resources'][175]=42
+        result=self.compare(a,b)
+        self.assertEqual(result['status'],'different')
+        self.assertEqual(result['firstDifference']['player'],8)
+        b[0]['window']['endTick']=192
+        self.assertEqual(self.compare(a,b)['status'],'incomplete')

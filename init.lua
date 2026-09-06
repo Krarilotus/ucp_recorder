@@ -15,7 +15,7 @@ function module:enable(config)
   end
   require('code/sessions').captureSettings()
   local engine=Engine.new(sites)
-  if config.multiplayerDiagnostics then engine.trace=require('code/multiplayer-trace').new(engine) end
+  if config.multiplayerDiagnostics then engine.trace=require('code/multiplayer-trace').new(engine,config) end
   fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
   local recorder=Session:new(engine,config)
   self.recorder=recorder

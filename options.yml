@@ -41,3 +41,19 @@ options:
   contents:
     type: boolean
     value: false
+- url: recorder.multiplayerDiagnosticsStartTick
+  header: "Diagnostic window start tick"
+  text: "For bounded multiplayer diagnostics, use the same multiple of 64 on both peers. Ignored when the end tick is zero."
+  hasHeader: true
+  display:
+  contents:
+    type: integer
+    value: 64
+- url: recorder.multiplayerDiagnosticsEndTick
+  header: "Diagnostic window end tick"
+  text: "Zero logs until mission exit. A later multiple of 64 seals the evidence at this simulation boundary, before either peer needs to leave. Use the same window on both peers. This does not stop the match or enable replay."
+  hasHeader: true
+  display:
+  contents:
+    type: integer
+    value: 0
