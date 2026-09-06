@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.31.0
+
+- Match the native pause-menu font, centered button text, colors, hover blending
+  and disabled style. Fit labels using the game's own text-width calculation.
+  Keep native frames/backgrounds and the Skirmish menu's existing hit boxes.
+- Simplify the replay library to Back, Remove, Rename and Play. Single-click
+  selects; double-click or Enter plays, matching the native load list. Support
+  arrow/page keys, F2 and Delete; show paging only when needed.
+- Label full automatic matches and named snapshots separately and select the
+  newly finished full recording. Remove requires confirmation and moves the
+  whole recording into `ucp/replays/removed`, preserving its files and identity.
+- Add English/German menu localization, following `UCP_GUI_LANGUAGE` when the
+  launcher supplies it and falling back to the installed game's language.
+- Add a replay-only player-view selector for the native HUD and report rendering.
+  Restore the recorded local identity before rendering returns; leave native
+  command ownership and simulation state intact. This is an inspection view,
+  not control of another player's actions or a multiplayer replay implementation.
+- Retain 0.30.0 RNG attribution. The reported RNG2 divergence and the broader
+  spectator-input/ghost-preview audit remain unresolved; this menu release does
+  not establish replay determinism. Live visual verification is still required.
+
 ## 0.30.0
 
 - Add optional single-player RNG caller diagnostics for both recording and

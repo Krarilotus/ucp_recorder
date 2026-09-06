@@ -21,7 +21,9 @@ gameplay and the recorded-settings restart still need live verification.
 4. Use **Pause > Save replay as...** to name a copy of the match so far. Recording
    continues. **Quit Mission** saves the full recording automatically.
 5. Open **Skirmish > Replays**, select a completed recording and click **Play**.
-   **Rename replay...** changes a completed recording's display name.
+   Double-click or Enter also plays; **Rename replay...** (F2) changes its name.
+   **Remove** (Delete) moves a recording out of the library after confirmation,
+   keeping its files in `ucp/replays/removed`.
 
 Recordings have separate folders under `ucp/replays/`. Do not terminate the game
 process to finish a recording. Native game saves/loads during capture are
@@ -41,6 +43,11 @@ the match without recording. See [failure handling](docs/rally-points-and-captur
 Version 0.29.0 covers workshop production and nine other omitted native gameplay
 commands. The recorder reuses the original game dispatcher; see the
 [complete command audit and focused test steps](docs/command-coverage.md).
+
+Version 0.31.0 uses native fonts and centered button labels, a simpler localized
+library, and **Pause > Replay controls > View player** for inspecting another
+player's HUD/reports during playback. See [menus and player views](docs/replay-menus.md)
+for controls, language setup, and the remaining test limitations.
 
 ## Troubleshooting and test status
 

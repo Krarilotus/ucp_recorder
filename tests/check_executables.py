@@ -108,6 +108,8 @@ def check(folder):
         check_immediate(reader,name)
         from check_rng_observer_native import check_rng_observer
         check_rng_observer(reader,lua,native,root,name)
+        from check_replay_view_native import check_replay_view
+        check_replay_view(reader,lua,native,root,name)
         from check_dispatch_native import check_dispatch
         check_dispatch(reader,name)
         from check_world_hash_native import check_world_hash

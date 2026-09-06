@@ -3,6 +3,25 @@ import test_recorder as fixture
 
 
 class BrowserTests(unittest.TestCase):
+    def test_newly_completed_full_recording_is_selected_once(self):
+        self.check('''
+entries={entry('old')}; browser:refresh()
+table.insert(entries,1,entry('full')); recorder.lastCompletedReplay='full'
+browser:refresh(); assert(browser.selected.id=='full')
+browser:select(2); browser:refresh(); assert(browser.selected.id=='old')
+table.insert(entries,1,entry('next')); recorder.lastCompletedReplay='next'
+browser:refresh(); assert(browser.selected.id=='next')
+''')
+    def test_double_click_requires_same_recording_and_survives_clock_wrap(self):
+        self.check('''
+entries={entry('one'),entry('two')}; browser:refresh()
+assert(not browser:click(1,4294967200))
+assert(browser:click(1,100))
+assert(not browser:click(2,150))
+assert(not browser:click(2,650)) -- native threshold is strictly below 500 ms
+browser:select(1); assert(not browser:click(2,700)) -- keyboard movement breaks the pair
+assert(not browser:click(99,701) and browser.index==2)
+''')
     check = fixture.RecorderTests.check
 
     def setUp(self):

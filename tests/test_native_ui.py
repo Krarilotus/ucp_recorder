@@ -5,6 +5,49 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_unavailable_button_uses_native_disabled_style_and_ignores_click(self):
+        self.check('''
+local functions={}; local nextId=10; local allowed=false; local clicks=0; local rendered
+utils.createLuaFunctionWrapper=function(fn) nextId=nextId+1; functions[nextId]=fn; return nextId end
+ui.textNative=function(...) rendered={...} end
+ui.widthNative=function() return 32 end
+ui.buttonNative=function() assert(memory[sites.buttonState.value+16]==0) end
+local address=core.allocate(80)
+ui:button(address,0,0,140,30,'Play',function() clicks=clicks+1 end,nil,nil,function() return allowed end)
+memory[sites.buttonState.value+16]=1
+functions[memory[address+20]]({}); assert(clicks==0)
+functions[memory[address+28]]({})
+assert(rendered[6]==0x7f7f7f and rendered[9]==0 and memory[sites.buttonState.value+16]==1)
+allowed=true; functions[memory[address+20]]({}); assert(clicks==1)
+''')
+
+    def test_native_font_centering_and_width_fit_use_original_text_parameters(self):
+        self.check('''
+local text,calls='',{}
+core.writeString=function(_,s) text=s end
+ui.widthNative=function() return (#text-1)*8 end
+ui.textNative=function(...) calls[#calls+1]={...} end
+ui:text('A very long replay name',120,24,1,18,true,80)
+assert(#text<=11 and text:sub(-4)=='...\\0')
+local c=calls[1]
+assert(#calls==1 and c[3]==120 and c[4]==24 and c[5]==1)
+assert(c[6]==0xCCFAFF and c[7]==18 and c[9]==2)
+ui:text('Title',300,20,1,16,false)
+c=calls[2]; assert(c[6]==0xC2F0EB and c[7]==16 and c[9]==4)
+''')
+
+    def test_player_view_scope_wraps_rendering_but_never_input_or_reset(self):
+        self.check('''
+local hook; local scoped=false; local seen={}
+core.hookCode=function(f) hook=f; return function(_,action) seen[action]=scoped; return 42 end end
+memory[0x8000+0x4c]=0x7000; memory[0x8000+20]=123
+memory[0x7000]=0x9000; memory[0x9000]=0x66
+ui.renderScope=function(run) scoped=true; local result=run(); scoped=false; return result end
+ui:trackVisibility({0x8000},function() return true end)
+for action=0,3 do assert(hook(0x7000,action)==42) end
+assert(not seen[0] and seen[1] and not seen[2] and seen[3])
+''')
+
     def test_optional_ui_resolves_entries_before_recorder_hooks(self):
         self.check('''
 local accessed=false

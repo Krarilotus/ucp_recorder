@@ -56,11 +56,19 @@ end
 function M.new(profile)
   platform.mkdir(M.ROOT)
   local prefix = os.date('!%Y%m%d-%H%M%S')
+  local removed={}
+  local ok,entries=pcall(function() return ucp.internal.io.directories(M.ROOT..'/removed') or {} end)
+  if ok then
+    for _,entry in ipairs(entries) do
+      local old=entry:gsub('[/\\]+$',''):match('([^/\\]+)$')
+      if old then removed[old]=true end
+    end
+  end
   local id, path
   for i=1,9999 do
     id=prefix .. '-' .. string.format('%04d', i)
     path=M.path(id)
-    if platform.mkdir(path) then break end
+    if not removed[id] and platform.mkdir(path) then break end
     assert(i < 9999, 'Cannot allocate replay name')
   end
   local settings=M.settings()
@@ -94,6 +102,16 @@ end
 function M.title(manifest)
   local ok,name=pcall(validation.displayName,manifest.displayName)
   return ok and name or manifest.id
+end
+
+function M.remove(id)
+  -- Do not require a playable profile: incomplete and old captures also need
+  -- library management. Check identity and state before moving the whole folder.
+  local manifest=json:decode(read(M.path(id)..'/manifest.json'))
+  assert(type(manifest)=='table' and manifest.id==id,'Replay identity differs')
+  assert(manifest.status~='recording' and manifest.status~='copying',
+    'An active recording cannot be removed')
+  platform.removeReplay(M.ROOT,id)
 end
 
 -- Seal a separate copy at the last observed boundary without stopping capture or

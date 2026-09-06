@@ -1,5 +1,6 @@
 local store=require('code/sessions')
 local native=require('code/native')
+local tr=require('code/locale').text
 local Browser={PAGE_SIZE=6}
 
 function Browser:new(recorder)
@@ -8,6 +9,10 @@ end
 
 function Browser:refresh(preferred)
   local previous=self.items[self.index]
+  if self.recorder.lastCompletedReplay~=self.lastCompletedReplay then
+    self.lastCompletedReplay=self.recorder.lastCompletedReplay
+    preferred=preferred or self.lastCompletedReplay
+  end
   preferred=preferred or (previous and previous.id) or os.getenv('UCP_RECORDER_REPLAY')
   self.items={}
   for _,item in ipairs(store.list()) do
@@ -19,6 +24,7 @@ function Browser:refresh(preferred)
 end
 
 function Browser:select(index)
+  self.lastClick=nil
   self.selected=nil
   if #self.items==0 then self.index=1; self.message='New Skirmishes are recorded automatically when enabled.'; return end
   self.index=math.max(1,math.min(#self.items,index))
@@ -29,6 +35,17 @@ function Browser:select(index)
   elseif store.compatible(manifest) then self.message='Ready to play with your current settings.'
   elseif store.settings().hash==(manifest.restartSettingsHash or manifest.settingsHash) then self.message='Install the recorded extension and framework versions to play.'
   else self.message='Play will queue a restart with the recorded settings.' end
+end
+
+-- Native load-list behavior: the same row twice within 500 ms activates it.
+-- The clock is presentation-only and never participates in replay scheduling.
+function Browser:click(index,now)
+  local item=self.items[index]
+  if not item then return false end
+  local previous=self.lastClick
+  self:select(index)
+  self.lastClick={id=item.id,time=now}
+  return previous and previous.id==item.id and (now-previous.time)%4294967296<500 or false
 end
 
 function Browser:page(delta)
@@ -48,7 +65,18 @@ function Browser:row(index)
   local state=type(item.status)=='string' and item.status:sub(1,16) or 'unavailable'
   local name=store.title(item)
   if #name>28 then name=name:sub(1,25)..'...' end
-  return string.format('%s  |  %d ticks  |  %s',name,ticks,state)
+  local label=state=='complete' and (item.sourceId and 'Snapshot' or 'Full match')
+    or state=='failed' and 'Failed' or state=='recording' and 'Recording' or 'Incomplete'
+  return tr('%s  |  %d ticks  |  %s',name,ticks,tr(label))
+end
+
+function Browser:remove()
+  assert(self.recorder.mode=='none','Finish the active session before removing a replay')
+  local item=assert(self.items[self.index],'Choose a recording.')
+  local index=self.index
+  store.remove(item.id)
+  self:refresh(); self:select(index)
+  self.message='Replay removed.'
 end
 
 function Browser:play()

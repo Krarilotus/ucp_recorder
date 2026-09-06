@@ -21,6 +21,12 @@ function M.stdcallAddress(address,count)
 end
 local wrap=M.stdcallAddress
 
+local tickCount
+function M.milliseconds()
+  tickCount=tickCount or M.stdcall('kernel32.dll','GetTickCount',0)
+  return tickCount()%4294967296
+end
+
 -- UCP's library loader accepts extension DLLs, not Windows system libraries.
 -- Bootstrap GetProcAddress from the already loaded kernel32 export directory;
 -- use the game's verified GetModuleHandleA import (ASLR-resolved by Windows).
@@ -98,6 +104,35 @@ function M.replace(source, destination)
   move = move or M.stdcall('kernel32.dll', 'MoveFileExA', 3)
   local a,b=buffer('source',source),buffer('destination',destination)
   assert(move(a, b, 9) ~= 0, 'Cannot finish writing replay metadata')
+end
+
+-- Removing a replay is a recoverable, non-overwriting directory rename. Never
+-- recurse through files or follow a reparse point supplied in the replay folder.
+function M.removeReplay(root,id)
+  assert(root=='ucp/replays' and type(id)=='string' and #id<80 and id:match('^[%w_-]+$'),
+    'Invalid replay removal path')
+  getAttributes=getAttributes or M.stdcall('kernel32.dll','GetFileAttributesA',1)
+  local function directory(path)
+    local value=getAttributes(buffer('directory',path))
+    assert(value>=0 and value~=0xffffffff and math.floor(value/16)%2==1
+      and math.floor(value/1024)%2==0,'Replay directory is missing or is a link')
+  end
+  directory(root); directory(root..'/'..id)
+  M.mkdir(root..'/removed'); directory(root..'/removed')
+  local full=M.stdcall('kernel32.dll','GetFullPathNameA',4)
+  local function absolute(path)
+    local input=buffer('fullInput',path); local output=buffer('fullOutput','')
+    local size=full(input,4096,output,0)
+    assert(size>0 and size<4096,'Cannot resolve replay removal path')
+    return core.readString(output,size):gsub('/','\\')
+  end
+  local base=absolute(root)
+  local source,destination=absolute(root..'/'..id),absolute(root..'/removed/'..id)
+  assert(source:lower()==(base..'\\'..id):lower()
+    and destination:lower()==(base..'\\removed\\'..id):lower(),'Replay removal escaped its directory')
+  move=move or M.stdcall('kernel32.dll','MoveFileExA',3)
+  assert(move(buffer('source',source),buffer('destination',destination),8)~=0,
+    'Cannot remove replay; a removed copy may already exist')
 end
 
 function M.identity()

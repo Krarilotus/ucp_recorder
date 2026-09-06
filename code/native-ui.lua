@@ -17,6 +17,7 @@ end
 function M.new(sites,onError)
   local o=setmetatable({sites=sites,onError=onError,dialogs={},textBuffer=core.allocate(1024,true)},{__index=M})
   o.textNative=core.exposeCode(sites.text.address,9,1)
+  o.widthNative=core.exposeCode(sites.textWidth.address,3,1)
   o.borderNative=core.exposeCode(sites.border.address,6,1)
   o.buttonNative=core.exposeCode(sites.basicButton.address,3,1)
   o.menuConstructor=core.exposeCode(sites.menuConstructor.address,2,1)
@@ -33,35 +34,50 @@ function M:callback(callback)
   end)
 end
 
-function M:text(label,x,y,alignment)
+function M:text(label,x,y,alignment,font,hover,maxWidth,disabled)
+  label=require('code/locale').native(label)
   label=tostring(label):gsub('[\r\n%z]',' '):sub(1,150)
   core.writeString(self.textBuffer,label..'\0')
-  -- Font slots 0..14 are uninitialized in the HD menus. Slot 19 is the
-  -- game's 16-pixel antialiased font; text expects BGR24, unlike RGB15 borders.
-  self.textNative(self.sites.textManager.value,self.textBuffer,x+1,y+1,alignment or 0,0,19,0,0)
-  self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,0x9AD7E4,19,0,0)
+  if maxWidth then
+    local function width() return self.widthNative(self.sites.textManager.value,self.textBuffer,font or 18) end
+    if width()>maxWidth then
+      repeat
+        label=label:sub(1,-2)
+        core.writeString(self.textBuffer,label..'...\0')
+      until #label==0 or width()<=maxWidth
+    end
+  end
+  -- Match native OptionsMenu_Buttons: font18, BGR24 colors and native blending.
+  -- Alignment1 is centered on x; a positive width centers inside that width.
+  self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,
+    disabled and 0x7F7F7F or (hover and 0xCCFAFF or 0xC2F0EB),font or 18,0,
+    disabled and 0 or (hover and 2 or 4))
 end
 
-function M:button(address,x,y,width,height,label,action,selected)
+function M:button(address,x,y,width,height,label,action,selected,leftAligned,enabled)
   for offset=0,self.ITEM_SIZE-4,4 do core.writeInteger(address+offset,0) end
   core.writeInteger(address,3)
   core.writeInteger(address+4,x); core.writeInteger(address+8,y)
   core.writeInteger(address+12,width); core.writeInteger(address+16,height)
-  core.writeInteger(address+20,self:callback(action))
+  core.writeInteger(address+20,self:callback(function() if not enabled or enabled() then action() end end))
   core.writeInteger(address+28,self:callback(function()
     local state=self.sites.buttonState.value
     local drawX,drawY=core.readInteger(state),core.readInteger(state+4)
     local text=type(label)=='function' and label() or label
     if text=='' then return end
     -- The same tiled interface_icons3 skin used by the native pause-menu buttons.
+    local interactive=not enabled or enabled()
+    local previousHover=core.readInteger(state+16)
+    if not interactive then core.writeInteger(state+16,0) end
     self.buttonNative(self.sites.buttonSurface.value,0,-1)
+    if not interactive then core.writeInteger(state+16,previousHover) end
     local color=core.readSmallInteger(self.sites.gold.value)%65536
     local hover=core.readInteger(state+16)~=0
-    self.borderNative(self.sites.pencil.value,drawX,drawY,drawX+width-1,drawY+height-1,color)
-    if hover or (selected and selected()) then
+    if selected and selected() then
       self.borderNative(self.sites.pencil.value,drawX+2,drawY+2,drawX+width-3,drawY+height-3,color)
     end
-    self:text(text,drawX+8,drawY+math.floor((height-12)/2))
+    self:text(text,leftAligned and drawX+8 or drawX+math.floor(width/2),
+      drawY+math.floor((height-13)/2),leftAligned and 0 or 1,18,hover,width-16,not interactive)
   end))
   core.writeInteger(address+36,1) -- SIMPLE_RENDER, native button coordinates
   core.writeSmallInteger(address+48,0xfff0) -- no user-control lookup
@@ -73,7 +89,7 @@ function M:modal(items,count,width,height,render)
   local array=core.allocate((count+1)*self.ITEM_SIZE,true)
   for i,item in ipairs(items) do
     local address=array+(i-1)*self.ITEM_SIZE
-    self:button(address,item.x,item.y,item.width,item.height,item.label,item.action,item.selected)
+    self:button(address,item.x,item.y,item.width,item.height,item.label,item.action,item.selected,item.leftAligned,item.enabled)
     core.writeInteger(address+0x4c,menu)
   end
   core.writeInteger(array+count*self.ITEM_SIZE,0x66)
@@ -105,6 +121,14 @@ function M:close() self:show(-1) end
 
 function M:activeDialog()
   return core.readInteger(self.sites.modalComposition.value+0x2c)
+end
+
+function M:installViewRender()
+  local original
+  -- The gold/popularity/population strip is drawn outside the menu-item loop.
+  original=core.hookCode(function()
+    return self.renderScope(function() return original() end)
+  end,self.sites.playerSummary.address,0,0,#self.sites.playerSummary.bytes)
 end
 
 function M:installInput(singlePlayer,handler)
@@ -171,6 +195,9 @@ function M:trackVisibility(referenceItems,predicate)
         end)
         if not ok then self.onError(reason) end
       end
+    end
+    if self.renderScope and (action==1 or action==3) then
+      return self.renderScope(function() return original(this,action) end)
     end
     return original(this,action)
   end,self.sites.handleMenu.address,2,1,#self.sites.handleMenu.bytes)

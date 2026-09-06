@@ -2,6 +2,8 @@
 -- Signatures and ABI: UCP ui module ui/game.lua and ui/headers/latest/ui.h.
 return {
   SHC = {
+    playerSummary = {address=0x00433780, bytes={131,236,16,139,13,220,117,162,1}},
+    textWidth = {address=0x00471690, bytes={86,139,116,36,8,133,246,117,6,51,192,94,194,8,0}},
     basicButton = {address=0x00463A90, bytes={139,68,36,4,131,236,8,86,139,53,168,49,237,0,51,201}},
     buttonSurface = {address=0x004918CC, bytes={185,188,199,242,0}, value=0x00F2C7BC},
     windowProc = {address=0x004B2AE0, bytes={131,236,72,161,32,66,185,0}},
@@ -21,6 +23,8 @@ return {
     modalStack = {address=0x004A9E40, bytes={139,21,164,66,223,0,137,80,36}, value=0x00DF42A4},
   },
   Extreme = {
+    playerSummary = {address=0x004339C0, bytes={131,236,16,139,13,220,170,75,2}},
+    textWidth = {address=0x004718B0, bytes={86,139,116,36,8,133,246,117,6,51,192,94,194,8,0}},
     basicButton = {address=0x00463CA0, bytes={139,68,36,4,131,236,8,86,139,53,40,54,237,0,51,201}},
     buttonSurface = {address=0x00491A2C, bytes={185,60,204,242,0}, value=0x00F2CC3C},
     windowProc = {address=0x004B2C50, bytes={131,236,72,161,176,67,185,0}},

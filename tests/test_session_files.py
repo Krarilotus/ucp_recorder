@@ -12,6 +12,29 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_removal_preserves_files_and_prevents_reusing_archived_identity(self):
+        def archive(root, identity):
+            base=Path(root)
+            destination=base/'removed'/identity
+            destination.parent.mkdir(exist_ok=True)
+            if destination.exists():
+                raise OSError('destination already exists')
+            (base/identity).rename(destination)
+        self.lua.globals().archive_directory=archive
+        self.lua.execute('''
+require('code/platform').removeReplay=archive_directory
+local m=recording(); store.finish(m)
+local p=store.path(m.id); local commands=store.read(p..'/stream-commands.json')
+store.remove(m.id)
+assert(#store.list()==0)
+assert(store.read(store.ROOT..'/removed/'..m.id..'/stream-commands.json')==commands)
+assert(not pcall(store.remove,'../escape'))
+local active=recording(); assert(active.id~=m.id); active.status='recording'; store.save(active)
+assert(not pcall(store.remove,active.id))
+active.status='failed'; store.save(active); store.remove(active.id)
+assert(#store.list()==0)
+''')
+
     def test_named_copies_are_independent_complete_files_and_do_not_trim_source(self):
         self.lua.execute('''
 local m=recording(); local path=store.path(m.id)

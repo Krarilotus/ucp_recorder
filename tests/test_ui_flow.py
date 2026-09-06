@@ -6,12 +6,37 @@ import test_browser
 class UIFlowTests(unittest.TestCase):
     check = test_browser.BrowserTests.check
 
+    def test_keyboard_navigation_rename_and_remove_cancel_preserve_selection(self):
+        self.check('''
+entries={}; for i=1,9 do entries[i]=entry('replay'..i) end
+browse(); local library=shown
+input(0x100,40); assert(menu.browser.index==2)
+input(0x100,34); assert(menu.browser.index==8 and menu.browser:firstRow()==7)
+input(0x100,36); assert(menu.browser.index==1)
+input(0x100,113); assert(shown~=library)
+input(0x102,27); assert(shown==library)
+input(0x100,46); assert(shown~=library)
+click('Cancel'); assert(shown==library and menu.browser.index==1 and #menu.browser.items==9)
+input(0x102,13); assert(played=='replay1' and shown==-1)
+''')
+
+    def test_view_selector_only_changes_presentation_choice(self):
+        self.check('''
+local roster={}; for i=1,8 do roster[i]={kind=i==4 and 'ai' or 'empty'} end
+recorder.engine.networkState=function() return {roster=roster} end
+recorder.mode='play'; recorder.active=true; recorder.status='playing'; recorder.manifest={player=1}
+pauseAction(); click('View player'); click('Player 4')
+assert(shown==5 and menu.view:player()==4 and recorder.manifest.player==1)
+recorder.mode='record'; assert(not menu.view:available())
+''')
+
     def setUp(self):
         test_browser.BrowserTests.setUp(self)
         self.check('''
 local nextId=300
 controls={}; dialogs={}; renders={}; texts={}; shown=-1
 ui={
+ installViewRender=function() end,
  modal=function(_,items,count,width,height,render)
   assert(count==#items)
   for i,a in ipairs(items) do
@@ -37,12 +62,16 @@ recorder.status='idle'; recorder.autoRecord=true
 menu=require('code/ui'); menu.createButtons(recorder,{})
 function click(label)
  for _,item in ipairs(assert(dialogs[shown])) do
-  if item.label==label then return item.action() end
+  local text=type(item.label)=='function' and item.label() or item.label
+  if text==label then return item.action() end
  end
  error('Button missing: '..label)
 end
 function browse()
- for _,item in pairs(controls) do if item.label=='Replays' then return item.action() end end
+ for _,item in pairs(controls) do
+  local text=type(item.label)=='function' and item.label() or item.label
+  if text=='Replays' then return item.action() end
+ end
  error('Replay entry missing')
 end
 ''')

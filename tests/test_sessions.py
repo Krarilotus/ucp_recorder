@@ -68,6 +68,7 @@ local r=session(); assert(r.autoRecord and not scoped)
 r:beginMatch(); assert(r.status=='armed' and scoped and snapshots==0)
 r:prepareRecording(); now=1; r:onTick(); assert(r.active and snapshots==1)
 now=65; r:onTick(); r:reset(); assert(savedManifest.status=='complete' and savedManifest.lastTick==65)
+assert(r.lastCompletedReplay==savedManifest.id)
 r:beginMatch(); r:prepareRecording(); now=1; r:onTick(); assert(snapshots==2)
 ''')
 

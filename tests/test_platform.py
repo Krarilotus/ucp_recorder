@@ -7,6 +7,42 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PlatformTests(unittest.TestCase):
+    def test_removal_checks_paths_and_links_and_never_overwrites(self):
+        lua=self.runtime()
+        lua.execute('''
+core.readString=function(a,n) return stringRead(a):sub(1,n) end
+local moves=0
+platform.stdcall=function(_,name)
+ if name=='GetFileAttributesA' then return function(a)
+  local p=stringRead(a)
+  return linked==p and 1040 or 16
+ end end
+ if name=='CreateDirectoryA' then return function() return 1 end end
+ if name=='GetFullPathNameA' then return function(a,n,out)
+  local p='C:\\\\Game\\\\'..stringRead(a):gsub('/','\\\\')
+  if escapePath then p='C:\\\\elsewhere' end
+  core.writeString(out,p..'\\0'); return #p
+ end end
+ if name=='MoveFileExA' then return function(a,b,flags)
+  moves=moves+1; assert(flags==8)
+  assert(stringRead(a)=='C:\\\\Game\\\\ucp\\\\replays\\\\test')
+  assert(stringRead(b)=='C:\\\\Game\\\\ucp\\\\replays\\\\removed\\\\test')
+  return exists and 0 or 1
+ end end
+ error(name)
+end
+for _,id in ipairs({'../other','a/b','',string.rep('x',80)}) do
+ assert(not pcall(platform.removeReplay,'ucp/replays',id))
+end
+for _,p in ipairs({'ucp/replays','ucp/replays/test','ucp/replays/removed'}) do
+ linked=p; assert(not pcall(platform.removeReplay,'ucp/replays','test'))
+end
+linked=nil; escapePath=true; assert(not pcall(platform.removeReplay,'ucp/replays','test'))
+assert(moves==0)
+escapePath=false; platform.removeReplay('ucp/replays','test'); assert(moves==1)
+exists=true; assert(not pcall(platform.removeReplay,'ucp/replays','test'))
+''')
+
     def runtime(self, variant='SHC', forward=False):
         lua=LuaRuntime()
         lua.globals().source_root=ROOT.as_posix()

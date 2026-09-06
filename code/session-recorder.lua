@@ -298,6 +298,7 @@ function Session:reset()
         assert(self.finalRngData,'Missing ending RNG state')
         manifest.finalRngHash=sha.sha256(self.finalRngData)
         store.finish(manifest)
+        self.lastCompletedReplay=manifest.id
       end)
       if not ok then
         manifest.status='failed'; pcall(store.save,manifest)
