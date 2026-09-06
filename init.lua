@@ -12,8 +12,10 @@ local function enable(self,config,stage)
   local fixSites=stage('simulation hook checks',fixes.verify)
   if config.multiplayerDiagnostics then
     stage('network diagnostic checks',require('code/network-observer').verify)
-    stage('RNG diagnostic checks',require('code/rng-observer').verify)
     stage('world-hash diagnostic checks',require('code/world-hash-observer').verify)
+  end
+  if config.multiplayerDiagnostics or config.singleplayerRngDiagnostics then
+    stage('RNG diagnostic checks',require('code/rng-observer').verify)
   end
   local seed
   stage('seed options',function()
@@ -28,12 +30,19 @@ local function enable(self,config,stage)
     local rngReturnAddresses=fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
     if engine.trace then engine.trace.rngReturnAddresses=rngReturnAddresses end
     local recorder=Session:new(engine,config)
+    if recorder.rngTrace then recorder.rngTrace.returnAddresses=rngReturnAddresses end
     self.recorder=recorder
     engine:install(recorder)
     if engine.trace then
       require('code/network-observer').install(engine.trace)
-      require('code/rng-observer').install(engine.trace)
       require('code/world-hash-observer').install(engine.trace)
+    end
+    if engine.trace or recorder.rngTrace then
+      -- One native hook per stream even when both diagnostic options are on.
+      require('code/rng-observer').install({engine=engine,observe=function(_,event,...)
+        if engine.trace then engine.trace:observe(event,...) end
+        if recorder.rngTrace then recorder.rngTrace:observe(event,...) end
+      end})
     end
     local ui=require('code/ui')
     ui.createButtons(recorder,uiSites)

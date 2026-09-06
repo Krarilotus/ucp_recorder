@@ -44,6 +44,11 @@ commands. The recorder reuses the original game dispatcher; see the
 
 ## Troubleshooting and test status
 
+For a replay that stops with **RNG divergence**, keep the recording and its
+failure report. Version 0.30.0 adds optional caller diagnostics and a read-only
+inspection tool; see [focused RNG diagnosis](docs/rng-attribution.md).
+The reported 0.29.0 mismatch at tick 22,912 is still unresolved.
+
 **`Recorder session hook conflicts at save` in 0.17.0:** update to this PR's
 published package. Version 0.18.0 fixed rejection of map-extensions 1.0.0's CALL
 save wrapper. Switching between Crusader and Extreme does not update the module.

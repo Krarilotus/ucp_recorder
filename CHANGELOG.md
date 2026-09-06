@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.30.0
+
+- Add optional single-player RNG caller diagnostics for both recording and
+  playback on Crusader and Extreme. Preserve separate attempts, normalize
+  relocated calls, and collect counts and an ordering checksum per checkpoint.
+- Bound diagnostic memory and output (64 MiB per attempt). File failures and
+  limits disable the observer without pausing gameplay or invalidating capture.
+  Keep multiplayer and single-player observation on one hook per RNG stream.
+- Include a read-only failure inspection and attribution comparison tool, with
+  instructions for focused desync tests. Existing recordings can be inspected;
+  caller attribution requires a new recording with the option enabled.
+- Document the unresolved 0.29.0 RNG2 mismatch at tick 22,912. This release adds
+  evidence for diagnosis; it does not claim to fix that mismatch. Simulation
+  profile remains `recorder-sp-v10`.
+
 ## 0.29.0
 
 - Support ten omitted native gameplay commands on Crusader and Extreme: change

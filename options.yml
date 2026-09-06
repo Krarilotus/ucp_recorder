@@ -1,6 +1,14 @@
 meta:
   version: 1.0.0
 options:
+- url: recorder.singleplayerRngDiagnostics
+  header: "Single-player RNG diagnostics"
+  text: "Log which game functions consume random values during recording and playback. Enable before making a test recording; keep the same settings for playback. Adds diagnostic overhead and up to 64 MiB per attempt. Diagnostic failures do not stop the match."
+  hasHeader: true
+  display:
+  contents:
+    type: boolean
+    value: false
 - url: recorder.autoRecord
   header: "Record Skirmishes automatically"
   text: "Record new single-player Skirmishes and save them when you leave the match. Named copies can also be saved from the pause menu."

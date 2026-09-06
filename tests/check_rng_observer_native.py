@@ -17,6 +17,19 @@ observerTrace={engine={rng=0x3000000},observe=function(_,event,stream,stack)
 end}
 ''')
     observer = lua.execute((root/'code/rng-observer.lua').read_text())
+    attribution = lua.execute((root/'code/rng-attribution.lua').read_text())
+    lua.globals().attributionModule = attribution
+    lua.execute('''
+actualAttribution=attributionModule.new({rng=0x3000000,
+ singlePlayer=function() return true end,tick=function() return 64 end})
+actualAttribution.file=true; actualAttribution:clear()
+local previousObserve=observerTrace.observe
+observerTrace.observe=function(self,event,stream,stack)
+ previousObserve(self,event,stream,stack)
+ actualAttribution:observe(event,stream,stack)
+ assert(not actualAttribution.failed)
+end
+''')
     observer.install(lua.globals().observerTrace)
     registers = dict(EAX=UC_X86_REG_EAX, EBX=UC_X86_REG_EBX, ECX=UC_X86_REG_ECX,
         EDX=UC_X86_REG_EDX, ESI=UC_X86_REG_ESI, EDI=UC_X86_REG_EDI,
@@ -58,3 +71,5 @@ end}
             assert list(event.values()) == [stream, stack, stop]
             cases += 1
     print(f'PASS: {variant} {cases} original RNG/observer pairs including both index wraps; state/registers identical')
+    assert lua.globals().actualAttribution.count == cases
+    print(f'PASS: {variant} actual SP caller attribution observes all {cases} native cases without changing RNG state')

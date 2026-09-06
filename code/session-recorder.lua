@@ -10,6 +10,9 @@ function Session:new(engine,config)
   o.halt=core.allocate(4,true)
   o.status='idle'
   o.autoRecord=not config or config.autoRecord~=false
+  if config and config.singleplayerRngDiagnostics then
+    o.rngTrace=require('code/rng-attribution').new(engine)
+  end
   return setmetatable(o,{__index=self})
 end
 
@@ -33,6 +36,7 @@ function Session:guard(callback)
   if not ok then
     if self.status=='error' and (self.active or self.mode~='none') then return false end -- retain the first session failure
     self.status='error'; self.error=tostring(reason)
+    if self.rngTrace then self.rngTrace:observe('finish','session failed') end
     local recordingFailed=self.mode=='record'
     local pauseGame=self.engine:singlePlayer() and (self.active or self.mode=='play')
     local stopSimulation=pauseGame and not recordingFailed
@@ -108,6 +112,7 @@ function Session:activateRecording()
   self:saveInfo(0,seed,seed,r[1],r[2],r[4],r[3])
   self.manifest.status='recording'; store.save(self.manifest)
   self.active=true; self.status='recording'
+  if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'record') end
   print('Recording '..self.manifest.id)
 end
 
@@ -154,6 +159,7 @@ function Session:startPlayback(id)
   assert(self.engine:player()==manifest.player,'Loaded save has a different player slot')
   self:checkResources(manifest.startResources,'starting save')
   self.active=true; self.status='playing'; self.playedCommands=0
+  if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'play') end
   self.nextCheckpoint=nil
   self:playbackResult('playing')
   print('Playing '..id)
@@ -197,6 +203,8 @@ function Session:onTick()
   end
   if not self.active then return end
   local now=self.engine:tick()
+  -- Flush before replay checks can halt at the first mismatch.
+  if self.rngTrace and now%64==0 then self.rngTrace:observe('checkpoint') end
   if self.status=='recording' then
     self.manifest.lastTick=now
     self.manifest.finalRng=self.engine:rngState()
@@ -237,6 +245,7 @@ function Session:onTick()
       self:checkResources(self.manifest.finalResources,'ending state')
       self:checkRngData(self.manifest.finalRngHash,'ending state')
       self.status='finished'; core.writeInteger(self.halt,1); self.engine:pause()
+      if self.rngTrace then self.rngTrace:observe('finish','playback finished') end
       self:playbackResult('finished',{rngCheckpoints='matched',
         fullRngCheckpoints='matched',resourceCheckpoints='matched'})
     end
@@ -269,6 +278,7 @@ function Session:checkResources(expected,phase)
 end
 
 function Session:reset()
+  if self.rngTrace then self.rngTrace:observe('finish','session ended') end
   self.capturePending=nil
   local reportOk,reportError=true,nil
   if self.mode=='play' and (self.status=='playing' or self.status=='loading') and self.manifest then

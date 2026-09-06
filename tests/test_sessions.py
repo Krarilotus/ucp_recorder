@@ -6,6 +6,22 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_attribution_starts_after_snapshot_and_flushes_before_desync(self):
+        self.check('''
+local r=session(); local events={}
+r.rngTrace={observe=function(_,event,...)
+ events[#events+1]=event
+ if event=='begin' then assert(snapshots==1 and r.active and r.status=='recording') end
+end}
+r:startRecording(); assert(#events==0); r:activateRecording()
+now=64; r:onTick(); assert(events[1]=='begin' and events[2]=='checkpoint')
+r:reset(); assert(events[3]=='finish')
+r.mode='play'; r.status='playing'; r.active=true; r.manifest={id='test',lastTick=128}
+r.rngFile={read=function() return {time=64,rng={99,22,3,4}} end}
+assert(not r:guard(function() r:onTick() end))
+assert(events[4]=='checkpoint' and events[5]=='finish' and r.status=='error')
+''')
+
     def test_failed_recording_can_resume_normal_game_but_never_seal_as_complete(self):
         self.check('''
 local r=session(); r:beginMatch(); r:prepareRecording(); now=1; r:onTick()

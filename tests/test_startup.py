@@ -123,6 +123,16 @@ assert(tostring(reason):find('requires Automarket 1.1.0',1,true))
 assert(not tostring(reason):find('unexpected recorder mutation',1,true))
 ''')
 
+    def test_singleplayer_attribution_checks_rng_hooks_before_installation(self):
+        self.prepare_enable()
+        self.check('''
+bytes[0x46a7d0]=0xcc
+local ok,reason=pcall(function() require('init'):enable({singleplayerRngDiagnostics=true}) end)
+assert(not ok and report:find('FAILED: RNG diagnostic checks',1,true))
+assert(not tostring(reason):find('unexpected recorder mutation',1,true))
+assert(not tostring(reason):find('settings sentinel',1,true))
+''')
+
     def test_supported_save_wrappers_on_both_variants_keep_strict_tail_checks(self):
         self.check('''
 local Engine=require('code/engine')
