@@ -62,6 +62,16 @@ browser:refresh(); assert(not pcall(function() browser:play() end))
 assert(not restarted and not played)
 ''')
 
+    def test_pinned_profile_allows_one_restart_then_blocks_unresolved_environment(self):
+        self.check('''
+entries={entry('locked')}; entries[1].different=true
+entries[1].settingsCapture='resolved-v1'; entries[1].restartSettingsHash='pinned'
+currentSettings='recorded'; browser:refresh(); assert(not browser:play() and restarted=='locked')
+restarted=nil; currentSettings='pinned'; browser:refresh()
+assert(not pcall(function() browser:play() end) and not restarted)
+assert(browser.message:find('Install'))
+''')
+
     def test_rename_keeps_identity_selection_and_displays_name(self):
         self.check('''
 entries={entry('one'),entry('two')}; browser:refresh('two')

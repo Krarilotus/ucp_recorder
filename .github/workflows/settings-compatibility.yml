@@ -1,0 +1,19 @@
+name: Recorded settings framework compatibility
+on:
+  pull_request:
+  push:
+    branches: [fix/resolved-replay-settings]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S tests/framework-settings -B build-framework-settings
+      - run: cmake --build build-framework-settings --config Release
+      - run: ctest --test-dir build-framework-settings -C Release --output-on-failure

@@ -2,6 +2,12 @@
 
 Work in progress: recording and playback of single-player Stronghold Crusader and Crusader Extreme Skirmishes using UCP3.
 
+Version 0.25.0 saves a separate launch profile containing the exact loaded
+extension versions, order and resolved options. The replay library uses it for
+settings restarts and accepts an already matching effective configuration even
+when its source text differs. Original configuration files remain preserved.
+See [recorded launch settings](docs/recorded-settings.md).
+
 Version 0.24.0 captures the game's completed multiplayer world-hash subtotals
 and compares them by match tick. `--inspect` now identifies differing simulation
 domains while retaining uncovered-command and RNG evidence. This is an opt-in
@@ -60,4 +66,4 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.24.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.
+The builder creates `dist/recorder-0.25.0.zip` with a flat module layout. `definition.yml` uses metadata schema version `1.0.0`; that is separate from the extension version.

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.25.0
+
+- Save a separate replay launch configuration with the exact loaded extension
+  versions, order and resolved options. Restarts use this pinned profile instead
+  of resolving the original configuration's version ranges again. Preserve the
+  original UCP configuration alongside it.
+- Compare new recordings using their effective recorded environment: formatting,
+  comments or version-range text alone no longer force a restart when the loaded
+  options, extension versions/order and framework already match.
+- Preserve literal nested option data through UCP's contents.value normalization.
+  Round-trip the profile through the installed YAML bridge before capture and
+  reject values it would silently coerce or truncate.
+- Carry the launch profile and its checksum into named copies, validate it before
+  playback, and recheck original settings, launch settings and environment after
+  the helper has waited for the game to close. A failed restore cannot cause an
+  endless restart loop; legacy recordings retain their original restart path.
+- Add tests using the production UCP YAML parser, JSON encoder, version matcher
+  and option normalizer, plus file-integrity, menu and Windows-helper coverage.
+  No content/asset fingerprinting or multiplayer playback is added by this change.
+
 ## 0.24.0
 
 - Capture all 14 native world-hash subtotals immediately after calculation on

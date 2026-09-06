@@ -1,5 +1,9 @@
 # Replay browser and settings restart (0.17.0)
 
+For new 0.25.0 recordings, the helper uses `replay-config.yml`, a profile with
+exact loaded versions and resolved options. See [recorded launch settings](recorded-settings.md).
+The raw `ucp-config.yml` path below describes legacy recordings.
+
 The browser is a native modal dialog opened from the single-player Skirmish lobby. It uses MenuItem, Menu and MenuModal layouts documented by the UCP UI module and OpenSHC, and the original game's red frame, font, colours and button input. No new graphics library, CFFI module or external bitmap is required.
 
 `ui-sites.lua` records the exact entry bytes and pointer operands used for Crusader and Extreme. Verification runs before this module installs any hooks. The dialog finds an unused modal ID rather than taking a known menu's ID. Arrays allocate an extra sentinel entry; each button points to its owning Menu.

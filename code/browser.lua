@@ -27,7 +27,7 @@ function Browser:select(index)
   self.selected=ok and manifest or nil
   if not ok then self.message=tostring(manifest):match('^[^\n]+'):gsub('^.-:%d+: ','')
   elseif store.compatible(manifest) then self.message='Ready to play with your current settings.'
-  elseif store.settings().hash==manifest.settingsHash then self.message='Install the recorded extension and framework versions to play.'
+  elseif store.settings().hash==(manifest.restartSettingsHash or manifest.settingsHash) then self.message='Install the recorded extension and framework versions to play.'
   else self.message='Play will queue a restart with the recorded settings.' end
 end
 
@@ -69,7 +69,7 @@ end
 function Browser:restart()
   assert(self.selected,'Choose a completed recording')
   assert(self.recorder.mode=='none','Finish or cancel the active recording first')
-  assert(store.settings().hash~=self.selected.settingsHash,
+  assert(store.settings().hash~=(self.selected.restartSettingsHash or self.selected.settingsHash),
     'Installed extensions or framework differ. Install the recorded versions before playing.')
   require('code/restart').queue(self.selected.id)
   self.message='Restart queued. Exit the game to reopen with recorded settings.'

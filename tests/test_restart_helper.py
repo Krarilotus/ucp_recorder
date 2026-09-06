@@ -102,3 +102,40 @@ exit $LASTEXITCODE
         self.assertTrue((self.root/'waited.txt').exists(), result.stderr)
         self.assertFalse((self.root/'launch.json').exists())
         self.assertTrue((self.folder/'restart-error.txt').exists(), result.stderr)
+
+    def pinned_profile(self):
+        pinned=self.session/'replay-config.yml'
+        pinned.write_text('{"active":true,"config-full":{"load-order":[{"extension":"recorder","version":"0.25.0"}]}}')
+        environment=self.session/'environment.json'
+        environment.write_text('{"framework":"test framework"}')
+        self.manifest.update(settingsCapture='resolved-v1',restartSettingsHash=hashlib.sha256(pinned.read_bytes()).hexdigest(),
+                             environmentHash=hashlib.sha256(environment.read_bytes()).hexdigest())
+        (self.session/'manifest.json').write_text(json.dumps(self.manifest))
+        return pinned,environment
+
+    def test_resolved_capture_launches_its_pinned_profile(self):
+        pinned,_=self.pinned_profile()
+        original=self.settings.read_bytes()
+        result=self.run_helper()
+        self.assertEqual(result.returncode,0,result.stderr)
+        launch=json.loads((self.root/'launch.json').read_text(encoding='utf-8-sig'))
+        self.assertEqual(launch['arguments'],f'--ucp-config-file="{pinned}"')
+        self.assertEqual(self.settings.read_bytes(),original)
+
+    def test_changed_pinned_profile_or_environment_never_launches(self):
+        pinned,environment=self.pinned_profile()
+        good=pinned.read_bytes()
+        pinned.write_text('changed pinned options')
+        self.run_helper()
+        self.assertFalse((self.root/'launch.json').exists())
+        pinned.write_bytes(good); environment.write_text('changed environment')
+        self.run_helper()
+        self.assertFalse((self.root/'launch.json').exists())
+
+    def test_unknown_settings_profile_never_waits_or_launches(self):
+        self.pinned_profile()
+        self.manifest['settingsCapture']='unknown'
+        (self.session/'manifest.json').write_text(json.dumps(self.manifest))
+        self.run_helper()
+        self.assertFalse((self.root/'waited.txt').exists())
+        self.assertFalse((self.root/'launch.json').exists())

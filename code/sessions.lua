@@ -35,14 +35,16 @@ local function canonical(value)
 end
 
 function M.captureSettings()
+  local restartSettings,resolved=require('code/recorded-settings').capture(allActiveExtensions,configFinal)
   local extensions={}
   for i,extension in ipairs(allActiveExtensions or {}) do
     extensions[i]={name=extension.name,version=extension.version}
   end
   local raw=read(CONFIG_FILE)
-  local environment=canonical({extensions=extensions,config=configFinal or {},
+  local environment=canonical({extensions=extensions,config=resolved,
     framework=read('ucp/ucp-version.yml')})
-  activeSettings={raw=raw,hash=sha.sha256(raw),environment=environment,environmentHash=sha.sha256(environment)}
+  activeSettings={raw=raw,hash=sha.sha256(raw),environment=environment,environmentHash=sha.sha256(environment),
+    settingsCapture='resolved-v1',restartSettings=restartSettings,restartSettingsHash=sha.sha256(restartSettings)}
 end
 
 function M.settings()
@@ -64,9 +66,11 @@ function M.new(profile)
   local settings=M.settings()
   write(path .. '/ucp-config.yml', settings.raw)
   write(path .. '/environment.json',settings.environment)
+  if settings.restartSettings then write(path..'/replay-config.yml',settings.restartSettings) end
   local manifest={format=M.FORMAT, id=id, variant=profile.name,
     executable=profile.sha256, simulationProfile=M.PROFILE,
-    settingsHash=settings.hash,environmentHash=settings.environmentHash,created=os.date('!%Y-%m-%dT%H:%M:%SZ'),
+    settingsHash=settings.hash,environmentHash=settings.environmentHash,settingsCapture=settings.settingsCapture,
+    restartSettingsHash=settings.restartSettingsHash,created=os.date('!%Y-%m-%dT%H:%M:%SZ'),
     status='armed', commandCount=0, lastTick=0}
   M.save(manifest)
   return manifest
@@ -99,6 +103,7 @@ function M.copy(source,name,finalRngHash)
   local copy=M.new({name=source.variant,sha256=source.executable})
   local id,created=copy.id,copy.created
   for key,value in pairs(source) do copy[key]=value end
+  copy.settingsCapture=source.settingsCapture; copy.restartSettingsHash=source.restartSettingsHash
   copy.id=id; copy.created=created; copy.displayName=name; copy.sourceId=source.id
   copy.status='copying'; copy.finalRngHash=finalRngHash
   local path,original=M.path(id),M.path(source.id)
@@ -112,6 +117,10 @@ function M.copy(source,name,finalRngHash)
     assert(sha.sha256(read(path..'/rng.bin'))==copy.rngHash,'Starting RNG state is damaged')
     assert(sha.sha256(read(path..'/ucp-config.yml'))==copy.settingsHash,'Recorded settings are damaged')
     assert(sha.sha256(read(path..'/environment.json'))==copy.environmentHash,'Recorded environment is damaged')
+    if copy.restartSettingsHash then
+      write(path..'/replay-config.yml',read(original..'/replay-config.yml'))
+      assert(sha.sha256(read(path..'/replay-config.yml'))==copy.restartSettingsHash,'Recorded launch settings are damaged')
+    end
     M.finish(copy)
   end,debug.traceback)
   if not ok then copy.status='failed'; pcall(M.save,copy); error(reason) end
@@ -139,6 +148,9 @@ function M.load(id, profile)
   validation.manifest(manifest)
   assert(sha.sha256(read(M.path(id)..'/ucp-config.yml'))==manifest.settingsHash, 'Recorded settings are damaged')
   assert(sha.sha256(read(M.path(id)..'/environment.json'))==manifest.environmentHash,'Recorded environment is damaged')
+  if manifest.restartSettingsHash then
+    assert(sha.sha256(read(M.path(id)..'/replay-config.yml'))==manifest.restartSettingsHash,'Recorded launch settings are damaged')
+  end
   return manifest
 end
 
@@ -206,7 +218,8 @@ end
 
 function M.compatible(manifest)
   local current=M.settings()
-  return current.hash==manifest.settingsHash and current.environmentHash==manifest.environmentHash
+  return (manifest.settingsCapture=='resolved-v1' or current.hash==manifest.settingsHash)
+    and current.environmentHash==manifest.environmentHash
     and require('code/automarket-replay').compatible(manifest.automarket)
 end
 

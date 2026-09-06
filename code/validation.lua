@@ -59,6 +59,10 @@ end
 
 function M.manifest(value)
   assert(type(value)=='table','Invalid replay manifest')
+  if value.settingsCapture~=nil or value.restartSettingsHash~=nil then
+    assert(value.settingsCapture=='resolved-v1','Unknown recorded settings profile')
+    M.hash(value.restartSettingsHash,'recorded launch settings hash')
+  end
   if value.displayName~=nil then M.displayName(value.displayName) end
   require('code/automarket-replay').descriptor(value.automarket)
   M.integer(value.player,1,8,'player slot')
