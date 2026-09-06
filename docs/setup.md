@@ -9,20 +9,20 @@ latest-build live verification is outstanding. Multiplayer playback is unavailab
 
 1. Open the PR you want to test in
    [Corax34/ucp_recorder](https://github.com/Corax34/ucp_recorder/pulls). Find its
-   **test release** link in the comments. Assets are published in
+   **test release** link in its description or comments. Assets are published in
    [Krarilotus/ucp_recorder releases](https://github.com/Krarilotus/ucp_recorder/releases),
    so the upstream Releases page may be empty.
 2. Choose the release for that PR's current commit: tags look like
-   `pr-<number>-<commit>`. Under **Assets**, download **`recorder-0.28.0.zip`**
+   `pr-<number>-<commit>`. Under **Assets**, download **`recorder-0.29.0.zip`**
    and optionally its `.zip.sha256` checksum. **Source code (zip)** and
    **Code > Download ZIP** are repository archives, not installable modules.
 3. Close the test game. Use the UCP launcher's extension install **+** button/file
    picker to select the ZIP. If selecting it from Downloads fails, copy it into
    your test game folder and select it there.
 4. For manual installation, put the ZIP at
-   `<test game>/ucp/modules/recorder-0.28.0.zip`. Keep it zipped. This is a
+   `<test game>/ucp/modules/recorder-0.29.0.zip`. Keep it zipped. This is a
    **module**, not a plugin; `definition.yml` and `init.lua` are at the ZIP root.
-5. Reload the extension list, enable **UCP-Recorder**, and select **0.28.0**.
+5. Reload the extension list, enable **UCP-Recorder**, and select **0.29.0**.
    Older packages may remain for old replays, but the active configuration must
    select the intended version once. Update any preset requiring an older recorder.
 6. PR builds are unsigned development packages. Use the launcher's **Disable
@@ -31,12 +31,12 @@ latest-build live verification is outstanding. Multiplayer playback is unavailab
 7. Keep your working graphics configuration, including **graphicsApiReplacer**
    and its dependencies if needed. Recorder does not replace a graphics wrapper.
 8. Launch through UCP. Check the console/log says
-   `enabling extension: recorder version: 0.28.0`. Since 0.26.0,
+   `enabling extension: recorder version: 0.29.0`. Since 0.26.0,
    `<test game>/ucp/recorder-startup.txt` records the versions/order that reached
    recorder and its startup result.
 
 Do not change `meta.version` to the recorder version. `meta.version: 1.0.0` is
-the definition file format; `version: 0.28.0` is the extension version, and
+the definition file format; `version: 0.29.0` is the extension version, and
 `name: recorder` determines the ZIP filename.
 
 Releases appear after verification and publication succeed. The publisher runs
@@ -51,7 +51,7 @@ Recorder does not bundle or install them. The combination under investigation is
 
 | Extension | Version / requirement |
 | --- | --- |
-| recorder | 0.28.0 for this PR |
+| recorder | 0.29.0 for this PR |
 | Ascension-Multiplayer | 1.0.11 |
 | automarket | 1.1.0; the adapter checks this exact wire format |
 | protocol | 1.0.0 for the Automarket adapter |

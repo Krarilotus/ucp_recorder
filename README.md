@@ -11,7 +11,7 @@ gameplay and the recorded-settings restart still need live verification.
 ## Install and try it
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download the
-   `recorder-0.28.0.zip` asset from this PR's test release, not GitHub's source ZIP.
+   `recorder-0.29.0.zip` asset from this PR's test release, not GitHub's source ZIP.
    Release links are posted on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls);
    assets are hosted in the [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -37,6 +37,10 @@ See [recorded settings](docs/recorded-settings.md).
 Version 0.28.0 adds rally-point replay and fixes disabled controls after a
 recording failure. If recording fails, it pauses once; resume to continue
 the match without recording. See [failure handling](docs/rally-points-and-capture-failures.md).
+
+Version 0.29.0 covers workshop production and nine other omitted native gameplay
+commands. The recorder reuses the original game dispatcher; see the
+[complete command audit and focused test steps](docs/command-coverage.md).
 
 ## Troubleshooting and test status
 
@@ -86,6 +90,6 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.28.0.zip` with a flat module layout.
+The builder creates `dist/recorder-0.29.0.zip` with a flat module layout.
 `definition.yml` uses metadata schema version `1.0.0`; that is separate from
-the extension version `0.28.0`.
+the extension version `0.29.0`.

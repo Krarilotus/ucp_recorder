@@ -144,6 +144,37 @@ assert(#recorder.commands==1 and recorder.commands[1].time==12 and recorder.comm
 assert(not engine.received[0])
 ''')
 
+    def test_remaining_gameplay_payloads_survive_capture_and_playback_dispatch(self):
+        self.command_hooks('record')
+        self.check('''
+local captured={}
+for category,size in pairs({[33]=7,[37]=7,[72]=4,[73]=2,[74]=6,
+                           [75]=4,[76]=1213,[79]=1,[86]=3,[97]=4}) do
+ bytes[address+8]=category; memory[engine.base+0x2d830]=size
+ local expected={}
+ for i=0,size-1 do
+  local byte=(i*73+category)%256
+  bytes[address+10+i]=byte; expected[#expected+1]=string.format('%02X',byte)
+ end
+ callbacks[engine.sites.localTimed.address]({ESI=engine.base})
+ assert(before().EDX==category); after()
+ local c=recorder.commands[#recorder.commands]
+ assert(not recorder.error and c.commandCategory==category and c.size==size)
+ assert(c.data:upper()==table.concat(expected))
+ captured[#captured+1]=c
+end
+assert(#captured==10)
+recorder.mode='play'; recorder.status='playing'; engine.schedule=simulatedSchedule
+for _,c in ipairs(captured) do
+ engine:resetCommands(); memory[engine.base+engine.sites.writeIndexOffset]=0
+ bytes[address+9]=0
+ engine:scheduleCommand(c)
+ assert(before().EDX==c.commandCategory and engine.journal.executed==0)
+ after()
+ assert(not recorder.error and engine.journal.executed==1 and not engine:commandsPending())
+end
+''')
+
     def test_local_input_records_without_any_receive_copy(self):
         self.command_hooks('record')
         self.check('''

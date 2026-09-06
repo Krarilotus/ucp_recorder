@@ -6,6 +6,36 @@ import test_session_files as file_fixture
 class CommandLayoutTests(unittest.TestCase):
     setUp = recorder_fixture.RecorderTests.setUp
 
+    def test_remaining_gameplay_layouts_reject_short_and_long_payloads(self):
+        self.lua.execute('''
+local validate=require('code/validation').sessionCommand
+for _,variant in ipairs({'SHC','Extreme'}) do
+ for category,size in pairs({[33]=7,[37]=7,[72]=4,[73]=2,[74]=6,
+                            [75]=4,[76]=1213,[79]=1,[86]=3,[97]=4}) do
+  local c={commandCategory=category,player=1,time=10,size=size,data=string.rep('A5',size)}
+  local m={player=1,variant=variant}
+  assert(validate(c,m)==c)
+  for _,wrong in ipairs({size-1,size+1}) do
+   c.size=wrong; c.data=string.rep('A5',wrong)
+   local ok,err=pcall(validate,c,m)
+   assert(not ok and err:find('payload size',1,true))
+  end
+ end
+end
+''')
+
+    def test_native_io_network_and_removed_commands_remain_excluded(self):
+        self.lua.execute('''
+local validate=require('code/validation').sessionCommand
+for _,variant in ipairs({'SHC','Extreme'}) do
+ for category,size in pairs({[8]=0,[30]=0,[32]=0,[39]=75,[54]=8,[77]=4,[83]=3}) do
+  local c={commandCategory=category,player=1,time=10,size=size,data=string.rep('00',size)}
+  local ok,err=pcall(validate,c,{player=1,variant=variant})
+  assert(not ok and err:find('Unsupported replay command category',1,true))
+ end
+end
+''')
+
     def test_rally_points_use_five_byte_native_layout_on_both_variants(self):
         self.lua.execute('''
 local validate=require('code/validation').sessionCommand

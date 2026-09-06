@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.29.0
+
+- Support ten omitted native gameplay commands on Crusader and Extreme: change
+  workshop production, operate drawbridges, select siege engines and their units,
+  release dogs, remove tower siege equipment, delete wall/pitch areas, request
+  unit-linkage recalculation, replenish ammunition and place braziers.
+- Audit all 120 native command-table entries and document admitted commands and
+  deliberate exclusions. Retain exclusions for save/load, lobby, immediate,
+  network/resync and player-connection operations instead of accepting every
+  command with a timed payload.
+- Verify every native receive handler's payload size and timestamp policy on
+  both variants, and test the production handler and its real UID-checked action.
+  Add capture/playback and malformed-layout tests for the new commands.
+- Keep simulation profile `recorder-sp-v10` and the 0.28.0 recovery behavior:
+  capture failure pauses once and releases normal gameplay after unpause.
+
 ## 0.28.0
 
 - Record and replay native rally-point commands, including cathedral/monk,

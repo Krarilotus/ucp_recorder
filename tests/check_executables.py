@@ -95,6 +95,8 @@ def check(folder):
         check_heads_placement(reader,lua,name,scoped)
         from check_command_layouts_native import check_layouts
         check_layouts(folder/file,lua,name)
+        from check_production_native import check_production
+        check_production(folder/file,name)
         from check_taunt_native import check_taunts
         check_taunts(folder/file,lua,name,scoped)
         from check_wedding_native import check_weddings
