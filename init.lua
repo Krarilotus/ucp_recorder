@@ -24,6 +24,7 @@ function module:enable(config)
   if engine.trace then
     require('code/network-observer').install(engine.trace)
     require('code/rng-observer').install(engine.trace)
+    require('code/world-hash-observer').install(engine.trace)
   end
   local ui=require('code/ui')
   ui.createButtons(recorder,uiSites)

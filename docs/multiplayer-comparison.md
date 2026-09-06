@@ -63,3 +63,9 @@ extensions' generated code can still have process-specific addresses.
 It requires the corrected fixed-buffer payload source from 0.21.0. The game's
 partial world hash and the recorder's RNG/resource observations cover different
 state; neither substitutes for a complete reconstructed multiplayer replay.
+
+Recorder 0.24.0 adds `worldHashes`, capturing local subtotals immediately after
+native calculation and comparing shared advertised ticks. It can identify the
+first differing simulation domains, including differences hidden by a total-hash
+collision. Read [native world-hash evidence](native-world-hashes.md) for the
+overlapping native layout, sample bounds and interpretation limits.

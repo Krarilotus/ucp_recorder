@@ -106,6 +106,8 @@ def check(folder):
         check_rng_observer(reader,lua,native,root,name)
         from check_dispatch_native import check_dispatch
         check_dispatch(reader,name)
+        from check_world_hash_native import check_world_hash
+        check_world_hash(folder/file,name)
         print(f'PASS: {name} native patch sites, RNG fields, player layout and menu reference')
 
 

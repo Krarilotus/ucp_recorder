@@ -35,6 +35,7 @@ function M:open()
   end
   self.file=assert(io.open(self.path..'/commands.jsonl','w'))
   self.count=0; self.events=0; self.gaps=0; self.rngCalls={}; self.lastResult=nil
+  self.pendingNativeHashes={}
   local environmentHash=store.settings().environmentHash
   validation.hash(environmentHash,'diagnostic environment hash')
   self.network=self.engine:networkState()
@@ -42,6 +43,7 @@ function M:open()
     variant=native.profile.name,executable=native.profile.sha256,
     environmentHash=environmentHash,
     network=self.network,rngAttribution=true,immediatePayloadSource='native-fixed-v1',
+    nativeWorldHashes=self.nativeWorldHashes,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
   if self.network.syncStatus~=0 then self:gap('capture began during native synchronization') end
   if self.window and self.engine:tick()~=self.window.startTick then
@@ -115,6 +117,34 @@ function M:rngEvidence()
   return entries
 end
 
+function M:worldHash()
+  if not self.file then return end
+  self:checkNetwork()
+  local player=validation.integer(self.engine:player(),1,8,'native hash player')
+  local base=self.engine.base
+  local function unsigned(address)
+    local value=core.readInteger(address)
+    if value<0 then value=value+4294967296 end
+    return validation.integer(value,0,4294967295,'native hash value')
+  end
+  local tick=validation.integer(core.readInteger(base+0x7a8bc+player*4),0,self.engine:tick(),'native hash tick')
+  local total=unsigned(base+0x7a898+player*4)
+  local domains,sum={},0
+  for i=0,13 do
+    domains[i+1]=unsigned(base+0x7a8e0+player*48+i*4)
+    sum=(sum+domains[i+1])%4294967296
+  end
+  assert(sum==total,'Native hash subtotals do not match completed total')
+  assert(#self.pendingNativeHashes<256,'Too many native hash observations between checkpoints')
+  self.pendingNativeHashes[#self.pendingNativeHashes+1]={player=player,time=tick,total=total,domains=domains}
+end
+
+function M:worldHashEvidence()
+  local entries=self.pendingNativeHashes
+  self.pendingNativeHashes={}
+  return entries
+end
+
 function M:statusLines()
   if self.failed then return {'Test capture stopped: '..tostring(self.failureReason or 'error'):match('^[^\n]+'),
     'Multiplayer replay playback is not available.'} end
@@ -160,7 +190,7 @@ function M:onTick()
   self:open()
   self.lastTick=now
   self:record({kind='checkpoint',time=now,rng=self.engine:rngState(),resources=self.engine:resourceState(),
-    rngHash=sha.sha256(self.engine:rngData()),rngCalls=self:rngEvidence()})
+    rngHash=sha.sha256(self.engine:rngData()),rngCalls=self:rngEvidence(),worldHashes=self:worldHashEvidence()})
   if self.window and now==self.window.endTick then self:finishWindow() end
 end
 
@@ -220,7 +250,7 @@ function M:stop(reason)
       local incomplete=self.incomplete or self.executing
         or (self.window and self.lastTick~=self.window.endTick)
       self:write({kind='end',status=incomplete and 'incomplete' or 'complete',lastTick=self.lastTick,
-        commands=self.count,events=self.events,reason=reason})
+        commands=self.count,events=self.events,reason=reason,pendingNativeHashes=#self.pendingNativeHashes})
       self.lastResult={path=self.path,lastTick=self.lastTick,commands=self.count,gaps=self.gaps or 0}
     end)
     self.file=nil
@@ -229,6 +259,7 @@ function M:stop(reason)
   end
   self.received={}; self.executing=nil; self.failed=false; self.incomplete=false; self.path=nil
   self.rngCalls={}; self.rngCallerCount=0; self.failureReason=nil
+  self.pendingNativeHashes={}
   self.lastTick=nil
   self.network=nil
   self.closed=false

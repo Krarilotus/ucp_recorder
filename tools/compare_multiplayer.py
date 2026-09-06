@@ -367,9 +367,9 @@ def rng_call_counts(entries):
     return result
 
 
-def rng_checkpoints(records, header):
+def rng_checkpoints(records, header, require_attribution=True):
     """Validate interval boundaries even when timed-replay coverage has gaps."""
-    if header.get('rngAttribution') is not True or header['format'] < 5:
+    if header['format'] < 5 or (require_attribution and header.get('rngAttribution') is not True):
         raise ValueError('RNG interval inspection requires caller attribution (0.20.0+)')
     window = capture_window(header)
     next_tick = (header['firstTick'] + 63) // 64 * 64
@@ -406,7 +406,7 @@ def rng_checkpoints(records, header):
                 for value in values:
                     integer(value, -2147483648, 2147483647)
             hash_value(record.get('rngHash'))
-            counts = rng_call_counts(record.get('rngCalls'))
+            counts = rng_call_counts(record.get('rngCalls')) if require_attribution else None
             checkpoints += 1
             yield record, counts
         elif kind == 'command':
@@ -478,6 +478,79 @@ def inspect_rng_intervals(left, right):
     return result
 
 
+WORLD_DOMAINS = ('units', 'buildings', 'trees', 'tribes', 'playerData', 'mapState',
+                 'tileMap', 'entities', 'moats', 'climbData', 'pitchDitches',
+                 'unused', 'aivs', 'heatMaps')
+
+
+def world_hash_samples(records, header):
+    """Validate complete observation windows before returning any comparisons."""
+    if header.get('nativeWorldHashes') != 'native-domains-v1':
+        raise ValueError('Native world-hash inspection requires immediate subtotal capture (0.24.0+)')
+    def checked_records():
+        for record in records:
+            if record.get('kind') == 'end':
+                integer(record.get('pendingNativeHashes'), 0, 256)
+                if record['pendingNativeHashes'] != 0:
+                    raise ValueError('Unflushed native world-hash observations at trace end')
+            yield record
+    samples, duplicates = {}, 0
+    previous_tick = header['firstTick']
+    previous_checkpoint = header['firstTick']
+    for checkpoint, _ in rng_checkpoints(checked_records(), header, require_attribution=False):
+        entries = checkpoint.get('worldHashes')
+        if not isinstance(entries, list) or len(entries) > 256:
+            raise ValueError('Missing or oversized native world-hash evidence')
+        for entry in entries:
+            if not isinstance(entry, dict) or set(entry) != {'player', 'time', 'total', 'domains'}:
+                raise ValueError('Malformed native world-hash observation')
+            integer(entry['player'], 1, 8)
+            if entry['player'] != header['localPlayer']:
+                raise ValueError('Native world-hash observation belongs to another player')
+            tick, total, domains = entry['time'], entry['total'], entry['domains']
+            integer(tick, max(previous_tick, previous_checkpoint), checkpoint['time'])
+            integer(total, 0, 4294967295)
+            if not isinstance(domains, list) or len(domains) != 14:
+                raise ValueError('Native world-hash observation requires 14 subtotals')
+            for value in domains:
+                integer(value, 0, 4294967295)
+            if sum(domains) & 0xffffffff != total:
+                raise ValueError('Native world-hash subtotal sum differs from total')
+            if tick in samples:
+                if samples[tick] != entry:
+                    raise ValueError('Conflicting native world hashes for the same match tick')
+                duplicates += 1
+            samples[tick] = entry
+            previous_tick = tick
+        previous_checkpoint = checkpoint['time']
+    return samples, duplicates
+
+
+def inspect_world_hashes(left, right):
+    purpose = 'Completed native world-hash observations only; not replay validation'
+    try:
+        with Path(left).open(encoding='utf-8') as a, Path(right).open(encoding='utf-8') as b:
+            ar, br = rows(a), rows(b)
+            ah, bh = next(ar), next(br)
+            peer_pair(ah, bh)
+            av, ad = world_hash_samples(ar, ah)
+            bv, bd = world_hash_samples(br, bh)
+        common = av.keys() & bv.keys()
+        differences = sorted(t for t in common if av[t]['domains'] != bv[t]['domains'])
+        result = dict(purpose=purpose, pairedTicks=len(common), differentTicks=len(differences),
+                      sameTicks=len(common)-len(differences), leftUnpairedTicks=len(av.keys()-bv.keys()),
+                      rightUnpairedTicks=len(bv.keys()-av.keys()), leftDuplicates=ad, rightDuplicates=bd)
+        if differences:
+            tick = differences[0]
+            result['firstDifference'] = dict(matchTick=tick, leftPlayer=ah['localPlayer'],
+                rightPlayer=bh['localPlayer'], leftTotal=av[tick]['total'], rightTotal=bv[tick]['total'],
+                domains=[dict(domain=name, left=x, right=y) for name, x, y in
+                         zip(WORLD_DOMAINS, av[tick]['domains'], bv[tick]['domains']) if x != y])
+        return result
+    except (OSError, ValueError, TypeError, KeyError, StopIteration, AttributeError) as error:
+        return dict(purpose=purpose, inspectionError=str(error) or 'Empty native world-hash evidence')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('left', type=Path)
@@ -490,5 +563,6 @@ if __name__ == '__main__':
         result['observations'] = {'left': inspect_trace(args.left), 'right': inspect_trace(args.right)}
         result['nativeSync'] = inspect_native_sync(args.left, args.right)
         result['rngIntervals'] = inspect_rng_intervals(args.left, args.right)
+        result['worldHashes'] = inspect_world_hashes(args.left, args.right)
     print(json.dumps(result, indent=2))
     raise SystemExit({'matched': 0, 'different': 1, 'incomplete': 2}[result['status']])

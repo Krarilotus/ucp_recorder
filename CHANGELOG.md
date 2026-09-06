@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.24.0
+
+- Capture all 14 native world-hash subtotals immediately after calculation on
+  Crusader and Extreme. The game's 48-byte player stride overlaps two values;
+  delayed reads can report overwritten data. Observation copies values without
+  changing native hashes, synchronization, commands or simulation state.
+- Add `worldHashes` to multiplayer comparison `--inspect`: pair completed
+  calculations by advertised match tick, report the first differing domains,
+  preserve total-hash collisions, and count unmatched samples and duplicates.
+  Reject conflicting samples, invalid sums, incomplete windows and peer changes.
+- Bound pending samples and expose unflushed end-of-match observations. Read or
+  storage failures stop diagnostics without suppressing native gameplay.
+- Add original-executable observer checks for all eight slots and native skip
+  paths on both variants, plus Lua capture and malformed comparison fixtures.
+  This does not enable multiplayer playback or establish the cause of the prior
+  RNG1 difference. Single-player simulation profile remains `recorder-sp-v9`.
+
 ## 0.23.0
 
 - Prevent delayed AI taunt replies from advancing simulation RNG during active
