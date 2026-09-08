@@ -79,6 +79,10 @@ on each call, even if the match clock did not advance. On expiry it resets to
 200; when marked dirty, it rebuilds connectivity regions and building linkage.
 The countdown is at `117CAD8` / `120F718`. These are observed native writes,
 not suggested restore values. Crusader saves the countdown in section 1023.
+UCP2 Legacy's `o_increase_path_update_tick_rate` changes the reset immediate from
+200 to 50. The entry guard preserves that option; the native check covers both
+intervals. Forced rebuild calls also exist during preparation and path planning,
+so equal countdown samples alone do not prove equal maintenance history.
 
 In Crusader, `canUnitReachAdjacentTile` (`4105F0`) reads the connectivity region
 of the unit and neighboring tiles and passes those regions to the navigation

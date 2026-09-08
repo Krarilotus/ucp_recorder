@@ -30,7 +30,8 @@ def check_tick_boundary(path, lua, root, variant):
     stack = 0x3f08000
 
     def run(patched, stopped, mode, local, paused, save=0, sync_status=0, stop_now=False,
-            refresh=False, viewing=False, modal=False, navigation=None, enabled=True, legacy=False):
+            refresh=False, viewing=False, modal=False, navigation=None, enabled=True, legacy=False,
+            reset_period=200):
         machine = Uc(UC_ARCH_X86, UC_MODE_32)
         load_image(machine, path)
         put = lambda address, value: machine.mem_write(address, struct.pack('<I', value & 0xffffffff))
@@ -80,6 +81,10 @@ def check_tick_boundary(path, lua, root, variant):
             # The dirty-map flood fill is deliberately outside this check.
             targets.remove(navigation_entry)
             put(countdown, navigation)
+            # UCP2 Legacy o_increase_path_update_tick_rate changes this one
+            # immediate from 200 to 50. Replay admission must preserve it.
+            assert machine.mem_read(navigation_entry + 0x38, 10) == b'\xc7\x05' + struct.pack('<II', countdown, 200)
+            put(navigation_entry + 0x3e, reset_period)
         calls = []
         # These two maintenance calls have one stack argument; all other
         # reached world-update callees have thiscall's register receiver only.
@@ -146,17 +151,17 @@ def check_tick_boundary(path, lua, root, variant):
         count += 1
     for mode, local in ((99, 0), (1, 1), (1, 0)):
         for paused, modal in ((1, False), (-1, False), (0, True), (0, False)):
-            for initial in (100, 1):
-                original = run(False, 0, mode, local, paused, modal=modal, navigation=initial)
-                expected = initial - 1 if initial > 1 else 200
+            for initial, reset_period in ((100, 200), (1, 200), (1, 50)):
+                options = dict(modal=modal, navigation=initial, reset_period=reset_period)
+                original = run(False, 0, mode, local, paused, **options)
+                expected = initial - 1 if initial > 1 else reset_period
                 assert original[-1] == expected
                 # Reproduce the published guard's missing viewer-pause scope.
-                old = run(True, 0, mode, local, paused, modal=modal, navigation=initial,
-                          viewing=True, legacy=True)
+                old = run(True, 0, mode, local, paused, viewing=True, legacy=True, **options)
                 assert old[-1] == expected
-                recording = run(True, 0, mode, local, paused, modal=modal, navigation=initial)
+                recording = run(True, 0, mode, local, paused, **options)
                 assert recording == original
-                viewing = run(True, 0, mode, local, paused, modal=modal, navigation=initial, viewing=True)
+                viewing = run(True, 0, mode, local, paused, viewing=True, **options)
                 should_stop = (local or mode == 99) and (paused != 0 or modal)
                 assert viewing[-1] == (initial if should_stop else expected), (variant, viewing)
                 if should_stop:
@@ -164,8 +169,7 @@ def check_tick_boundary(path, lua, root, variant):
                     assert viewing[0] == ([] if paused else [menu])
                 elif not local and mode != 99:
                     assert viewing == original  # live MP ignores viewer state
-                inactive = run(True, 1, mode, local, paused, modal=modal, navigation=initial,
-                               viewing=True, enabled=False)
+                inactive = run(True, 1, mode, local, paused, viewing=True, enabled=False, **options)
                 assert inactive == original
                 count += 1
     print(f'PASS: {variant} tick entry/endpoint halt and passive control flow ({count} cases)')
