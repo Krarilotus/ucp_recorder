@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import zipfile
+from module_package import build_module
 
 
 def gh(*args):
@@ -52,23 +53,8 @@ def package():
     build = json.loads(os.environ['PR_BUILD'])
     source = Path('source').resolve()
     destination = Path('out')
-    destination.mkdir(exist_ok=True)
-    definition = (source / 'definition.yml').read_text(encoding='utf-8')
-    assert re.search(r'^name: recorder\s*$', definition, re.M), 'Unexpected module identity'
-    version = re.search(r'^version: (\d+\.\d+\.\d+)\s*$', definition, re.M).group(1)
-    asset = destination / f'recorder-{version}.zip'
-    files = [source / name for name in ('definition.yml', 'options.yml', 'init.lua', 'README.md', 'CHANGELOG.md')]
-    files += sorted((source / 'code').rglob('*.lua'))
-    files += sorted((source / 'docs').rglob('*.md'))
-    for name in ('compare_multiplayer.py', 'inspect_replay.py'):
-        tool = source / 'tools' / name
-        if tool.exists():
-            files.append(tool)
-    with zipfile.ZipFile(asset, 'w', zipfile.ZIP_DEFLATED) as archive:
-        for path in files:
-            assert path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(source)
-            archive.write(path, path.relative_to(source).as_posix())
-    checksum = hashlib.sha256(asset.read_bytes()).hexdigest()
+    package = build_module(source, destination)
+    asset, version, checksum = package.path, package.version, package.sha256
     asset.with_suffix('.zip.sha256').write_text(f'{checksum}  {asset.name}\n', encoding='utf-8')
     (destination / 'build.json').write_text(json.dumps(dict(build, version=version, sha256=checksum)), encoding='utf-8')
 
