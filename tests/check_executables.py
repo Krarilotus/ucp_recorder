@@ -111,6 +111,8 @@ def check(folder):
         from check_spawn_context_native import check_spawn_context, check_menu_pause
         check_spawn_context(reader,lua,root,name)
         check_menu_pause(reader,lua,root,name)
+        from check_results_native import check_results
+        check_results(reader,lua,root,name)
         from check_replay_view_native import check_replay_view
         check_replay_view(reader,lua,native,root,name)
         from check_header_native import check_header

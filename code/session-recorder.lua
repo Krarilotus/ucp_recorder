@@ -8,6 +8,7 @@ function Session:new(engine,config)
   local o=Base:new({name='unused',rngLogMethod='checkpoints'})
   o.engine=engine
   o.halt=core.allocate(4,true)
+  o.resultsHold=core.allocate(4,true)
   o.status='idle'
   o.autoRecord=not config or config.autoRecord~=false
   if config and config.singleplayerRngDiagnostics then
@@ -150,6 +151,10 @@ function Session:startPlayback(id)
   self:openFiles('r')
   self.manifest=manifest
   self.mode='play'; self.status='loading'; self.active=false
+  -- The native victory/defeat banner leaves the simulation after eight real
+  -- seconds. Hold that presentation transition throughout playback, including
+  -- verified completion/failure; only leaving the replay releases it.
+  core.writeInteger(self.resultsHold,1)
   self.error=nil
   self.playedCommands=0
   self.playbackStarted=os.date('!%Y-%m-%dT%H:%M:%SZ')
@@ -285,6 +290,7 @@ function Session:checkResources(expected,phase)
 end
 
 function Session:reset()
+  core.writeInteger(self.resultsHold,0)
   if self.rngTrace then self.rngTrace:observe('finish','session ended') end
   self.capturePending=nil
   local reportOk,reportError=true,nil

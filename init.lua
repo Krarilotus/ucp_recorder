@@ -30,6 +30,7 @@ local function enable(self,config,stage)
     local rngReturnAddresses=fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
     if engine.trace then engine.trace.rngReturnAddresses=rngReturnAddresses end
     local recorder=Session:new(engine,config)
+    fixes.install({sites.resultsTimer},recorder.resultsHold,engine.base+0x618)
     if recorder.rngTrace then recorder.rngTrace.returnAddresses=rngReturnAddresses end
     self.recorder=recorder
     engine:install(recorder)

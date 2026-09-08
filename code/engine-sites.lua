@@ -1,6 +1,8 @@
 -- Checked native entry points used by session capture and playback.
 return {
   SHC = {
+    resultsTimer = {address=0x004AFB4A, bytes={61,64,31,0,0}, kind='raw', patch='equalFlags'},
+    resultsBranch = {address=0x004AFB4F, bytes={118,41}},
     haltingMenu = {address=0x0046BD20, bytes={161,128,221,145,1,133,192,116,8,131,248,99,116,3,51,192,195,131,61,4,102,18,1,0,116,6,184,1,0,0,0,195,51,192,131,61,188,124,254,1,28,15,148,192,195}},
     tick = {address=0x0045CE44, bytes={185,192,121,162,1}},
     save = {address=0x00474480, bytes={131,236,16,83,85,86}},
@@ -29,6 +31,8 @@ return {
     writeIndexOffset = 0x00109EE0,
   },
   Extreme = {
+    resultsTimer = {address=0x004AFCBA, bytes={61,64,31,0,0}, kind='raw', patch='equalFlags'},
+    resultsBranch = {address=0x004AFCBF, bytes={118,41}},
     haltingMenu = {address=0x0046BF40, bytes={161,240,77,53,2,133,192,116,8,131,248,99,116,3,51,192,195,131,61,132,106,18,1,0,116,6,184,1,0,0,0,195,51,192,131,61,188,177,167,2,28,15,148,192,195}},
     tick = {address=0x0045D054, bytes={185,192,174,75,2}},
     save = {address=0x004746B0, bytes={131,236,16,83,85,86}},

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.35.0
+
+- Keep natural victory/defeat playback in the game until the recorded ending
+  tick is verified. The native eight-second results timer can no longer cut
+  playback short when the replay runs at a different speed or is paused.
+  Keep the native victory/defeat banner visible; ordinary recording and
+  multiplayer retain the original results transition.
+- Preserve failed/finished replay controls until the viewer leaves the mission;
+  an expired results timer cannot dismiss the final verification status.
+
 ## 0.34.0
 
 - Include unit-spawn context in optional single-player RNG diagnostics on

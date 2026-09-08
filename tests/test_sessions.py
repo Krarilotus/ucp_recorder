@@ -6,6 +6,27 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_results_timer_hold_survives_completion_and_failure_until_exit(self):
+        self.check('''
+for _,fail in ipairs({false,true}) do
+ local r=session(); local store=require('code/sessions'); local hash=string.rep('a',64)
+ local manifest={id='test',startTick=1,lastTick=65,player=1,commandCount=0,
+  snapshotHash=hash,rngHash=hash,finalRngHash=hash,finalRng={11,22,3,4},
+  startResources=resourceState(),finalResources=resourceState()}
+ store.load=function() return manifest end
+ store.compatible=function() return true end; store.preflight=function() end
+ store.read=function(path) return path:find('rng.bin',1,true) and string.rep('x',0x9c50) or 'snapshot' end
+ engine.loadSnapshot=function() assert(memory[r.resultsHold]==1); now=1 end
+ r:startPlayback('test'); assert(memory[r.resultsHold]==1 and r.status=='playing')
+ if fail then assert(not r:guard(function() error('injected playback failure') end))
+ else now=65; r:onTick(); assert(r.status=='finished') end
+ assert(memory[r.resultsHold]==1)
+ r:onMenuView(61); assert(memory[r.resultsHold]==0 and r.mode=='none')
+ r:startRecording(); assert(memory[r.resultsHold]==0)
+ r:reset()
+end
+''')
+
     def test_return_from_results_seals_last_observed_tick_and_selects_full_match(self):
         self.check('''
 for _,view in ipairs({20,41,61}) do
