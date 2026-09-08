@@ -90,7 +90,7 @@ function noMutation() error('unexpected recorder mutation') end
 core.allocate=noMutation; core.allocateCode=noMutation; core.writeCode=noMutation
 core.detourCode=noMutation; core.hookCode=noMutation; core.exposeCode=noMutation
 function launch(diagnostics)
- return pcall(function() require('init'):enable({multiplayerDiagnostics=diagnostics}) end)
+ return pcall(function() require('init'):enable({multiplayerDiagnostics=diagnostics,autoRecord=false}) end)
 end
 ''')
 

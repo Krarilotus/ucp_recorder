@@ -51,7 +51,7 @@ function M.createButtons(recorder,sites)
     ui:text(tr(browser.message),x+300,y+124,1,18,false,552)
   end,function() return tr(editorTitle) end)
   ui:installInput(function()
-    return recorder.engine:singlePlayer() or ui:activeDialog()==M.statusDialog
+    return recorder.engine:singlePlayer() or ui:activeDialog()==M.statusDialog or ui:activeDialog()==nameDialog
   end,function(message,key)
     if ui:activeDialog()==nameDialog and editor then
       local action=editor:input(message,key)
@@ -99,8 +99,20 @@ function M.createButtons(recorder,sites)
   end)
   M.statusDialog=ui:modal({
     {x=24,y=186,width=180,height=30,label=function() return tr('Back') end,action=function() ui:show(5) end},
-    {x=340,y=186,width=236,height=30,label=function() return view:available() and tr('View player') or '' end,
-      action=function() if view:available() then ui:show(playerDialog) end end}
+    {x=340,y=186,width=236,height=30,label=function()
+      local trace=recorder.engine.trace
+      if not recorder.engine:singlePlayer() and trace and trace.file and trace.saveCopy then return tr('Save capture as...') end
+      return view:available() and tr('View player') or ''
+    end,action=function()
+      local trace=recorder.engine.trace
+      if not recorder.engine:singlePlayer() and trace and trace.file and trace.saveCopy then
+        openName(trace.capture.id,function(name)
+          local copy=trace:saveCopy(name)
+          browser.message=tr('Saved: %s',copy.displayName)
+          return M.statusDialog
+        end,M.statusDialog,'Save capture as...')
+      elseif view:available() then ui:show(playerDialog) end
+    end}
   },2,600,240,function(x,y)
     if not recorder.engine:singlePlayer() then
       local lines=recorder.engine.trace and recorder.engine.trace:statusLines()

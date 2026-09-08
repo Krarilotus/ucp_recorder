@@ -139,6 +139,8 @@ for _,site in pairs(sites) do
 end
 for _,site in pairs(require('code/ui-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 for _,site in ipairs(require('code/scoped-sites').SHC) do core.writeBytes(site.address,site.bytes) end
+for _,site in pairs(require('code/network-sites').SHC) do core.writeBytes(site.address,site.bytes) end
+local world=require('code/world-hash-sites').SHC; core.writeBytes(world.address,world.bytes)
 core.hookCode=function() return function() return 0 end end
 core.writeString=function() end
 core.callTo=function() return {} end

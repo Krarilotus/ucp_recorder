@@ -11,7 +11,7 @@ gameplay and the recorded-settings restart still need live verification.
 ## Install and try it
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download the
-   `recorder-0.29.0.zip` asset from this PR's test release, not GitHub's source ZIP.
+   `recorder-0.36.0.zip` asset from this PR's test release, not GitHub's source ZIP.
    Release links are posted on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls);
    assets are hosted in the [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -50,6 +50,13 @@ player's HUD/reports during playback. See [menus and player views](docs/replay-m
 for controls, language setup, and the remaining test limitations.
 
 ## Troubleshooting and test status
+
+Multiplayer matches now save a continuous **capture on each PC** by default,
+under `ucp/multiplayer-recordings`. Use **Pause > Replay status > Save capture as...**
+to name a separate copy while the full capture continues. Captures store settings
+and network evidence, but **cannot yet be played in the replay browser**.
+Do not spend a full match testing playback at this stage; see the
+[multiplayer capture stages and test gates](docs/multiplayer-capture.md).
 
 For a replay that stops with **RNG divergence**, keep the recording and its
 failure report. Version 0.30.0 adds optional caller diagnostics and a read-only

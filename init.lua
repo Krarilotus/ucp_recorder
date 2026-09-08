@@ -4,13 +4,15 @@ local Session=require('code/session-recorder')
 local module={}
 
 local function enable(self,config,stage)
+  local multiplayerCapture=config.autoRecord~=false
+  local multiplayerObserve=multiplayerCapture or config.multiplayerDiagnostics
   stage('native executable checks',native.verify)
   stage('Automarket compatibility',require('code/automarket-replay').current)
   local sites=stage('session hook checks',Engine.verify)
   local uiSites=stage('menu hook checks',require('code/native-ui').verify)
   local fixes=require('code/fixes')
   local fixSites=stage('simulation hook checks',fixes.verify)
-  if config.multiplayerDiagnostics then
+  if multiplayerObserve then
     stage('network diagnostic checks',require('code/network-observer').verify)
     stage('world-hash diagnostic checks',require('code/world-hash-observer').verify)
   end
@@ -26,7 +28,8 @@ local function enable(self,config,stage)
   stage('recorded settings',require('code/sessions').captureSettings)
   stage('hook and menu installation',function()
     local engine=Engine.new(sites)
-    if config.multiplayerDiagnostics then engine.trace=require('code/multiplayer-trace').new(engine,config) end
+    if multiplayerCapture then engine.trace=require('code/multiplayer-capture').new(engine,config)
+    elseif config.multiplayerDiagnostics then engine.trace=require('code/multiplayer-trace').new(engine,config) end
     local rngReturnAddresses=fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
     if engine.trace then engine.trace.rngReturnAddresses=rngReturnAddresses end
     local recorder=Session:new(engine,config)
@@ -38,7 +41,7 @@ local function enable(self,config,stage)
       require('code/network-observer').install(engine.trace)
       require('code/world-hash-observer').install(engine.trace)
     end
-    if engine.trace or recorder.rngTrace then
+    if config.multiplayerDiagnostics or recorder.rngTrace then
       -- One native hook per stream even when both diagnostic options are on.
       require('code/rng-observer').install({engine=engine,observe=function(_,event,...)
         if engine.trace then engine.trace:observe(event,...) end

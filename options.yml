@@ -11,7 +11,7 @@ options:
     value: false
 - url: recorder.autoRecord
   header: "Record Skirmishes automatically"
-  text: "Record new single-player Skirmishes and save them when you leave the match. Named copies can also be saved from the pause menu."
+  text: "Record single-player Skirmishes and capture multiplayer matches automatically on this PC. Multiplayer captures are not yet playable offline. Named copies can be saved from the pause menu."
   hasHeader: true
   display:
   contents:
@@ -43,7 +43,7 @@ options:
     value: 1
 - url: recorder.multiplayerDiagnostics
   header: "Multiplayer diagnostics"
-  text: "Log executed multiplayer commands and resource/RNG evidence for comparison. This does not enable multiplayer replay."
+  text: "Add per-caller RNG telemetry to automatic multiplayer captures. With automatic recording disabled, collect a diagnostic-only window instead. This does not enable multiplayer playback."
   hasHeader: true
   display:
   contents:

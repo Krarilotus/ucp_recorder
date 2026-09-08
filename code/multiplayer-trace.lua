@@ -27,14 +27,15 @@ end
 
 function M:open()
   if self.file then return end
-  platform.mkdir(M.ROOT)
+  local root=self.root or M.ROOT
+  platform.mkdir(root)
   local prefix=os.date('!%Y%m%d-%H%M%S')
   for i=1,9999 do
-    local path=M.ROOT..'/'..prefix..'-'..string.format('%04d',i)
+    local path=root..'/'..prefix..'-'..string.format('%04d',i)
     if platform.mkdir(path) then self.path=path; break end
     assert(i<9999,'Cannot allocate multiplayer trace folder')
   end
-  self.file=assert(io.open(self.path..'/commands.jsonl','w'))
+  self.file=assert(io.open(self.path..'/commands.jsonl',self.fileMode or 'w'))
   self.count=0; self.events=0; self.gaps=0; self.rngCalls={}; self.lastResult=nil
   self.pendingNativeHashes={}
   local environmentHash=store.settings().environmentHash
@@ -43,7 +44,7 @@ function M:open()
   self:write({kind='header',format=self.window and 6 or 5,window=self.window,
     variant=native.profile.name,executable=native.profile.sha256,
     environmentHash=environmentHash,
-    network=self.network,rngAttribution=true,immediatePayloadSource='native-fixed-v1',
+    network=self.network,rngAttribution=self.rngAttribution~=false,immediatePayloadSource='native-fixed-v1',
     nativeWorldHashes=self.nativeWorldHashes,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
   if self.network.syncStatus~=0 then self:gap('capture began during native synchronization') end
@@ -310,6 +311,7 @@ function M:observe(event,...)
     local f=self.file; self.file=nil
     if f then pcall(f.close,f) end
     if self.path then pcall(store.write,self.path..'/error.txt',tostring(reason)) end
+    if self.captureFailure then pcall(self.captureFailure,self,tostring(reason)) end
     print('Multiplayer diagnostics stopped: '..tostring(reason))
   end
 end

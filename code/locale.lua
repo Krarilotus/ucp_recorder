@@ -1,6 +1,15 @@
 -- GUI language is passed at launch. Older launchers fall back to the game language.
 local M={}
 local de={
+ ['Save capture as...']='Mitschnitt benennen',
+ ['Named copy saved: %s']='Benannter Zwischenstand gespeichert: %s',
+ ['Capture stopped: %s']='Mitschnitt abgebrochen: %s',
+ ['Existing capture files are preserved.']='Vorhandene Aufzeichnungsdateien bleiben erhalten.',
+ ['Multiplayer capture: tick %d; %d commands']='Mehrspieler-Mitschnitt: Tick %d; %d Befehle',
+ ['Automatic capture continues until you leave the match.']='Der Mitschnitt läuft bis zum Verlassen des Spiels weiter.',
+ ['Saved on this PC. Offline playback is not available yet.']='Auf diesem PC gespeichert. Offline-Wiedergabe fehlt noch.',
+ ['Multiplayer capture saved: %s']='Mehrspieler-Mitschnitt gespeichert: %s',
+ ['Waiting for the multiplayer match.']='Warte auf den Beginn der Mehrspieler-Partie.',
  ['Replays']='Replays', ['Recorded Skirmishes']='Aufgezeichnete Gefechte',
  ['Auto: on']='Auto: ein', ['Auto: off']='Auto: aus',
  ['Play']='Abspielen', ['Back']='Zurück', ['Close']='Schließen', ['Cancel']='Abbrechen',

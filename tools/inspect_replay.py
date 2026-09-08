@@ -1,7 +1,104 @@
 """Read-only failure triage and comparison of optional single-player RNG traces."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
+
+
+def multiplayer_capture(folder):
+    """Inspect persisted evidence without repairing, truncating or claiming playback."""
+    folder = Path(folder)
+    manifest = json.loads((folder / 'capture.json').read_text(encoding='utf-8'))
+    if manifest.get('kind') != 'multiplayer-capture' or manifest.get('format') != 1:
+        raise ValueError('Unsupported multiplayer capture')
+    issues = []
+    for name, field in [('ucp-config.yml', 'settingsHash'), ('environment.json', 'environmentHash'),
+                        ('initial-rng.bin', 'rngHash'), ('replay-config.yml', 'restartSettingsHash')]:
+        if field == 'restartSettingsHash' and not manifest.get(field):
+            continue
+        path = folder / name
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != manifest.get(field):
+            issues.append('Missing or damaged ' + name)
+    sequence = commands = checkpoints = gaps = valid_bytes = 0
+    segments = 1
+    transitions = []
+    categories = {}
+    footer = None
+    last_tick = manifest['startTick']
+    next_checkpoint = (last_tick + 63) // 64 * 64
+    with (folder / 'commands.jsonl').open('rb') as stream:
+        header_line = stream.readline(1024 * 1024)
+        header = json.loads(header_line)
+        if (header.get('kind') != 'header' or header.get('format') != 5
+                or header.get('firstTick') != manifest['startTick']
+                or header.get('network') != manifest['initialNetwork']
+                or any(header.get(k) != manifest.get(k) for k in ('variant', 'executable', 'environmentHash'))):
+            raise ValueError('Capture header differs from its manifest')
+        valid_bytes = len(header_line)
+        while True:
+            line = stream.readline(1024 * 1024)
+            if not line:
+                break
+            if footer is not None:
+                issues.append('Data follows capture footer'); break
+            try:
+                if not line.endswith(b'\n'):
+                    raise ValueError('Interrupted or oversized journal row')
+                row = json.loads(line)
+                kind = row.get('kind')
+                if kind == 'end':
+                    if row.get('events') != sequence or row.get('commands') != commands:
+                        raise ValueError('Footer counts differ from journal')
+                    if row.get('status') not in ('complete', 'incomplete'):
+                        raise ValueError('Invalid footer status')
+                    footer = row
+                else:
+                    if row.get('sequence') != sequence + 1:
+                        raise ValueError('Missing or repeated journal sequence')
+                    tick = row.get('time')
+                    rewind = kind == 'gap' and row.get('reason') == 'simulation clock moved backwards'
+                    if type(tick) is not int or (tick < last_tick and not rewind):
+                        raise ValueError('Timeline reset or invalid event tick')
+                    if rewind:
+                        previous_tick = row.get('details', {}).get('previousTick')
+                        if type(previous_tick) is not int or tick >= previous_tick:
+                            raise ValueError('Invalid timeline reset marker')
+                        next_checkpoint = (tick + 63) // 64 * 64
+                        segments += 1
+                    if kind == 'checkpoint' and tick != next_checkpoint:
+                        raise ValueError('Missing checkpoint boundary')
+                    if kind not in ('command', 'untracked', 'checkpoint', 'gap'):
+                        raise ValueError('Unknown journal event')
+                    sequence += 1; last_tick = tick
+                    if kind in ('command', 'untracked'):
+                        commands += 1
+                        key = str(row.get('category'))
+                        categories[key] = categories.get(key, 0) + 1
+                    elif kind == 'checkpoint':
+                        checkpoints += 1; next_checkpoint += 64
+                    else:
+                        gaps += 1
+                        if len(transitions) < 100 and 'immediate command' not in row.get('reason', ''):
+                            transitions.append({'time': tick, 'reason': row.get('reason'), 'details': row.get('details')})
+                valid_bytes += len(line)
+            except (ValueError, TypeError, AttributeError) as error:
+                issues.append(str(error)); break
+    size = (folder / 'commands.jsonl').stat().st_size
+    snapshot = manifest.get('status') == 'snapshot'
+    if snapshot and (manifest.get('bytes') != size or manifest.get('events') != sequence
+                     or manifest.get('commands') != commands):
+        issues.append('Named snapshot boundary differs from journal')
+    if manifest.get('status') == 'closed' and (footer is None or manifest.get('bytes') != size):
+        issues.append('Closed capture is missing its committed ending')
+    framing = 'damaged' if issues else ('snapshot' if snapshot else ('sealed' if footer else 'unsealed prefix'))
+    return {'capture': manifest['id'], 'playable': False, 'journalFraming': framing,
+            'issues': issues, 'validPrefixBytes': valid_bytes, 'fileBytes': size,
+            'lastJournalTick': last_tick, 'events': sequence, 'commands': commands,
+            'checkpoints': checkpoints, 'coverageGaps': gaps, 'timelineSegments': segments, 'commandCategories': categories,
+            'transitions': transitions, 'footer': footer,
+            'remainingPlaybackRequirements': manifest.get('missing', []),
+            'caution': 'Journal framing and sidecar hashes are not command semantics or replay validation. '
+                       'An unsealed prefix may come from an active game or a crash. Original files were not changed.'}
 
 
 def rows(path):
@@ -107,12 +204,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("failure").add_argument("replay_folder", type=Path)
+    sub.add_parser('multiplayer').add_argument('capture_folder', type=Path)
     comparison = sub.add_parser("compare")
     comparison.add_argument("first", type=Path)
     comparison.add_argument("second", type=Path)
     args = parser.parse_args()
     try:
-        result = failure(args.replay_folder) if args.action == "failure" else compare(args.first, args.second)
+        if args.action == 'multiplayer':
+            result = multiplayer_capture(args.capture_folder)
+        else:
+            result = failure(args.replay_folder) if args.action == "failure" else compare(args.first, args.second)
     except (OSError, ValueError, KeyError, TypeError) as error:
         parser.exit(2, f"Cannot inspect replay: {error}\n")
     print(json.dumps(result, indent=2))

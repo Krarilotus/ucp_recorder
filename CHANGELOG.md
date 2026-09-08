@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.36.0
+
+- Automatically persist a continuous multiplayer capture on each PC when
+  automatic recording is enabled. Start at the first simulation callback and
+  keep capturing until mission exit, independently of diagnostic window options.
+  Save resolved UCP settings, initial RNG/resources and native player identities.
+- Add **Replay status > Save capture as...** with English/German native menu
+  controls. Named snapshots copy a flushed prefix and leave the source running.
+- Preserve unsupported roster/synchronization changes and clock rewinds as
+  explicit evidence. A capture write failure stops capture only; files remain
+  available. Bound each journal to 256 MiB and report reaching the limit.
+- Add `inspect_replay.py multiplayer CAPTURE_FOLDER` for sidecar integrity,
+  journal continuity, named boundaries and surviving crash-prefix inspection.
+  Do not treat these captures as playable replays: initial world serialization,
+  offline identity restoration and network transition playback are still missing.
+
 ## 0.35.0
 
 - Keep natural victory/defeat playback in the game until the recorded ending

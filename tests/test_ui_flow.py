@@ -6,6 +6,21 @@ import test_browser
 class UIFlowTests(unittest.TestCase):
     check = test_browser.BrowserTests.check
 
+    def test_multiplayer_named_capture_uses_local_copy_and_returns_to_status(self):
+        self.check('''
+recorder.engine.singlePlayer=function() return false end
+local source={id='host-capture'}
+local saved
+recorder.engine.trace={file=true,capture=source,
+ saveCopy=function(_,name) saved=name; return {displayName=name} end,
+ statusLines=function() return {'Capture active','Not playable'} end}
+pauseAction(); local status=shown
+click('Save capture as...'); assert(inputAllowed() and shown~=status)
+input(0x102,string.byte('X')); input(0x102,13)
+assert(saved=='X' and shown==status and recorder.engine.trace.file and source.id=='host-capture')
+click('Save capture as...'); input(0x102,27); assert(shown==status and saved=='X')
+''')
+
     def test_paused_finished_and_failed_replay_show_distinct_status_and_progress(self):
         self.check('''
 recorder.mode='play'; recorder.status='playing'; recorder.playedCommands=3
