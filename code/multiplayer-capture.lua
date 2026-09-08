@@ -100,7 +100,9 @@ function M:statusLines()
   if self.file then return {tr('Multiplayer capture: tick %d; %d commands',self.observedTick or 0,self.count),
     self.lastNamedCopy and tr('Named copy saved: %s',self.lastNamedCopy)
       or tr('Automatic capture continues until you leave the match.'),
-    tr('Saved on this PC. Offline playback is not available yet.')} end
+    self.capture and self.capture.world and self.capture.world.status=='failed'
+      and tr('Start state unavailable; see capture.json for details.')
+      or tr('Saved on this PC. Offline playback is not available yet.')} end
   if self.lastCapture then return {tr('Multiplayer capture saved: %s',self.lastCapture.id),
     tr('Saved on this PC. Offline playback is not available yet.')} end
   return {tr('Waiting for the multiplayer match.'),tr('Saved on this PC. Offline playback is not available yet.')}

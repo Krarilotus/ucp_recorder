@@ -5,6 +5,7 @@ local de={
  ['Named copy saved: %s']='Benannter Zwischenstand gespeichert: %s',
  ['Capture stopped: %s']='Mitschnitt abgebrochen: %s',
  ['Existing capture files are preserved.']='Vorhandene Aufzeichnungsdateien bleiben erhalten.',
+ ['Start state unavailable; see capture.json for details.']='Startzustand fehlt; Details stehen in capture.json.',
  ['Multiplayer capture: tick %d; %d commands']='Mehrspieler-Mitschnitt: Tick %d; %d Befehle',
  ['Automatic capture continues until you leave the match.']='Der Mitschnitt läuft bis zum Verlassen des Spiels weiter.',
  ['Saved on this PC. Offline playback is not available yet.']='Auf diesem PC gespeichert. Offline-Wiedergabe fehlt noch.',

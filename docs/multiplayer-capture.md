@@ -18,6 +18,8 @@ single-player library and always declare `playable: false`.
   journal. It does not call the game's save routine or modify the source stream.
 - Keep the entire capture folder, including `capture.json`, `commands.jsonl`,
   `initial-rng.bin`, `environment.json`, `ucp-config.yml` and `replay-config.yml`.
+  Version 0.37.0 also adds `world.json`, `world-layout.bin`, `world.bin` and,
+  with Automarket enabled, `automarket.bin`; keep those with the capture too.
 - `multiplayerDiagnostics` adds per-caller RNG attribution. Without it, captures
   retain command/checkpoint/resource/RNG and native world-hash observations with
   no extra hook on each RNG call. Diagnostic start/end options apply only when
@@ -63,6 +65,8 @@ An unsealed prefix can come from an active capture or a crashed process.
 2. **Starting world:** audit the native multiplayer save path and extension save
    wrappers, capture a restorable start at a defined command boundary, and prove
    that saving does not change either peer's simulated state.
+   [0.37.0 captures and verifies read-only world evidence](multiplayer-world-state.md);
+   native restore and complete extension coverage remain open.
 3. **Offline playback:** restore human/AI identities without a live transport;
    dispatch the recorded native commands; classify/reproduce immediate and
    system events; restore extension state with the recorded UCP configuration.

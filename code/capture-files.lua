@@ -25,6 +25,13 @@ function M.begin(path,engine,settings)
   store.write(path..'/initial-rng.bin',rng)
   capture.rngHash=sha.sha256(rng)
   capture.initialResources=engine:resourceState()
+  -- World evidence is independent of command persistence: an unsupported
+  -- layout or failed world write must not discard the useful command journal.
+  local ok,world=pcall(require('code/world-capture').capture,path,engine)
+  capture.world=ok and world or {status='failed',reason=tostring(world)}
+  if ok then
+    capture.missing[1]='native-world-restore-and-extension-state-coverage'
+  end
   M.save(capture)
   return capture
 end
@@ -66,6 +73,12 @@ function M.copy(source,name,bytes,events,commands,tick)
       prefix(source.path..'/'..file,path..'/'..file)
     end
     if source.restartSettingsHash then prefix(source.path..'/replay-config.yml',path..'/replay-config.yml') end
+    if source.world and source.world.status=='complete' then
+      prefix(source.path..'/world.json',path..'/world.json')
+      prefix(source.path..'/world-layout.bin',path..'/world-layout.bin')
+      prefix(source.path..'/world.bin',path..'/world.bin')
+      if source.world.automarket then prefix(source.path..'/automarket.bin',path..'/automarket.bin') end
+    end
     prefix(source.path..'/commands.jsonl',path..'/commands.jsonl',bytes)
     copy.status='snapshot'; M.save(copy)
   end)

@@ -34,6 +34,14 @@ def check(folder):
         native = lua.execute((root/'code/native.lua').read_text())
         profile = native.verify()
         assert profile['name'] == name
+        world=lua.execute((root/'code/world-sections.lua').read_text())[name]
+        table=reader(world['address'],world['bytes'])
+        import hashlib
+        assert hashlib.sha256(table).hexdigest()==world['hash'], f'{name}: native save table'
+        assert len(table)==1968 and struct.unpack_from('<I',table,len(table)-16)[0]==0
+        entries=list(struct.iter_unpack('<IIIHH',table[:-16]))
+        assert len(entries)==122 and all(not skip for _,skip,_,_,_ in entries)
+        assert sum(size for _,_,size,_,_ in entries)==world['total']
         rng = native.addr(0x1a279c0)
         assert native.addr(0x1a3160c) == rng+0x9c4c
         synchrony = native.addr(0x191d768)

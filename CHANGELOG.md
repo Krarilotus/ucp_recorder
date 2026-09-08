@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.37.0
+
+- Capture all 122 native starting-world sections on each multiplayer peer, with
+  exact layout checks and per-section hashes for Crusader and Extreme. Read memory
+  directly without invoking the native multiplayer save/synchronization routine.
+- Preserve Automarket 1.1.0's settings, credit and fees alongside the native
+  world. Include completed world evidence in named capture copies; report failed
+  start-state capture while allowing the command journal to continue.
+- Add offline integrity checks and `inspect_replay.py compare-worlds` to locate
+  host/client starting-state differences. These are raw evidence files, not yet
+  playable saves; native restore, other extension state and network-event replay
+  remain open. Physical runtime overhead has not been measured for this stage.
+
 ## 0.36.0
 
 - Automatically persist a continuous multiplayer capture on each PC when

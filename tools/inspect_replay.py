@@ -2,7 +2,89 @@
 import argparse
 import hashlib
 import json
+import struct
 from pathlib import Path
+
+
+WORLD_TABLES = {
+    'SHC': ('0d29f28ecf7ea55c4f1598a78b2a7e30796c8534f0a48a3f5d0313b682773450', 13776465),
+    'Extreme': ('b82cc2d084a6e1afa2ee3e38630561a8783e3952c6073add339bc4bb79f3eeab', 25168385),
+}
+
+
+def world_capture(folder, capture=None):
+    """Verify each section against the original descriptor table and its hash."""
+    folder = Path(folder)
+    if capture is None:
+        capture = json.loads((folder / 'capture.json').read_text(encoding='utf-8'))
+    descriptor = capture.get('world', {})
+    if descriptor.get('status') != 'complete':
+        return {'status': 'unavailable', 'reason': descriptor.get('reason', 'Not captured by this version')}
+    encoded = (folder / 'world.json').read_bytes()
+    if len(encoded) > 1024 * 1024 or hashlib.sha256(encoded).hexdigest() != descriptor.get('hash'):
+        raise ValueError('World manifest hash differs')
+    world = json.loads(encoded)
+    if (world.get('format') != 1 or world.get('kind') != 'native-world-evidence'
+            or world.get('status') != 'complete' or world.get('tick') != capture.get('startTick')
+            or any(world.get(k) != capture.get(k) for k in ('variant', 'executable'))):
+        raise ValueError('World manifest identity differs')
+    expected_hash, total = WORLD_TABLES[world['variant']]
+    table = (folder / 'world-layout.bin').read_bytes()
+    if len(table) != 1968 or hashlib.sha256(table).hexdigest() != expected_hash or world.get('tableHash') != expected_hash:
+        raise ValueError('Native world layout differs')
+    if world.get('bytes') != total or (folder / 'world.bin').stat().st_size != total:
+        raise ValueError('Native world data length differs')
+    entries = world.get('sections')
+    if not isinstance(entries, list) or len(entries) != 122:
+        raise ValueError('Native world section count differs')
+    offset = 0
+    with (folder / 'world.bin').open('rb') as source:
+        for i, entry in enumerate(entries):
+            address, skip, size, compressed, section = struct.unpack_from('<IIIHH', table, i * 16)
+            if skip or any(entry.get(k) != v for k, v in dict(address=address, size=size,
+                    compressed=compressed, section=section, offset=offset).items()):
+                raise ValueError('Native world section descriptor differs')
+            data = source.read(size)
+            if len(data) != size or hashlib.sha256(data).hexdigest() != entry.get('sha256'):
+                raise ValueError(f'Native world section {section} is damaged')
+            offset += size
+    market = world.get('automarket')
+    if bool(market) != bool(descriptor.get('automarket')):
+        raise ValueError('Automarket snapshot presence differs')
+    if market:
+        data = (folder / 'automarket.bin').read_bytes()
+        if (market.get('version') != '1.1.0' or market.get('format') != 2 or market.get('bytes') != 2416
+                or len(data) != 2416 or data[:4] != b'\x02\0\0\0'
+                or hashlib.sha256(data).hexdigest() != market.get('sha256')):
+            raise ValueError('Automarket world state is damaged')
+    return {'status': 'verified evidence', 'tick': world['tick'], 'bytes': total,
+            'sections': entries, 'automarket': market, 'omissions': world.get('omissions', []),
+            'caution': 'Raw native sections include local presentation state and padding. '
+                       'Equal bytes do not establish complete extension coverage or working restoration.'}
+
+
+def compare_worlds(first, second):
+    a, b = world_capture(first), world_capture(second)
+    if a['status'] != 'verified evidence' or b['status'] != 'verified evidence':
+        raise ValueError('Both captures need verified world evidence')
+    if a['tick'] != b['tick'] or [(e['section'], e['address'], e['size']) for e in a['sections']] != [
+            (e['section'], e['address'], e['size']) for e in b['sections']]:
+        raise ValueError('World variant or capture tick differs')
+    differences = []
+    with (Path(first) / 'world.bin').open('rb') as left, (Path(second) / 'world.bin').open('rb') as right:
+        for x, y in zip(a['sections'], b['sections']):
+            if x['sha256'] == y['sha256']:
+                continue
+            left.seek(x['offset']); right.seek(y['offset'])
+            old, new = left.read(x['size']), right.read(y['size'])
+            index = next(i for i, pair in enumerate(zip(old, new)) if pair[0] != pair[1])
+            differences.append({'section': x['section'], 'size': x['size'], 'firstOffset': index,
+                                'firstAddress': f"0x{x['address'] + index:08X}",
+                                'firstBytes': [old[index], new[index]]})
+    return {'tick': a['tick'], 'sectionsCompared': len(a['sections']), 'differences': differences,
+            'automarketIdentical': a['automarket'] == b['automarket'],
+            'caution': 'Section differences are investigation leads, not a desync verdict. '
+                       'Automarket includes each PC\'s local editing slot (slot zero).'}
 
 
 def multiplayer_capture(folder):
@@ -19,6 +101,11 @@ def multiplayer_capture(folder):
         path = folder / name
         if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != manifest.get(field):
             issues.append('Missing or damaged ' + name)
+    try:
+        world = world_capture(folder, manifest)
+    except (OSError, ValueError, KeyError, TypeError, struct.error) as error:
+        world = {'status': 'damaged', 'reason': str(error)}
+        issues.append('World evidence: ' + str(error))
     sequence = commands = checkpoints = gaps = valid_bytes = 0
     segments = 1
     transitions = []
@@ -95,7 +182,7 @@ def multiplayer_capture(folder):
             'issues': issues, 'validPrefixBytes': valid_bytes, 'fileBytes': size,
             'lastJournalTick': last_tick, 'events': sequence, 'commands': commands,
             'checkpoints': checkpoints, 'coverageGaps': gaps, 'timelineSegments': segments, 'commandCategories': categories,
-            'transitions': transitions, 'footer': footer,
+            'transitions': transitions, 'footer': footer, 'world': world,
             'remainingPlaybackRequirements': manifest.get('missing', []),
             'caution': 'Journal framing and sidecar hashes are not command semantics or replay validation. '
                        'An unsealed prefix may come from an active game or a crash. Original files were not changed.'}
@@ -208,9 +295,14 @@ def main():
     comparison = sub.add_parser("compare")
     comparison.add_argument("first", type=Path)
     comparison.add_argument("second", type=Path)
+    worlds = sub.add_parser('compare-worlds')
+    worlds.add_argument('first', type=Path)
+    worlds.add_argument('second', type=Path)
     args = parser.parse_args()
     try:
-        if args.action == 'multiplayer':
+        if args.action == 'compare-worlds':
+            result = compare_worlds(args.first, args.second)
+        elif args.action == 'multiplayer':
             result = multiplayer_capture(args.capture_folder)
         else:
             result = failure(args.replay_folder) if args.action == "failure" else compare(args.first, args.second)
