@@ -7,7 +7,10 @@ import re
 import subprocess
 import sys
 import zipfile
-from module_package import build_module
+if __package__:
+    from .module_package import build_module
+else:
+    from module_package import build_module
 
 
 def gh(*args):
