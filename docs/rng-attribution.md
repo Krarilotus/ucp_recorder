@@ -67,11 +67,25 @@ the first detected failing interval is preserved.
 
 Each interval holds at most 512 distinct `(stream, native return address)`
 entries. Calls update counts and a rolling 32-bit ordering checksum in memory;
-there is no per-call file write or growing per-call event list. Output is capped
+there is no per-call file write. Output is capped
 at 64 MiB per attempt. A limit or I/O error closes the diagnostic file and logs
 `RNG attribution stopped`; it never pauses the game or changes RNG state. Such
 a trace can lack its end marker and is incomplete. Diagnostics add CPU/storage
 overhead and are disabled by default.
+
+From 0.34.0, an interval can also contain up to 512 unit-spawn context records.
+These identify the tick, caller, player, display color, microtile position,
+height and unit type at `spawnUnit`'s RNG2 call. They reuse the existing RNG
+observer; no spawn hook or gameplay write is added. Native stack-layout tests
+cover both supported executables. If another module replaces the checked spawn
+entry or RNG call, the header reports `spawnContext: false` and ordinary caller
+attribution remains available. Old traces remain readable. The comparator only
+compares spawn context when both headers explicitly report it as available.
+
+The read is at SHC return `0x0053E5CB` / Extreme `0x0053E9EB`. The original
+spawn function has saved ESI, EBP, EDI and EBX before calling RNG2; from the RNG
+entry stack, offset 20 is its caller and offsets 24 through 44 are its six
+arguments. Context is observed before the native RNG call executes.
 
 The option is part of recorded UCP settings. An old recording cannot acquire
 its missing original caller history retroactively. Version 0.30.0 keeps
@@ -107,3 +121,22 @@ The initial collector required a host `bit` module, which UCP cannot resolve
 inside an extension ZIP. The corrected collector has no external bit-library
 dependency. Format 2 identifies its arithmetic ordering checksum; the comparator
 accepts both formats separately but rejects comparisons across formats.
+
+### Reproduced with caller traces (0.33.1)
+
+SHC recording `20260908-132338-0001`, Ascension 1.0.11 / Automarket 1.1.0,
+human versus Wolf on Der grüne Punkt, finalized naturally at tick 90,505. Two
+playback attempts failed at 18,112 before either of its two player commands
+was scheduled. One attempt opened replay controls and selected player 2; an
+untouched repeat produced the same failure. The recording itself included a
+pause/options visit. This rules out playback menu interaction as a necessary
+trigger for this reproduction; it does not yet isolate recording-time effects.
+
+Caller counts, ordering checksums and RNG states agree through 18,048. At
+18,106, recording has one additional RNG2 call at each of `0x0052EFDC`,
+`0x0052EFFE` (unit name assignment) and `0x0053E5CB` (unit spawning). At the
+next checkpoint, expected RNG is `[2494,22591,1875,18179]`, playback is
+`[2494,13729,1872,18179]`. The trace directly establishes three fewer calls,
+not just a modulo-index difference. The missing unit and the earlier world
+state that caused it remain unknown; the new spawn context targets that gap.
+Do not suppress these RNG calls: they participate in real unit creation.

@@ -37,6 +37,7 @@ function M.new(sites)
   e.schedule=core.exposeCode(native.addr(0x480210),5,1)
   e.saveNative=core.exposeCode(sites.save.address,2,1)
   e.loadNative=core.exposeCode(sites.load.address,1,0)
+  e.haltingMenuNative=core.exposeCode(sites.haltingMenu.address,1,1)
   e.buffer=core.allocate(1260,true)
   e.pathBuffer=core.allocate(512,true)
   e.pathOverride=core.allocate(4,true)
@@ -65,7 +66,9 @@ end
 function M:pause()
   if self:singlePlayer() then core.writeInteger(self.sites.paused,1) end
 end
-function M:isPaused() return core.readInteger(self.sites.paused)~=0 end
+function M:isPaused()
+  return core.readInteger(self.sites.paused)~=0 or self.haltingMenuNative(self.sites.gameCore)~=0
+end
 
 function M:rngState()
   return {core.readSmallInteger(self.rng),core.readSmallInteger(self.rng+2),

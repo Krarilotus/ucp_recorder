@@ -85,3 +85,26 @@ memory[100]=20; trace:observe('rngCall',2,100)
 memory[100]=10; trace:observe('rngCall',1,100)
 assert(first~=trace.order and trace.count==2)
 ''')
+
+    def test_spawn_context_is_optional_bounded_and_read_only(self):
+        self.check('''
+assert(not trace.spawnProfile and encoded[1].spawnContext==false)
+local context=require('code/rng-spawn-context')
+local profile=context.SHC
+core.writeBytes(profile.entry,{83,139,217,185,1,0,0,0,87,139,249})
+core.writeBytes(profile.call,profile.callBytes)
+trace:observe('finish','setup'); trace:observe('begin',manifest,'record')
+assert(trace.spawnProfile and encoded[#encoded].spawnContext==true)
+memory[100]=profile.call+5
+local args={-268435456,2,4,120,160,8,1}
+for i,value in ipairs(args) do memory[116+i*4]=value end
+now=50; trace:observe('rngCall',2,100)
+assert(trace.spawns[1].caller==0xf0000000 and trace.spawns[1].player==2)
+assert(trace.spawns[1].microX==120 and trace.spawns[1].unitType==1)
+assert(memory[120]==-268435456 and memory[144]==1)
+now=64; trace:observe('checkpoint')
+assert(#encoded[#encoded].spawns==1 and #trace.spawns==0)
+Attribution.MAX_SPAWNS=1
+trace:observe('rngCall',2,100); trace:observe('rngCall',2,100)
+assert(trace.failed and not trace.file and memory[144]==1)
+''')

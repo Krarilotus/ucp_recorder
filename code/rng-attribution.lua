@@ -2,14 +2,15 @@
 local store=require('code/sessions')
 local platform=require('code/platform')
 local native=require('code/native')
-local M={MAX_BYTES=64*1024*1024,MAX_CALLERS=512}
+local spawnContext=require('code/rng-spawn-context')
+local M={MAX_BYTES=64*1024*1024,MAX_CALLERS=512,MAX_SPAWNS=512}
 
 function M.new(engine)
   return setmetatable({engine=engine},{__index=M})
 end
 
 function M:clear()
-  self.calls={}; self.callers=0; self.count=0; self.order=0
+  self.calls={}; self.callers=0; self.count=0; self.order=0; self.spawns={}
 end
 
 function M:write(value)
@@ -32,7 +33,11 @@ function M:begin(manifest,mode)
   self.file=assert(io.open(self.path..'/calls.jsonl','w'))
   self.bytes=0; self:clear(); self.failed=nil
   self.previousTick=self.engine:tick()
+  local contextOk,context=pcall(spawnContext.verify,native.profile.name)
+  self.spawnProfile=contextOk and context or nil
+  if not contextOk then print('RNG spawn context disabled: '..tostring(context)) end
   self:write({kind='header',format=2,mode=mode,replay=manifest.id,
+    spawnContext=contextOk,
     variant=native.profile.name,executable=native.profile.sha256,
     firstTick=self.previousTick,rng=self.engine:rngState()})
 end
@@ -55,6 +60,13 @@ function M:rngCall(stream,stack)
   -- UCP resolves require() inside the extension ZIP, not LuaJIT's host modules.
   -- Keep intermediates below 2^53 so Lua numbers and integer Lua agree exactly.
   self.order=(((self.order*33+address)*33+tick)*33+stream)%4294967296
+  if stream==2 and self.spawnProfile then
+    local context=spawnContext.read(self.spawnProfile,address,stack,tick)
+    if context then
+      assert(#self.spawns<M.MAX_SPAWNS,'RNG attribution spawn limit reached')
+      self.spawns[#self.spawns+1]=context
+    end
+  end
 end
 
 function M:checkpoint()
@@ -66,7 +78,8 @@ function M:checkpoint()
     return a.stream<b.stream or (a.stream==b.stream and a.returnAddress<b.returnAddress)
   end)
   self:write({kind='checkpoint',fromTick=self.previousTick,time=now,
-    rng=self.engine:rngState(),count=self.count,order=self.order%4294967296,calls=entries})
+    rng=self.engine:rngState(),count=self.count,order=self.order%4294967296,calls=entries,
+    spawns=self.spawnProfile and self.spawns or nil})
   self.previousTick=now; self:clear()
 end
 

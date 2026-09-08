@@ -53,6 +53,16 @@ def trace(path):
         keys = [(c["stream"], c["returnAddress"]) for c in entry["calls"]]
         if len(set(keys)) != len(keys) or sum(c["count"] for c in entry["calls"]) != entry["count"]:
             raise ValueError(f"{path}: inconsistent attribution counts")
+        if entries[0].get("spawnContext"):
+            spawns = entry.get("spawns")
+            if not isinstance(spawns, list) or len(spawns) > 512:
+                raise ValueError(f"{path}: missing or oversized spawn context")
+            for spawn in spawns:
+                if not isinstance(spawn, dict) or any(type(spawn.get(key)) is not int for key in
+                        ("time", "caller", "player", "color", "microX", "microY", "height", "unitType")):
+                    raise ValueError(f"{path}: malformed spawn context")
+                if not entry["fromTick"] <= spawn["time"] <= entry["time"]:
+                    raise ValueError(f"{path}: spawn outside its checkpoint interval")
         previous = entry["time"]
     return entries[0], checkpoints, entries[-1].get("kind") == "end"
 
@@ -66,12 +76,15 @@ def compare(first, second):
     result = {"firstClosed": a_complete, "secondClosed": b_complete,
               "status": "matching observed prefix", "checkpointsCompared": 0,
               "caution": "Caller counts and the ordering checksum do not prove equal world state."}
+    with_spawns = bool(a_header.get("spawnContext") and b_header.get("spawnContext"))
+    result["spawnContextCompared"] = with_spawns
     for a, b in zip(a_rows, b_rows):
         if (a["fromTick"], a["time"]) != (b["fromTick"], b["time"]):
             result.update(status="different checkpoint boundaries", first=a["time"], second=b["time"])
             return result
         result["checkpointsCompared"] += 1
-        if any(a[key] != b[key] for key in ("count", "order", "rng", "calls")):
+        if (any(a[key] != b[key] for key in ("count", "order", "rng", "calls"))
+                or (with_spawns and a["spawns"] != b["spawns"])):
             def callers(row):
                 return {(c["stream"], c["returnAddress"]): c for c in row["calls"]}
             left, right = callers(a), callers(b)
@@ -83,6 +96,8 @@ def compare(first, second):
             result.update(status="attribution differs", fromTick=a["fromTick"], time=a["time"],
                           callerDifferences=differences, firstRng=a["rng"], secondRng=b["rng"],
                           firstOrder=a["order"], secondOrder=b["order"])
+            if with_spawns:
+                result.update(firstSpawns=a["spawns"], secondSpawns=b["spawns"])
             return result
     result["unpairedCheckpoints"] = abs(len(a_rows) - len(b_rows))
     return result

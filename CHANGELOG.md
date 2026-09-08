@@ -1,10 +1,22 @@
 # Changelog
 
+## 0.34.0
+
+- Include unit-spawn context in optional single-player RNG diagnostics on
+  Crusader and Extreme: the originating caller, player, unit type and location.
+  The comparison tool can distinguish different spawns even when RNG counts
+  match. This collects evidence for the reproduced RNG2 failure; it does not
+  change unit spawning or claim to fix desynchronization.
+- Show playback as paused when the native game menu suspends simulation, as
+  well as when the explicit pause flag is set. Use the game's own pause query.
+- Document the successful natural-ending save test and the repeatable RNG2
+  failure with and without replay menu/player-view interaction.
+
 ## 0.33.1
 
 - Finalize automatic recordings when match results return directly to the
   Skirmish lobby or main menu. Natural match endings no longer leave a recording
-  unavailable in the replay browser until game exit. Retain the last simulation
+  unavailable in the replay browser after returning from results. Retain the last simulation
   boundary and leave in-game reports and snapshot loading unaffected.
 
 ## 0.33.0

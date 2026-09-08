@@ -44,6 +44,30 @@ class InspectionTests(unittest.TestCase):
         self.assertFalse(report['secondClosed'])
         self.assertTrue(report['firstClosed'])
 
+    def test_spawn_context_distinguishes_players_even_with_equal_rng_counts(self):
+        a, b = self.sample(), self.sample()
+        for rows in (a,b):
+            rows[0]['spawnContext'] = True
+            rows[1]['spawns'] = [dict(time=63,caller=0x45b5e5,player=1,color=1,
+                                     microX=120,microY=160,height=8,unitType=1)]
+        b[1]['spawns'][0]['player'] = 2
+        report = module.compare(self.write('a',a),self.write('b',b))
+        self.assertEqual(report['status'],'attribution differs')
+        self.assertTrue(report['spawnContextCompared'])
+        self.assertEqual(report['callerDifferences'],[])
+        self.assertEqual(report['secondSpawns'][0]['player'],2)
+        del b[0]['spawnContext']
+        report = module.compare(self.write('a',a),self.write('b',b))
+        self.assertFalse(report['spawnContextCompared'])
+        self.assertEqual(report['status'],'matching observed prefix')
+
+    def test_claimed_spawn_context_requires_valid_interval_data(self):
+        for invalid in (None,{},[{}],[dict(time=100,caller=1,player=1,color=1,
+                                         microX=0,microY=0,height=0,unitType=1)]):
+            rows = self.sample(); rows[0]['spawnContext'] = True; rows[1]['spawns'] = invalid
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                module.trace(self.write('bad',rows))
+
     def test_incompatible_start_and_damaged_counts_are_rejected(self):
         first = self.write('first', self.sample())
         for damage in ('start', 'count', 'gap', 'duplicate', 'format'):
