@@ -1,0 +1,16 @@
+{
+  "auto_header": "Maçları otomatik kaydet",
+  "auto_text": "Bu bilgisayarda tek oyunculu çatışmaları ve çok oyunculu maçları kaydet. Duraklatma menüsünden adlandırılmış kopyalar kaydedilebilir. Çok oyunculu kayıtlar henüz çevrimdışı oynatılamaz.",
+  "seed_on_header": "Sabit başlangıç tohumu kullan",
+  "seed_on_text": "Yeni tek oyunculu kayıtlar için aşağıdaki tohumu kullan. İsteğe bağlıdır: tekrarlar kaydedilmiş rastgelelik durumunu geri yükler. Çok oyunculu tohumlar değişmez.",
+  "seed_header": "Başlangıç tohumu",
+  "seed_text": "-2147483648 ile 2147483647 arasında işaretli tam sayı. Yalnızca sabit başlangıç tohumu açıkken kullanılır.",
+  "rng_header": "Tek oyunculu rastgelelik tanılaması",
+  "rng_text": "Rastgele değer tüketen işlevleri günlüğe kaydet. Kayıttan önce aç ve oynatırken aynı ayarları koru. Ek yük ve deneme başına en fazla 64 MiB ekler; tanılama hataları maçı durdurmaz.",
+  "mp_header": "Çok oyunculu rastgelelik tanılaması",
+  "mp_text": "Otomatik kayıtlara rastgele sayı üreteci çağrılarını ekle. Otomatik kayıt kapalıysa yalnızca tanılama aralığı kaydedilir. Çok oyunculu tekrar oynatmayı etkinleştirmez.",
+  "start_header": "Tanılama başlangıç tiki",
+  "start_text": "İki bilgisayarda da 64’ün aynı katını kullan. Bitiş tiki sıfırsa yok sayılır. Otomatik kayıt her zaman maçın tamamını kaydeder.",
+  "end_header": "Tanılama bitiş tiki",
+  "end_text": "Sıfır, görevden çıkılana kadar kaydeder. Aksi halde iki bilgisayarda da 64’ün aynı, daha sonraki katını kullan. Tanılamanın bitmesi maçı veya otomatik kaydı durdurmaz."
+}

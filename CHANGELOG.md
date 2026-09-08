@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.38.0
+
+- Let the game continue without recorder hooks when a startup check fails. Use
+  UCP's existing error dialog to state that recording is disabled, and preserve
+  the failing stage/bytes in the startup report. Failures after installation has
+  started still abort the launch; partial patches are not silently ignored.
+- Identify Crusader/Extreme from their PE headers, then verify hook bytes in the
+  component that owns them. Remove duplicate requirements for unused legacy
+  sites and do not require an unchanged fixed-seed site when that option is off.
+  Required simulation and lifecycle hooks remain checked before installation.
+- Correct the starting-seed option's recorder namespace and hide its input when
+  unused. Remove the obsolete logging-mode selector; current sessions already
+  use checkpoint verification. Existing explicit seed settings remain supported.
+- Translate launcher option labels/help into all nine UCP languages and include
+  locale files in releases. Refresh fresh-install instructions and document the
+  pinned store-module inventory, optional dependencies and compatibility gaps.
+  This does not certify all mod combinations or enable multiplayer playback.
+
 ## 0.37.1
 
 - Hash large starting-world sections with Windows CryptoAPI rather than UCP's

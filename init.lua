@@ -3,15 +3,21 @@ local Engine=require('code/engine')
 local Session=require('code/session-recorder')
 local module={}
 
-local function enable(self,config,stage)
+local function enable(self,config,stage,install)
   local multiplayerCapture=config.autoRecord~=false
   local multiplayerObserve=multiplayerCapture or config.multiplayerDiagnostics
+  local seed
+  stage('seed options',function()
+    if config.useFixedSeed then
+      seed=require('code/validation').integer(config.fixedSeed,-2147483648,2147483647,'fixed seed')
+    end
+  end)
   stage('native executable checks',native.verify)
   stage('Automarket compatibility',require('code/automarket-replay').current)
   local sites=stage('session hook checks',Engine.verify)
   local uiSites=stage('menu hook checks',require('code/native-ui').verify)
   local fixes=require('code/fixes')
-  local fixSites=stage('simulation hook checks',fixes.verify)
+  local fixSites=stage('simulation hook checks',function() return fixes.verify(seed) end)
   if multiplayerObserve then
     stage('network diagnostic checks',require('code/network-observer').verify)
     stage('world-hash diagnostic checks',require('code/world-hash-observer').verify)
@@ -19,14 +25,8 @@ local function enable(self,config,stage)
   if config.multiplayerDiagnostics or config.singleplayerRngDiagnostics then
     stage('RNG diagnostic checks',require('code/rng-observer').verify)
   end
-  local seed
-  stage('seed options',function()
-    if config.useFixedSeed then
-      seed=require('code/validation').integer(config.fixedSeed,-2147483648,2147483647,'fixed seed')
-    end
-  end)
   stage('recorded settings',require('code/sessions').captureSettings)
-  stage('hook and menu installation',function()
+  install(function()
     local engine=Engine.new(sites)
     if multiplayerCapture then engine.trace=require('code/multiplayer-capture').new(engine,config)
     elseif config.multiplayerDiagnostics then engine.trace=require('code/multiplayer-trace').new(engine,config) end
@@ -89,7 +89,8 @@ local function enable(self,config,stage)
 end
 
 function module:enable(config)
-  return require('code/startup').run(function(stage) return enable(self,config,stage) end)
+  self.startup=require('code/startup').run(function(stage,install) enable(self,config,stage,install) end)
+  return self.startup
 end
 
 function module:disable()

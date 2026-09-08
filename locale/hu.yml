@@ -1,0 +1,16 @@
+{
+  "auto_header": "Mérkőzések automatikus rögzítése",
+  "auto_text": "Egyjátékos csaták és többjátékos mérkőzések rögzítése ezen a gépen. A szünetmenüben elnevezett másolatok menthetők. A többjátékos felvételek még nem játszhatók vissza kapcsolat nélkül.",
+  "seed_on_header": "Rögzített kezdőérték használata",
+  "seed_on_text": "Az alábbi kezdőérték használata új egyjátékos felvételekhez. Nem kötelező: a visszajátszás a rögzített véletlenállapotot állítja helyre. A többjátékos kezdőértékek nem változnak.",
+  "seed_header": "Kezdőérték",
+  "seed_text": "Előjeles egész szám -2147483648 és 2147483647 között. Csak bekapcsolt rögzített kezdőértéknél használatos.",
+  "rng_header": "Egyjátékos véletlenszám-diagnosztika",
+  "rng_text": "A véletlenértékeket használó függvények naplózása. Felvétel előtt kapcsold be, és visszajátszáskor tartsd meg ezeket a beállításokat. Többletterhelés és próbánként legfeljebb 64 MiB; a diagnosztikai hiba nem állítja le a mérkőzést.",
+  "mp_header": "Többjátékos véletlenszám-diagnosztika",
+  "mp_text": "A véletlenszám-generátor hívásainak hozzáadása az automatikus felvételekhez. Automatikus felvétel nélkül csak a diagnosztikai időszak rögzül. Nem kapcsolja be a többjátékos visszajátszást.",
+  "start_header": "A diagnosztika kezdő tickje",
+  "start_text": "Mindkét gépen ugyanazt a 64-gyel osztható értéket használd. Nulla záróértéknél figyelmen kívül marad. Az automatikus felvétel mindig a teljes mérkőzést rögzíti.",
+  "end_header": "A diagnosztika záró tickje",
+  "end_text": "Nulla esetén naplózás a küldetés elhagyásáig. Egyébként egy későbbi, 64-gyel osztható érték kell, mindkét gépen azonos. A diagnosztika vége nem állítja le a mérkőzést vagy az automatikus felvételt."
+}

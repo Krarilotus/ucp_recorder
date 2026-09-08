@@ -16,6 +16,8 @@ def image_reader(path):
 
     def read(address, size):
         rva = address-base
+        if 0 <= rva and rva+size <= headers:
+            return image[rva:rva+size]
         for i in range(sections):
             _, start, raw_size, raw = struct.unpack_from('<IIII', image, headers+i*40+8)
             if start <= rva and rva+size <= start+raw_size:
@@ -30,7 +32,8 @@ def check(folder):
         reader = image_reader(folder/file)
         lua = LuaRuntime(unpack_returned_tuples=True)
         lua.globals().read_bytes = lambda address, size: lua.table_from(list(reader(address, size)))
-        lua.execute('core={readBytes=read_bytes}')
+        lua.globals().source_root=root.as_posix()
+        lua.execute("package.path=source_root..'/?.lua;'..package.path; core={readBytes=read_bytes}")
         native = lua.execute((root/'code/native.lua').read_text())
         profile = native.verify()
         assert profile['name'] == name

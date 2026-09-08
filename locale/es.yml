@@ -1,0 +1,16 @@
+{
+  "auto_header": "Grabar partidas automáticamente",
+  "auto_text": "Grabar escaramuzas individuales y capturar partidas multijugador en este PC. Puedes guardar copias con nombre desde el menú de pausa. Las capturas multijugador aún no se pueden reproducir sin conexión.",
+  "seed_on_header": "Usar una semilla inicial fija",
+  "seed_on_text": "Usar la semilla indicada abajo para nuevas grabaciones individuales. Es opcional: las repeticiones restauran el estado aleatorio grabado. Las semillas multijugador no cambian.",
+  "seed_header": "Semilla inicial",
+  "seed_text": "Número entero con signo entre -2147483648 y 2147483647. Solo se usa cuando la semilla inicial fija está activada.",
+  "rng_header": "Diagnóstico aleatorio individual",
+  "rng_text": "Registrar qué funciones consumen valores aleatorios. Activar antes de grabar y mantener los mismos ajustes para reproducir. Añade carga y hasta 64 MiB por intento; los fallos de diagnóstico no terminan la partida.",
+  "mp_header": "Diagnóstico aleatorio multijugador",
+  "mp_text": "Añadir las llamadas al generador aleatorio a las capturas automáticas. Sin grabación automática, solo se registra la ventana de diagnóstico. No activa la reproducción multijugador.",
+  "start_header": "Tick inicial del diagnóstico",
+  "start_text": "Usar el mismo múltiplo de 64 en ambos PC. Se ignora si el tick final es cero. La captura automática siempre registra toda la partida.",
+  "end_header": "Tick final del diagnóstico",
+  "end_text": "Cero registra hasta salir de la misión. De lo contrario, usar un múltiplo de 64 posterior e idéntico en ambos PC. Finalizar el diagnóstico no detiene la partida ni la captura automática."
+}

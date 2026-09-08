@@ -1,0 +1,16 @@
+{
+  "auto_header": "Record matches automatically",
+  "auto_text": "Record single-player Skirmishes and capture multiplayer matches on this PC. Named copies are available in the pause menu. Multiplayer captures cannot yet be played offline.",
+  "seed_on_header": "Use a fixed starting seed",
+  "seed_on_text": "Use the seed below for new single-player recordings. This is optional: replays restore the recorded random state. Multiplayer seeds are unchanged.",
+  "seed_header": "Starting seed",
+  "seed_text": "Signed whole number from -2147483648 to 2147483647. Used only when the fixed starting seed is enabled.",
+  "rng_header": "Single-player RNG diagnostics",
+  "rng_text": "Log which functions consume random values. Enable before recording and keep the same settings for playback. Adds overhead and up to 64 MiB per attempt; diagnostic failures do not stop the match.",
+  "mp_header": "Multiplayer RNG diagnostics",
+  "mp_text": "Add RNG caller telemetry to automatic captures. With automatic recording off, collect only the diagnostic window. This does not enable multiplayer playback.",
+  "start_header": "Diagnostic window start tick",
+  "start_text": "Use the same multiple of 64 on both PCs. Ignored when the end tick is zero. Automatic capture always records the full match.",
+  "end_header": "Diagnostic window end tick",
+  "end_text": "Zero logs until mission exit. Otherwise use a later multiple of 64, identical on both PCs. Ending diagnostics does not stop the match or automatic capture."
+}

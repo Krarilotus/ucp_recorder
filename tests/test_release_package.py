@@ -1,5 +1,4 @@
 """The trusted publisher must ship the documented tools without executing PR code."""
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -8,9 +7,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-spec = importlib.util.spec_from_file_location('pr_releases', Path(__file__).resolve().parents[1]/'tools/pr_releases.py')
-publisher = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(publisher)
+from tools import pr_releases as publisher
 
 
 class ReleasePackageTests(unittest.TestCase):

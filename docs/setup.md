@@ -13,16 +13,16 @@ latest-build live verification is outstanding. Multiplayer playback is unavailab
    [Krarilotus/ucp_recorder releases](https://github.com/Krarilotus/ucp_recorder/releases),
    so the upstream Releases page may be empty.
 2. Choose the release for that PR's current commit: tags look like
-   `pr-<number>-<commit>`. Under **Assets**, download **`recorder-0.29.0.zip`**
-   and optionally its `.zip.sha256` checksum. **Source code (zip)** and
+   `pr-<number>-<commit>`. Under **Assets**, download **`recorder-<version>.zip`**
+   and optionally its `.zip.sha256` checksum. Replace `<version>` with the version shown on that release. **Source code (zip)** and
    **Code > Download ZIP** are repository archives, not installable modules.
 3. Close the test game. Use the UCP launcher's extension install **+** button/file
    picker to select the ZIP. If selecting it from Downloads fails, copy it into
    your test game folder and select it there.
 4. For manual installation, put the ZIP at
-   `<test game>/ucp/modules/recorder-0.29.0.zip`. Keep it zipped. This is a
+   `<test game>/ucp/modules/recorder-<version>.zip`. Keep it zipped. This is a
    **module**, not a plugin; `definition.yml` and `init.lua` are at the ZIP root.
-5. Reload the extension list, enable **UCP-Recorder**, and select **0.29.0**.
+5. Reload the extension list, enable **UCP-Recorder**, and select **the downloaded version**.
    Older packages may remain for old replays, but the active configuration must
    select the intended version once. Update any preset requiring an older recorder.
 6. PR builds are unsigned development packages. Use the launcher's **Disable
@@ -31,12 +31,12 @@ latest-build live verification is outstanding. Multiplayer playback is unavailab
 7. Keep your working graphics configuration, including **graphicsApiReplacer**
    and its dependencies if needed. Recorder does not replace a graphics wrapper.
 8. Launch through UCP. Check the console/log says
-   `enabling extension: recorder version: 0.29.0`. Since 0.26.0,
+   `enabling extension: recorder version: <version>`. Since 0.26.0,
    `<test game>/ucp/recorder-startup.txt` records the versions/order that reached
    recorder and its startup result.
 
 Do not change `meta.version` to the recorder version. `meta.version: 1.0.0` is
-the definition file format; `version: 0.29.0` is the extension version, and
+the definition file format; `version: <version>` is the extension version, and
 `name: recorder` determines the ZIP filename.
 
 Releases appear after verification and publication succeed. The publisher runs
@@ -51,7 +51,7 @@ Recorder does not bundle or install them. The combination under investigation is
 
 | Extension | Version / requirement |
 | --- | --- |
-| recorder | 0.29.0 for this PR |
+| recorder | The selected PR release version |
 | Ascension-Multiplayer | 1.0.11 |
 | automarket | 1.1.0; the adapter checks this exact wire format |
 | protocol | 1.0.0 for the Automarket adapter |
@@ -62,7 +62,8 @@ Recorder does not bundle or install them. The combination under investigation is
 
 This is a test configuration, not complete compatibility certification. A
 different UI version is not automatically the cause of a startup failure.
-Other custom protocols are not supported for replay.
+Other custom protocols are not supported for replay. See the
+[source audit and compatibility boundaries](extension-compatibility.md).
 
 Keep dependencies before consumers. In the resolved extension order,
 **protocol, map-extensions, ui and automarket must be enabled before recorder**.
@@ -89,8 +90,10 @@ See [adapter details](automarket-replay.md).
 
 Each session has its own folder under `<test game>/ucp/replays/`. Named copies
 preserve recording in the background; duplicate display names cannot overwrite
-sessions. In multiplayer the pause-menu item is **Replay status**; diagnostic
-captures are not playable replays and have no named-replay save action.
+sessions. In multiplayer use **Replay status > Save capture as...** to name a
+copy of the capture so far. The full capture continues until mission exit.
+Multiplayer captures live under `ucp/multiplayer-recordings` and are not yet
+playable replays.
 
 To check recorded settings, change an ordinary gameplay option after recording
 and relaunch. Select the recording and click **Play**. If a restart is requested,
@@ -105,12 +108,14 @@ See [recorded settings](recorded-settings.md).
 | Symptom | Next action |
 | --- | --- |
 | `Recorder session hook conflicts at save` with 0.17.0 | Install this PR's ZIP and select its version. 0.17.0 rejected map-extensions 1.0.0's CALL save wrapper; 0.18.0 fixed it on both variants. Switching executables does not update the module. |
+| `DISABLED` in the startup report | Recorder failed a check before installing its hooks. UCP displays a message and lets the game continue **without recording**. Correct the reported conflict/order and restart. |
 | A hook conflict with the current version | Preserve the guard. Send the startup report and `ucp3.log`; addresses and expected/found bytes help identify a different patch. Do not NOP the check or remove map-extensions from an Automarket game. |
 | Recorder missing from the list | Check `ucp/modules`, the exact `recorder-<version>.zip` name and root-level `definition.yml`. Reload the list and use the published asset. |
 | `Could not find a matching extension` | Install the named version, or update the active preset's requirement. `Replay-Ascension-Test` is a separate local preset, not a recorder dependency; it is unnecessary for this manual setup. |
 | `Enable recorder after protocol` or unavailable Automarket protocol | Correct the active order so the adapter's dependencies and Automarket are enabled first. |
 | `Replay option requires a finite number` | The message names the option path. Replace NaN/infinity with a deliberate valid value in the test configuration; recorder does not choose gameplay values for you. |
 | `UCP cannot restore these replay option values without changes` | Preserve the configuration and report it. The installed framework would change an option's type/value on reload, so recorder refuses an inaccurate restore. |
+| `FAILED: hook and menu installation` | Installation had already started. The game must not continue with partial patches; correct the error and restart. |
 | No startup report | The launcher may have failed before recorder enabled, or writing failed. Send `ucp3.log` and the launcher error. Recorder also prints the report to the console/log when it runs. |
 | Missing replay buttons | Confirm the loaded version/startup result, then use a single-player Skirmish lobby. In a recorded match, open the pause menu. Report a screenshot, resolution and variant. |
 | Settings restart fails | Read `ucp/replays/restart-error.txt`. Confirm the recorded versions are installed and exit normally when requested. |

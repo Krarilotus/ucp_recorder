@@ -16,6 +16,7 @@ class RecorderTests(unittest.TestCase):
         self.lua.execute(r'''
 package.path = source_root .. '/?.lua;' .. package.path
 printed={}; print=function(...) printed[#printed+1]={...} end
+ERROR=-2; log=function(...) print(...) end
 memory, bytes, callbacks, files, handles, scheduled = {}, {}, {}, {}, {}, 0
 local nextAddress = 0x10000000
 core = {
@@ -156,7 +157,7 @@ assert(callbacks[0x47eaf0]==nil)
     def test_native_verification_fails_before_installing_hooks(self):
         self.check('''
 local module=dofile(source_root..'/init.lua')
-assert(not pcall(function() module:enable({}) end))
+assert(module:enable({}).status=='disabled')
 assert(next(callbacks)==nil)
 ''')
 

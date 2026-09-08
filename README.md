@@ -11,7 +11,7 @@ gameplay and the recorded-settings restart still need live verification.
 ## Install and try it
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download the
-   `recorder-0.37.1.zip` asset from this PR's test release, not GitHub's source ZIP.
+   `recorder-0.38.0.zip` asset from this PR's test release, not GitHub's source ZIP.
    Release links are posted on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls);
    assets are hosted in the [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -67,11 +67,14 @@ The reported 0.29.0 mismatch at tick 22,912 is still unresolved.
 published package. Version 0.18.0 fixed rejection of map-extensions 1.0.0's CALL
 save wrapper. Switching between Crusader and Extreme does not update the module.
 
-Version 0.26.0 writes `ucp/recorder-startup.txt` with loaded versions/order and
-the startup result. Optional multiplayer diagnostic sites are checked before
-recorder installs hooks. Conflicting hook reports include addresses and
-expected/actual bytes. `READY` means initialization succeeded, not replay
-validation. See [setup and error reporting](docs/setup.md) and the
+Recorder writes `ucp/recorder-startup.txt` with loaded versions/order and the
+startup result. Failed preflight checks display a UCP error message and allow the
+game to continue **without recording** (`DISABLED`). Installation failures remain
+fatal because native patches may already have been applied. `READY` means
+initialization succeeded, not replay validation. Launcher options are translated
+into all nine UCP languages; in-game font/language coverage remains a separate
+task. See [extension compatibility](docs/extension-compatibility.md),
+[setup and error reporting](docs/setup.md) and the
 [changelog](CHANGELOG.md).
 
 Development 0.18.0 Crusader playback completed twice with two AIs. A separate

@@ -1,0 +1,16 @@
+{
+  "auto_header": "Enregistrer les parties automatiquement",
+  "auto_text": "Enregistrer les escarmouches solo et capturer les parties multijoueurs sur ce PC. Des copies nommées sont disponibles dans le menu de pause. La lecture hors ligne des captures multijoueurs est encore indisponible.",
+  "seed_on_header": "Utiliser une graine initiale fixe",
+  "seed_on_text": "Utiliser la graine ci-dessous pour les nouveaux enregistrements solo. Ce réglage est facultatif : les replays restaurent l’état aléatoire enregistré. Les graines multijoueurs restent inchangées.",
+  "seed_header": "Graine initiale",
+  "seed_text": "Nombre entier signé de -2147483648 à 2147483647. Utilisé uniquement lorsque la graine initiale fixe est activée.",
+  "rng_header": "Diagnostic aléatoire en solo",
+  "rng_text": "Journaliser les fonctions qui consomment des valeurs aléatoires. Activer avant l’enregistrement et conserver les mêmes réglages pour la lecture. Coût supplémentaire et jusqu’à 64 Mio par essai ; une erreur de diagnostic ne termine pas la partie.",
+  "mp_header": "Diagnostic aléatoire multijoueur",
+  "mp_text": "Ajouter les appels au générateur aléatoire aux captures automatiques. Sans enregistrement automatique, seule la fenêtre de diagnostic est capturée. Cela n’active pas la lecture multijoueur.",
+  "start_header": "Tick de début du diagnostic",
+  "start_text": "Utiliser le même multiple de 64 sur les deux PC. Ignoré si le tick de fin vaut zéro. La capture automatique couvre toujours toute la partie.",
+  "end_header": "Tick de fin du diagnostic",
+  "end_text": "Zéro journalise jusqu’à la sortie de la mission. Sinon, choisir un multiple de 64 ultérieur, identique sur les deux PC. La fin du diagnostic n’arrête ni la partie ni la capture automatique."
+}

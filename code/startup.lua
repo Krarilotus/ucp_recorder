@@ -2,6 +2,15 @@
 -- Do not dump option values, account information or configuration file contents.
 local M={REPORT='ucp/recorder-startup.txt'}
 
+---@class RecorderStartupResult
+---@field status 'ready'|'disabled'
+---@field stage string
+---@field reason string|nil
+
+-- Checks must not install recorder hooks. Only install() crosses that boundary;
+-- an exception after it starts cannot be recovered without a verified rollback.
+---@param callback fun(check: fun(name: string, action: function): any, install: fun(action: function))
+---@return RecorderStartupResult
 function M.run(callback)
   local lines={'UCP Recorder startup', 'UTC: '..os.date('!%Y-%m-%dT%H:%M:%SZ'),
     'Loaded extensions in order:'}
@@ -9,18 +18,28 @@ function M.run(callback)
     lines[#lines+1]=string.format('%d. %s %s',i,tostring(extension.name),tostring(extension.version))
   end
   local stage='initialization'
+  local installing=false
   local ok,result=xpcall(function()
-    return callback(function(name,action)
+    local function check(name,action)
+      assert(not installing,'Recorder checks must precede installation')
       stage=name
       local value=action()
       lines[#lines+1]='OK: '..name
       return value
+    end
+    callback(check,function(action)
+      assert(not installing,'Recorder installation may only start once')
+      installing=true
+      stage='hook and menu installation'
+      action()
+      lines[#lines+1]='OK: '..stage
     end)
+    assert(installing,'Recorder installation was not started')
   end,debug.traceback)
   local profile=require('code/native').profile
   lines[#lines+1]='Native profile: '..(profile and profile.name or 'unidentified')
   lines[#lines+1]=ok and 'READY: replay hooks and menus installed; gameplay not validated.'
-    or ('FAILED: '..stage..'\n'..tostring(result))
+    or ((installing and 'FAILED: ' or 'DISABLED: ')..stage..'\n'..tostring(result))
   lines[#lines+1]='Setup and troubleshooting: docs/setup.md in the recorder release ZIP.'
   local report=table.concat(lines,'\n')..'\n'
   print(report)
@@ -33,9 +52,17 @@ function M.run(callback)
   end)
   if not written then print('Recorder startup report could not be saved: '..tostring(reason)) end
   if not ok then
-    error('Recorder startup failed during '..stage..'. See '..M.REPORT..
-      ' or ucp3.log.\n'..tostring(result),0)
+    if installing then
+      error('Recorder installation failed. Restart after resolving '..stage..'. See '..M.REPORT..
+        ' or ucp3.log.\n'..tostring(result),0)
+    end
+    -- UCP's ERROR logger displays its existing Windows message box without
+    -- terminating the process. Do not silently start a match without recording.
+    log(ERROR,'Recorder is disabled for this launch. No replay will be recorded.\n'..
+      'The game can continue. Failed check: '..stage..'.\n'..
+      'See '..M.REPORT..' or ucp3.log for details.\n'..tostring(result):match('^[^\r\n]*'))
+    return {status='disabled',stage=stage,reason=tostring(result)}
   end
-  return result
+  return {status='ready',stage=stage}
 end
 return M

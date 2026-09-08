@@ -1,0 +1,16 @@
+{
+  "auto_header": "Partien automatisch aufnehmen",
+  "auto_text": "Einzelspieler-Gefechte aufnehmen und Mehrspieler-Partien auf diesem PC erfassen. Benannte Kopien lassen sich im Pausenmenü speichern. Mehrspieler-Aufnahmen sind noch nicht offline abspielbar.",
+  "seed_on_header": "Festen Startwert verwenden",
+  "seed_on_text": "Den folgenden Startwert für neue Einzelspieler-Aufnahmen verwenden. Dies ist optional: Replays stellen den aufgezeichneten Zufallszustand wieder her. Mehrspieler-Startwerte bleiben unverändert.",
+  "seed_header": "Startwert",
+  "seed_text": "Ganze Zahl zwischen -2147483648 und 2147483647. Wird nur verwendet, wenn der feste Startwert eingeschaltet ist.",
+  "rng_header": "Einzelspieler-Zufallsdiagnose",
+  "rng_text": "Protokolliert, welche Funktionen Zufallswerte verbrauchen. Vor der Aufnahme einschalten und dieselben Einstellungen zur Wiedergabe verwenden. Zusätzlicher Aufwand und bis zu 64 MiB pro Versuch; Diagnosefehler beenden die Partie nicht.",
+  "mp_header": "Mehrspieler-Zufallsdiagnose",
+  "mp_text": "Ergänzt automatische Aufnahmen um Aufrufdaten des Zufallsgenerators. Ohne automatische Aufnahme wird nur das Diagnosefenster erfasst. Aktiviert keine Mehrspieler-Wiedergabe.",
+  "start_header": "Starttick des Diagnosefensters",
+  "start_text": "Auf beiden PCs dasselbe Vielfache von 64 verwenden. Wird bei Endtick null ignoriert. Die automatische Aufnahme erfasst immer die gesamte Partie.",
+  "end_header": "Endtick des Diagnosefensters",
+  "end_text": "Null protokolliert bis zum Verlassen der Mission. Sonst ein späteres Vielfaches von 64 auf beiden PCs einstellen. Das Diagnoseende stoppt weder die Partie noch die automatische Aufnahme."
+}
