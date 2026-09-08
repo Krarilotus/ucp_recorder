@@ -31,4 +31,11 @@ function M.installTick(site,enabled,mode,halt,callback,originalCallback,offline,
     halt=halt,callback=callback,originalCallback=originalCallback,skipTick=assert(exitAddress)}
   M.install({tick},enabled,mode,nil,offline)
 end
+
+function M.tickEntry(sites,halt,playback)
+  local site=sites.tickEntry
+  return {address=site.address,bytes=site.bytes,kind='raw',patch='tickEntry',
+    halt=halt,playback=playback,paused=sites.paused,
+    menu=sites.haltingMenu.address,gameCore=sites.gameCore}
+end
 return M

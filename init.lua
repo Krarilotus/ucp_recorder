@@ -97,10 +97,12 @@ local function enable(self,config,stage,install)
     -- A stopped replay must also reject paused/loading callers that never reach
     -- the clock hook. The callback can stop the current call at its epilogue;
     -- subsequent calls return at entry, before map/path maintenance.
-    fixes.install({sites.tickEntry},recorder.halt,engine.base+0x618,nil,engine.offlineFlag)
+    fixes.install({fixes.tickEntry(sites,recorder.halt,recorder.playbackActive)},
+      engine.scope,engine.base+0x618,nil,engine.offlineFlag)
     fixes.installTick(sites.tick,engine.scope,engine.base+0x618,recorder.halt,tickCallback,multiplayerTick,
       engine.offlineFlag,sites.tickExit.address)
     core.detourCode(function(registers)
+      if recorder.rngTrace then recorder.rngTrace:observe('afterTick') end
       if engine.trace then engine.trace:observe('afterTick') end
       if recorder.active and recorder.mode=='play' and recorder.afterTick then
         recorder:guard(function() recorder:afterTick() end)

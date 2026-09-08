@@ -29,7 +29,19 @@ function M.build(site,enabled,mode,seed,origin,returnAddresses,offline)
     compare(mode,99); rel({0x0f,0x85},'original')
   end
   labels.patched=#out; emit(0x9d)
-  if site.patch=='return' then
+  if site.patch=='tickEntry' then
+    emit(0x9c)
+    compare(site.halt,0); rel({0x0f,0x85},'stopped')
+    compare(site.playback,1); rel({0x0f,0x85},'original')
+    compare(site.paused,0); rel({0x0f,0x85},'stopped')
+    -- The checked native query only reads menu state. Preserve the incoming
+    -- thiscall receiver and registers; no Lua callback on this hot path.
+    emit(0x60,0xb9); dword(out,site.gameCore)
+    rel({0xe8},site.menu)
+    emit(0x85,0xc0,0x61) -- test eax,eax; popad preserves the query's flags
+    rel({0x0f,0x84},'original')
+    labels.stopped=#out; emit(0x9d,0xc3)
+  elseif site.patch=='return' then
     if site.pop then emit(0xc2,site.pop,0) else emit(0xc3) end
   elseif site.patch=='constant' then emit(0xb8); dword(out,site.value)
   elseif site.patch=='cleanup' then emit(0x8d,0x64,0x24,0x2c) -- lea esp,[esp+44], no flag changes

@@ -24,7 +24,7 @@ Window input / menu / audio / receive
 | Boundary | Crusader | Extreme | Current replay ownership |
 | --- | --- | --- | --- |
 | Timed command executor | `4892F0` | `489400` | Original handlers; observe actual actor, payload and execution order |
-| Tick function entry | `45CD10` | `45CF20` | Halt guard rejects stopped local replays before any tick-owned maintenance |
+| Tick function entry | `45CD10` | `45CF20` | Reject stopped or viewer-paused local playback before any tick-owned maintenance; loading and recording retain native admission |
 | Pre-clock observer | `45CE44` | `45D054` | Starting snapshot and checkpoint describe state after preceding commands, before the next clock advancement |
 | Clock increment | `45CE58` | `45D068` | Native increment, conditional on menu/pause state |
 | Tick early-return epilogue | `45CDA8` | `45CFB8` | A halt detected by the pre-clock callback returns here immediately |
@@ -71,6 +71,69 @@ It verifies unchanged live-MP control flow, paused refresh without clock
 advancement, local pause gating, immediate endpoint exit, later paused entry,
 sync/save returns and stack preservation. It does **not** certify render/input
 callbacks outside this function as non-mutating.
+
+### Navigation proves maintenance is gameplay state
+
+`updateSeparateAreaTileMap` (`4995E0` / `499750`) decrements its refresh countdown
+on each call, even if the match clock did not advance. On expiry it resets to
+200; when marked dirty, it rebuilds connectivity regions and building linkage.
+The countdown is at `117CAD8` / `120F718`. These are observed native writes,
+not suggested restore values. Crusader saves the countdown in section 1023.
+
+In Crusader, `canUnitReachAdjacentTile` (`4105F0`) reads the connectivity region
+of the unit and neighboring tiles and passes those regions to the navigation
+query from the unit-controls UI. `canNavigateToDefensiveBuilding` (`40AC80`)
+also consumes the layer from `UpdateLord` (`56C8A1` / `56D0E9`); its result
+controls the lord's state and target writes.
+Consequently, advancing this maintenance schedule during a viewer pause is not
+equivalent to only redrawing the screen.
+
+Playback now blocks the whole tick at entry while logically paused or in a
+halting menu, using the same native menu query as command selection. The session
+arms this rule after snapshot restoration and clears it before exit/replacement;
+map preparation still receives its native calls. This adds no per-tick Lua call
+and does not write individual navigation fields. Existing endpoint guards retain
+priority, including after the viewer presses unpause.
+
+Original-code checks execute the real countdown decrement, expiry/reset and
+clean-map return in both variants. They reproduce the old paused write and check
+the new admission rule, recording/loading pass-through, disabled scope and live
+MP behavior. The flood fill and other maintenance owners remain outside that
+check. A paused view refresh now waits for resume inside this tick owner; live
+inspection of flat view, reports and camera behavior is still required.
+
+**Record-time pause is a separate open contract.** Two command selections can
+share a match-clock value with maintenance between them. A timestamp-only stream
+cannot describe that ordering. Freezing a viewer must not erase source events:
+before changing the journal, trace source selection/maintenance boundaries and
+their consumers. Do not normalize this by resetting a countdown or changing the
+live game's pause rules. This finding does not attribute either archived RNG
+failure to navigation.
+
+The existing optional `singleplayerRngDiagnostics` now samples this countdown
+at restoration/capture start and each RNG checkpoint. Its existing main-loop
+return hook also counts returns, returns without clock advancement and clock
+jumps, without adding a hook or flushing a file per return. These counters do
+not assert that maintenance was admitted: a viewer-paused call returns at entry.
+`tools/inspect_replay.py compare` reports the first differing countdown and return
+pattern separately from RNG attribution. This can expose an earlier state
+difference without declaring a viewer pause itself to be desynchronization.
+
+For the next targeted SP check, enable those diagnostics **before recording**:
+
+1. Record a short fresh match with an AI and a few building/unit orders, without
+   pausing. End the mission and replay it once untouched.
+2. Replay that same recording again. Pause for 30 seconds, inspect the book,
+   toggle flat view, then resume to the recorded endpoint. Note any blocked
+   inspection or visual refresh that fails to recover after resume.
+3. Make a separate short recording with two orders given during a pause,
+   separated by ten seconds. Resume, end the mission and replay it untouched.
+
+Compare each playback with its own source attribution file. Step 2 isolates
+viewer control; step 3 investigates missing source phases. Preserve the entire
+replay folder and each attempt's logs, including a failed attempt. These are
+new-candidate recordings; do not edit historical environment manifests to load
+an older recording under different code.
 
 ## Restore coverage
 

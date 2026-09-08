@@ -26,6 +26,21 @@ class InspectionTests(unittest.TestCase):
                      calls=[dict(stream=2, returnAddress=0x404f16, count=1, firstTick=63, lastTick=63)]),
                 dict(kind='end', time=64, reason='finished')]
 
+    def test_phase_observations_do_not_mislabel_viewer_pause_as_rng_divergence(self):
+        a, b = self.sample(), self.sample()
+        for rows in (a, b):
+            for row in rows[:2]:
+                row['phase'] = dict(tickReturns=0, unclockedReturns=0, clockJumps=0, navigationCountdown=100)
+        b[0]['phase']['tickReturns'] = b[0]['phase']['unclockedReturns'] = 20
+        b[1]['phase']['navigationCountdown'] = 90
+        report = module.compare(self.write('a',a), self.write('b',b))
+        self.assertEqual(report['status'], 'matching observed prefix')
+        self.assertEqual(report['firstTickReturnDifference']['time'], 1)
+        self.assertEqual(report['firstNavigationDifference']['time'], 64)
+        del b[0]['phase']; del b[1]['phase']
+        report = module.compare(self.write('a',a), self.write('b',b))
+        self.assertNotIn('firstNavigationDifference', report)
+
     def test_names_first_changed_caller_without_claiming_world_equality(self):
         first = self.write('first', self.sample())
         changed = self.sample()

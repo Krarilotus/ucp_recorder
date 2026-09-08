@@ -19,12 +19,30 @@ io.open=function(path)
  close=function() closes=closes+1; return true end}
 end
 now=1; single=true
-engine={rng=0x2000,tick=function() return now end,singlePlayer=function() return single end,
+engine={rng=0x2000,sites={navigationCountdown=0x3000},tick=function() return now end,singlePlayer=function() return single end,
  rngState=function() return {10,20,30,40} end}
 realNative.profile.name='SHC'; realNative.profile.sha256='test-executable'
 Attribution=require('code/rng-attribution'); trace=Attribution.new(engine)
 manifest={id='test'}; trace:observe('begin',manifest,'record')
 assert(trace.file and encoded[1].kind=='header')
+''')
+
+    def test_tick_return_observations_are_bounded_and_retained_without_rng_calls(self):
+        self.check('''
+memory[0x3000]=100
+trace:observe('afterTick') -- no clock advancement
+now=2; trace:observe('afterTick')
+now=10; trace:observe('afterTick') -- replacement/other caller, not eight observed steps
+assert(writes==1)
+trace:observe('checkpoint')
+local phase=encoded[2].phase
+assert(phase.tickReturns==3 and phase.unclockedReturns==1 and phase.clockJumps==1)
+assert(phase.navigationCountdown==100 and memory[0x3000]==100)
+single=false; trace:observe('afterTick'); assert(trace.tickReturns==0)
+single=true; trace:observe('afterTick'); trace:observe('finish','paused exit')
+assert(encoded[3].phase.tickReturns==1 and encoded[3].phase.unclockedReturns==1)
+assert(encoded[4].kind=='end')
+trace:observe('afterTick'); assert(not trace.file)
 ''')
 
     def test_calls_are_buffered_normalized_and_flushed_at_boundary(self):

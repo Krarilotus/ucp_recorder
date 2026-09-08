@@ -279,11 +279,23 @@ def compare(first, second):
               "caution": "Caller counts and the ordering checksum do not prove equal world state."}
     with_spawns = bool(a_header.get("spawnContext") and b_header.get("spawnContext"))
     result["spawnContextCompared"] = with_spawns
+    def phase_difference(a, b, time):
+        if a.get("phase") is None or b.get("phase") is None:
+            return
+        for label, keys in (("firstNavigationDifference", ("navigationCountdown",)),
+                            ("firstTickReturnDifference", ("tickReturns", "unclockedReturns", "clockJumps"))):
+            left, right = ({key: row["phase"][key] for key in keys} for row in (a, b))
+            if label not in result and left != right:
+                result[label] = {"time": time, "first": left, "second": right,
+                    "caution": "Return counts include viewer-paused entry returns; this is an observation, not a desync cause."}
+
+    phase_difference(a_header, b_header, a_header["firstTick"])
     for a, b in zip(a_rows, b_rows):
         if (a["fromTick"], a["time"]) != (b["fromTick"], b["time"]):
             result.update(status="different checkpoint boundaries", first=a["time"], second=b["time"])
             return result
         result["checkpointsCompared"] += 1
+        phase_difference(a, b, a["time"])
         if (any(a[key] != b[key] for key in ("count", "order", "rng", "calls"))
                 or (with_spawns and a["spawns"] != b["spawns"])):
             def callers(row):

@@ -8,6 +8,9 @@ function Session:new(engine,config)
   local o=Base:new({name='unused'})
   o.engine=engine
   o.halt=core.allocate(4,true)
+  -- Native tick admission: viewing pause must freeze maintenance too. Loading
+  -- still needs native preparation calls, so arm only after restoration.
+  o.playbackActive=core.allocate(4,true)
   o.resultsHold=core.allocate(4,true)
   o.status='idle'
   o.autoRecord=not config or config.autoRecord~=false
@@ -160,6 +163,7 @@ function Session:startPlayback(id,prepared)
   self.firstDesync=nil
   self.preparedWorlds=prepared
   self.mode='play'; self.status='loading'; self.active=false
+  core.writeInteger(self.playbackActive,0)
   -- The native victory/defeat banner leaves the simulation after eight real
   -- seconds. Hold that presentation transition throughout playback, including
   -- verified completion/failure; only leaving the replay releases it.
@@ -183,6 +187,7 @@ function Session:startPlayback(id,prepared)
   assert(self.engine:player()==manifest.player,'Loaded save has a different player slot')
   self:checkResources(manifest.startResources,'starting save')
   self.active=true; self.status='playing'; self.playedCommands=0
+  core.writeInteger(self.playbackActive,1)
   if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'play') end
   self.nextCheckpoint=nil
   self:playbackResult('playing')
@@ -334,6 +339,7 @@ function Session:checkResources(expected,phase)
 end
 
 function Session:reset()
+  core.writeInteger(self.playbackActive,0)
   core.writeInteger(self.resultsHold,0)
   if self.rngTrace then self.rngTrace:observe('finish','session ended') end
   self.capturePending=nil

@@ -16,13 +16,15 @@ for _,fail in ipairs({false,true}) do
  store.load=function() return manifest end
  store.compatible=function() return true end; store.preflight=function() end
  store.read=function(path) return path:find('rng.bin',1,true) and string.rep('x',0x9c50) or 'snapshot' end
- engine.loadSnapshot=function() assert(memory[r.resultsHold]==1); now=1 end
- r:startPlayback('test'); assert(memory[r.resultsHold]==1 and r.status=='playing')
+ engine.loadSnapshot=function()
+  assert(memory[r.resultsHold]==1 and memory[r.playbackActive]==0); now=1
+ end
+ r:startPlayback('test'); assert(memory[r.resultsHold]==1 and memory[r.playbackActive]==1 and r.status=='playing')
  if fail then assert(not r:guard(function() error('injected playback failure') end))
  else now=65; r:onTick(); assert(r.status=='finished') end
  assert(memory[r.resultsHold]==1)
- r:onMenuView(61); assert(memory[r.resultsHold]==0 and r.mode=='none')
- r:startRecording(); assert(memory[r.resultsHold]==0)
+ r:onMenuView(61); assert(memory[r.resultsHold]==0 and memory[r.playbackActive]==0 and r.mode=='none')
+ r:startRecording(); assert(memory[r.resultsHold]==0 and memory[r.playbackActive]==0)
  r:reset()
 end
 ''')

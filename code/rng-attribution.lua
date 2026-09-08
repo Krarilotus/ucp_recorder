@@ -11,6 +11,24 @@ end
 
 function M:clear()
   self.calls={}; self.callers=0; self.count=0; self.order=0; self.spawns={}
+  self.tickReturns=0; self.unclockedReturns=0; self.clockJumps=0
+end
+
+-- Counts main-loop returns, not admitted world steps. Viewer-paused calls may
+-- return at the entry guard. The countdown sample exposes a changed schedule;
+-- neither observation proves why a later RNG call differs.
+function M:afterTick()
+  if not self.file or not self.engine:singlePlayer() then return end
+  local now=self.engine:tick()
+  self.tickReturns=self.tickReturns+1
+  if now==self.lastReturnedTick then self.unclockedReturns=self.unclockedReturns+1
+  elseif now~=self.lastReturnedTick+1 then self.clockJumps=self.clockJumps+1 end
+  self.lastReturnedTick=now
+end
+
+function M:phaseState()
+  return {tickReturns=self.tickReturns,unclockedReturns=self.unclockedReturns,
+    clockJumps=self.clockJumps,navigationCountdown=core.readInteger(self.engine.sites.navigationCountdown)}
 end
 
 function M:write(value)
@@ -33,13 +51,14 @@ function M:begin(manifest,mode)
   self.file=assert(io.open(self.path..'/calls.jsonl','w'))
   self.bytes=0; self:clear(); self.failed=nil
   self.previousTick=self.engine:tick()
+  self.lastReturnedTick=self.previousTick
   local contextOk,context=pcall(spawnContext.verify,native.profile.name)
   self.spawnProfile=contextOk and context or nil
   if not contextOk then print('RNG spawn context disabled: '..tostring(context)) end
   self:write({kind='header',format=2,mode=mode,replay=manifest.id,
     spawnContext=contextOk,
     variant=native.profile.name,executable=native.profile.sha256,
-    firstTick=self.previousTick,rng=self.engine:rngState()})
+    firstTick=self.previousTick,rng=self.engine:rngState(),phase=self:phaseState()})
 end
 
 function M:rngCall(stream,stack)
@@ -79,13 +98,13 @@ function M:checkpoint()
   end)
   self:write({kind='checkpoint',fromTick=self.previousTick,time=now,
     rng=self.engine:rngState(),count=self.count,order=self.order%4294967296,calls=entries,
-    spawns=self.spawnProfile and self.spawns or nil})
+    spawns=self.spawnProfile and self.spawns or nil,phase=self:phaseState()})
   self.previousTick=now; self:clear()
 end
 
 function M:finish(reason)
   if not self.file then return end
-  if self.count>0 or self.engine:tick()~=self.previousTick then self:checkpoint() end
+  if self.count>0 or self.tickReturns>0 or self.engine:tick()~=self.previousTick then self:checkpoint() end
   self:write({kind='end',time=self.engine:tick(),reason=reason})
   local file=self.file; self.file=nil
   assert(file:close())

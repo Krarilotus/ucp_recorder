@@ -1,7 +1,8 @@
 """Original tick control flow, including paths bypassing the clock observer.
 
-Subsystem callees are observable stand-ins: this checks which native phases
-execute and the stack contract, not their world-state effects or the outer loop.
+Subsystem callees are observable stand-ins except the selected height refresh
+and navigation countdown paths. This checks phase admission, their native writes
+and the stack contract, not a complete world update or the outer loop.
 """
 import struct
 
@@ -15,16 +16,21 @@ from native_image import load_image
 def check_tick_boundary(path, lua, root, variant):
     sites = lua.execute((root / 'code/engine-sites.lua').read_text())[variant]
     emitter = lua.execute((root / 'code/scoped-code.lua').read_text())
+    lua.globals().source_root = root.as_posix()
+    lua.execute("package.path=source_root..'/?.lua;'..package.path")
+    fixes = lua.eval("require('code/fixes')")
     entry, clock, ending = (sites[key] for key in ('tickEntry', 'tick', 'tickExit'))
     extreme = variant == 'Extreme'
     sync = 0x23547d8 if extreme else 0x191d768
     in_game = 0x46bd80 if extreme else 0x46bb60
     menu = sites['haltingMenu']['address']
     scope, halt, offline = 0x3e00100, 0x3e00104, 0x3e00108
+    playback = 0x3e0010c
     callback, entry_gate, clock_gate, done = 0x3e01000, 0x3e02000, 0x3e03000, 0x3e04000
     stack = 0x3f08000
 
-    def run(patched, stopped, mode, local, paused, save=0, sync_status=0, stop_now=False, refresh=False):
+    def run(patched, stopped, mode, local, paused, save=0, sync_status=0, stop_now=False,
+            refresh=False, viewing=False, modal=False, navigation=None, enabled=True, legacy=False):
         machine = Uc(UC_ARCH_X86, UC_MODE_32)
         load_image(machine, path)
         put = lambda address, value: machine.mem_write(address, struct.pack('<I', value & 0xffffffff))
@@ -34,7 +40,7 @@ def check_tick_boundary(path, lua, root, variant):
         put(sites['paused'], paused)
         put(sites['gameCore'] + 0x98, 17)
         put(0x2a7afa8 if extreme else 0x1fe7aa8, 8)  # no rotation requested
-        put(scope, 1); put(halt, stopped); put(offline, local)
+        put(scope, int(enabled)); put(halt, stopped); put(offline, local); put(playback, int(viewing))
         tile_map = 0x2526708 if extreme else 0x1a93208
         refresh_entry = 0x501da0 if extreme else 0x501a20
         put(tile_map + 0x5548b8, 2 if refresh else 0)
@@ -51,8 +57,9 @@ def check_tick_boundary(path, lua, root, variant):
         if patched:
             tick = lua.table_from(dict(address=clock['address'], bytes=clock['bytes'], kind='raw',
                 patch='tick', callback=callback, halt=halt, skipTick=ending['address']))
-            for site, enabled, target in ((entry, halt, entry_gate), (tick, scope, clock_gate)):
-                code = bytes(emitter.build(site, enabled, sync + 0x618, None, target, None, offline).values())
+            entry_site = entry if legacy else fixes.tickEntry(sites, halt, playback)
+            for site, flag, target in ((entry_site, halt if legacy else scope, entry_gate), (tick, scope, clock_gate)):
+                code = bytes(emitter.build(site, flag, sync + 0x618, None, target, None, offline).values())
                 machine.mem_write(target, code)
                 machine.mem_write(site['address'], bytes(emitter.jump(site['address'], target, len(site['bytes'])).values()))
             # Use the production view/pause gates too. The refresh routine
@@ -66,6 +73,13 @@ def check_tick_boundary(path, lua, root, variant):
         if refresh:
             targets.remove(refresh_entry)  # execute its real 256-height update
             targets.add(0x4f6e70 if extreme else 0x4f6ae0)  # changed-layer rebuild stand-in
+        navigation_entry = 0x499750 if extreme else 0x4995e0
+        countdown = sites['navigationCountdown']
+        if navigation is not None:
+            # Execute the original decrement/reset and clean-map early return.
+            # The dirty-map flood fill is deliberately outside this check.
+            targets.remove(navigation_entry)
+            put(countdown, navigation)
         calls = []
         # These two maintenance calls have one stack argument; all other
         # reached world-update callees have thiscall's register receiver only.
@@ -73,6 +87,8 @@ def check_tick_boundary(path, lua, root, variant):
         pop4.add(sites['queue']['address'])
 
         def observe(uc, ip, size, unused):
+            if ip == navigation_entry and navigation is not None:
+                assert get(uc.reg_read(reg.UC_X86_REG_ECX) + 0x6c) == 0
             if ip == done:
                 uc.emu_stop()
             elif ip == callback or ip in targets:
@@ -81,7 +97,7 @@ def check_tick_boundary(path, lua, root, variant):
                 else:
                     calls.append(ip)
                 sp = uc.reg_read(reg.UC_X86_REG_ESP)
-                uc.reg_write(reg.UC_X86_REG_EAX, int(ip == in_game))
+                uc.reg_write(reg.UC_X86_REG_EAX, int(ip == in_game or (ip == menu and modal)))
                 uc.reg_write(reg.UC_X86_REG_ESP, sp + 4 + (4 if ip in pop4 else 0))
                 uc.reg_write(reg.UC_X86_REG_EIP, get(sp))
 
@@ -94,7 +110,8 @@ def check_tick_boundary(path, lua, root, variant):
         assert machine.reg_read(reg.UC_X86_REG_EIP) == done
         assert machine.reg_read(reg.UC_X86_REG_ESP) == stack + 4, (variant, 'tick stack')
         assert machine.reg_read(reg.UC_X86_REG_ESI) == 0x12345678
-        return calls, get(sites['gameCore'] + 0x98), get(sites['paused'])
+        result = calls, get(sites['gameCore'] + 0x98), get(sites['paused'])
+        return result + (get(countdown),) if navigation is not None else result
 
     count = 0
     for paused, save, syncing in ((0, 0, 0), (1, 0, 0), (-1, 0, 0), (0, 1, 0),
@@ -127,4 +144,28 @@ def check_tick_boundary(path, lua, root, variant):
         else:
             assert observed == original  # never change live multiplayer's rules
         count += 1
+    for mode, local in ((99, 0), (1, 1), (1, 0)):
+        for paused, modal in ((1, False), (-1, False), (0, True), (0, False)):
+            for initial in (100, 1):
+                original = run(False, 0, mode, local, paused, modal=modal, navigation=initial)
+                expected = initial - 1 if initial > 1 else 200
+                assert original[-1] == expected
+                # Reproduce the published guard's missing viewer-pause scope.
+                old = run(True, 0, mode, local, paused, modal=modal, navigation=initial,
+                          viewing=True, legacy=True)
+                assert old[-1] == expected
+                recording = run(True, 0, mode, local, paused, modal=modal, navigation=initial)
+                assert recording == original
+                viewing = run(True, 0, mode, local, paused, modal=modal, navigation=initial, viewing=True)
+                should_stop = (local or mode == 99) and (paused != 0 or modal)
+                assert viewing[-1] == (initial if should_stop else expected), (variant, viewing)
+                if should_stop:
+                    assert viewing[1] == 17
+                    assert viewing[0] == ([] if paused else [menu])
+                elif not local and mode != 99:
+                    assert viewing == original  # live MP ignores viewer state
+                inactive = run(True, 1, mode, local, paused, modal=modal, navigation=initial,
+                               viewing=True, enabled=False)
+                assert inactive == original
+                count += 1
     print(f'PASS: {variant} tick entry/endpoint halt and passive control flow ({count} cases)')

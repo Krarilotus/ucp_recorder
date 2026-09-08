@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.43.1
+
+- Freeze tick-owned maintenance while viewing a paused replay or a halting game
+  menu. Previously the navigation refresh countdown still changed, even though
+  commands and the match clock were stopped. Loading, recording and live
+  multiplayer keep their native tick admission.
+- Verify the original navigation countdown paths in Crusader and Extreme and
+  preserve the native calling convention without an added per-tick Lua callback.
+  Flat-view maintenance waits for resume; in-game inspection remains required.
+- Document the writer-to-consumer evidence and distinguish viewer pause from
+  recorded paused-command ordering. That ordering, the historical RNG failures
+  and completed multiplayer playback validation remain open.
+- Extend optional SP attribution with bounded tick-return counts and navigation
+  countdown samples at existing checkpoints. Report those differences separately
+  from RNG attribution; no new native hook or per-return file write is added.
+
 ## 0.43.0
 
 - Keep recorded commands pending while playback is paused, including a halting

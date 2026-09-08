@@ -37,7 +37,8 @@ class ScopedCodeTests(unittest.TestCase):
         self.emitter=self.lua.execute((ROOT/'code/scoped-code.lua').read_text())
         self.profiles=self.lua.execute((ROOT/'code/scoped-sites.lua').read_text())
 
-    def run_code(self,site,enabled,mode,flags,gated,halt=0,offline=None,local_gate=False):
+    def run_code(self,site,enabled,mode,flags,gated,halt=0,offline=None,local_gate=False,
+                 viewing=0,paused=0,modal=0):
         machine=Uc(UC_ARCH_X86,UC_MODE_32)
         machine.mem_map(0x400000,0x3000000)
         machine.mem_map(0x4000000,0x1000)
@@ -48,6 +49,12 @@ class ScopedCodeTests(unittest.TestCase):
         def put(address,value): machine.mem_write(address,struct.pack('<I',value&0xffffffff))
         put(scope,enabled); put(mode_pointer,mode)
         put(0x600110,offline or 0)
+        if site['patch']=='tickEntry':
+            put(site['halt'],halt); put(site['playback'],viewing); put(site['paused'],paused)
+            # A thiscall callee may destroy all volatile registers. The entry
+            # gate must restore the original receiver, flags and argument stack.
+            machine.mem_write(site['menu'],b'\xb8'+struct.pack('<I',modal)
+                +b'\xb9\x22\0\0\0\xba\x33\0\0\0\xc3')
         if site['patch']=='tick':
             put(site['halt'],halt)
             machine.mem_write(site['callback'],b'\xff\x05'+struct.pack('<I',counter)+b'\xb8\x01\0\0\0\xc3')
@@ -65,7 +72,7 @@ class ScopedCodeTests(unittest.TestCase):
         initial=[0x500000,0x600010,0x600000,0x20,0x600000,0xabcdef00,0x410f000,0x4108000,flags]
         for register,value in zip(REGS,initial): machine.reg_write(register,value)
         stops={site['address']+len(original)}
-        if site['kind']=='tail' or site['patch']=='return':
+        if site['kind']=='tail' or site['patch'] in ('return','tickEntry'):
             put(initial[7],0x4f1000)
             stops.add(0x4f1000)
         if site['kind']=='branch': stops.add(site['target'])
@@ -77,6 +84,29 @@ class ScopedCodeTests(unittest.TestCase):
         self.assertIn(machine.reg_read(UC_X86_REG_EIP),stops)
         return tuple(machine.reg_read(r) for r in REGS)+(machine.reg_read(UC_X86_REG_EIP),
             struct.unpack('<I',machine.mem_read(counter,4))[0],struct.unpack('<I',machine.mem_read(0x600004,4))[0])
+
+    def test_viewer_pause_admission_preserves_original_thiscall_contract(self):
+        self.lua.globals().source_root=ROOT.as_posix()
+        self.lua.execute("package.path=source_root..'/?.lua;'..package.path")
+        fixes=self.lua.eval("require('code/fixes')")
+        engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
+        for engine in engines.values():
+            site=fixes.tickEntry(engine,0x60010c,0x600114)
+            for flags in (0x202,0xa83):
+                original=self.run_code(site,0,99,flags,False)
+                for enabled,mode,offline in ((0,99,0),(0,1,1),(1,1,0),(1,2,0),(1,99,0),(1,1,1)):
+                    for viewing,paused,modal,halt in ((0,1,1,0),(1,0,0,0),(1,1,0,0),
+                                                       (1,0,1,0),(1,0,0,1)):
+                        with self.subTest(mode=mode,offline=offline,flags=flags,viewing=viewing,
+                                          paused=paused,modal=modal,halt=halt,enabled=enabled):
+                            result=self.run_code(site,enabled,mode,flags,True,halt=halt,offline=offline,
+                                                 viewing=viewing,paused=paused,modal=modal)
+                            stop=enabled and (mode==99 or offline) and (halt or (viewing and (paused or modal)))
+                            if stop:
+                                self.assertEqual(result[:7],(0x500000,0x600010,0x600000,0x20,0x600000,0xabcdef00,0x410f000))
+                                self.assertEqual(result[7:10],(0x4108004,flags,0x4f1000))
+                            else:
+                                self.assertEqual(result,original)
 
     def test_offline_boundaries_preserve_live_code_and_callee_stack_contracts(self):
         profiles=self.lua.execute((ROOT/'code/offline-sites.lua').read_text())

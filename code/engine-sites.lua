@@ -8,6 +8,7 @@ return {
     tickEntry = {address=0x0045CD10, bytes={131,61,36,228,145,1,0}, kind='raw', patch='return'},
     tickExit = {address=0x0045CDA8, bytes={94,195}},
     tickReturned = {address=0x0057C384, bytes={185,104,215,145,1}},
+    navigationCountdown = 0x0117CAD8, -- native updateSeparateAreaTileMap (4995E0)
     save = {address=0x00474480, bytes={131,236,16,83,85,86}},
     fileName = {address=0x0046C300, bytes={139,129,196,11,0,0}},
     mapName = {address=0x0046C2E0, bytes={139,68,36,4,61,244,1,0,0}},
@@ -44,6 +45,7 @@ return {
     tickEntry = {address=0x0045CF20, bytes={131,61,148,84,53,2,0}, kind='raw', patch='return'},
     tickExit = {address=0x0045CFB8, bytes={94,195}},
     tickReturned = {address=0x0057C7B4, bytes={185,216,71,53,2}},
+    navigationCountdown = 0x0120F718, -- native updateSeparateAreaTileMap (499750)
     save = {address=0x004746B0, bytes={131,236,16,83,85,86}},
     fileName = {address=0x0046C520, bytes={139,129,196,11,0,0}},
     mapName = {address=0x0046C500, bytes={139,68,36,4,61,244,1,0,0}},
