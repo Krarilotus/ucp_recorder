@@ -105,3 +105,17 @@ Older inventories do not contain this coverage and require their recorded
 recorder version. Do not edit an old manifest to claim the new inventory profile.
 Configured path discovery is still a heuristic: this does not claim to inventory
 every external namespace that an arbitrary module might read.
+
+Binary transfers use the shared `code/binary-memory.lua` adapter. Shipped RPS
+builds can truncate `writeString` at the first NUL even though newer source
+uses a length-aware copy. A private-buffer probe selects the length-aware writer
+or bounded 4 KiB `writeBytes` calls, then verifies every byte value. Hashing and
+world compression share this adapter; no framework replacement is necessary.
+The probe runs once and releases its buffer, outside simulation work.
+
+`tests/test_native_hash.py` covers legacy truncation, chunk boundaries, actual
+Windows CryptoAPI and failure cleanup. To check an installation's real DLLs,
+place a matching 32-bit Lua 5.4 interpreter beside copies of its `lua.dll` and
+`RPS.dll`, then run `tests/check_binary_memory_windows.lua` with the recorder
+source directory and that installation's `ucp/code` directory as arguments.
+This standalone check uses private memory and needs no running game.

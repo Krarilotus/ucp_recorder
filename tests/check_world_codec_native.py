@@ -136,7 +136,9 @@ def check_codec(path,source_root,variant):
     lua.globals().expose = expose
     lua.globals().readBytes = lambda address, size: lua.table_from(list(machine.mem_read(address, size)))
     lua.globals().readString = lambda address, size: bytes(machine.mem_read(address, size))
-    lua.globals().writeString = lambda address, data: machine.mem_write(address, data.encode('latin-1'))
+    # Match the shipped RPS C-string writer, including truncation at embedded NUL.
+    lua.globals().writeString = lambda address, data: machine.mem_write(address, data.encode('latin-1').split(b'\0')[0]+b'\0')
+    lua.globals().writeBytes = lambda address, data: machine.mem_write(address, bytes(data[i] for i in range(1,len(data)+1)))
     lua.globals().readInteger = get
     lua.globals().writeInteger = put
     lua.execute('''
@@ -144,7 +146,7 @@ package.path=source_root..'/?.lua;'..package.path
 package.loaded['code/native']={profile={name=variant}}
 package.loaded['code/native-hash']={prepare=function() end}
 core={allocate=allocate,deallocate=release,exposeCode=expose,readBytes=readBytes,
- readString=readString,writeString=writeString,readInteger=readInteger,writeInteger=writeInteger}
+ readString=readString,writeString=writeString,writeBytes=writeBytes,readInteger=readInteger,writeInteger=writeInteger}
 codec=require('code/world-codec')
 function encodeSection(data)
  return codec.withBuffers(#data,function(work) retained=work; return work:compress(data) end)

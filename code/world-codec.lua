@@ -1,6 +1,7 @@
 -- Use the game's PKWARE primitives on private data, never its global decoder or
 -- multiplayer save routine. Conversion belongs outside an active match.
 local native=require('code/native')
+local binary=require('code/binary-memory')
 local M={MAX_SECTION=32*1024*1024}
 local entries={SHC={implode=0x4724c0,explode=0x4725a0},
   Extreme={implode=0x4726e0,explode=0x4727c0}}
@@ -19,7 +20,7 @@ local function prepare()
   local check=require('code/hook-check').verify
   check({address=sites.implode,bytes={0x83,0xec,0x34,0x55,0x56,0x57}},'Native world compressor conflicts')
   check({address=sites.explode,bytes={0x83,0xec,0x34,0x53,0x56}},'Native world decompressor conflicts')
-  require('code/native-hash').prepare() -- shared verification of binary core.writeString
+  binary.prepare()
   functions={implode=core.exposeCode(sites.implode,6,1),explode=core.exposeCode(sites.explode,6,1)}
   return functions
 end
@@ -32,7 +33,7 @@ end
 function Codec:compress(data)
   assert(self.state,'Native world codec buffers have been released')
   assert(type(data)=='string' and #data>0 and #data<=self.capacity,'Invalid world section size')
-  core.writeString(self.input,data)
+  binary.write(self.input,data)
   core.writeInteger(self.state+8,0)
   core.writeInteger(self.state+12,#data)
   core.writeInteger(self.state+16,0)

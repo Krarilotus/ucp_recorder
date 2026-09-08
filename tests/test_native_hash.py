@@ -23,6 +23,7 @@ class Backend:
         self.base=0x100000
         self.providers={}; self.hashes={}; self.calls=[]
         self.fail=None; self.truncate=False; self.allocated=False
+        self.byte_writes=[]; self.broken_bytes=False
         self.real=real
         if real:
             self.api=ctypes.WinDLL('advapi32.dll',use_last_error=True)
@@ -57,9 +58,18 @@ class Backend:
         self.allocated=True
         return self.base
 
+    def deallocate(self,address):
+        assert address==self.base and self.allocated
+        self.allocated=False
+
+    def write_bytes(self,address,values):
+        data=bytes(values[i] for i in range(1,len(values)+1))
+        self.byte_writes.append(len(data))
+        if not self.broken_bytes: self.write(address,data)
+
     def write_string(self,address,value):
         data=value.encode('latin-1')
-        self.write(address,data.split(b'\0')[0] if self.truncate else data)
+        self.write(address,data.split(b'\0')[0]+b'\0' if self.truncate else data)
 
     def bind(self,library,name,count):
         assert library=='advapi32.dll' and count==COUNTS[name]
@@ -111,12 +121,13 @@ class Backend:
         lua=LuaRuntime(encoding='latin-1')
         g=lua.globals(); g.source_root=ROOT.as_posix()
         g.bind=self.bind; g.allocate=self.allocate; g.write_string=self.write_string
+        g.deallocate=self.deallocate; g.write_bytes=self.write_bytes
         g.read_string=lambda a,n:self.read(a,n).decode('latin-1')
         g.read_integer=self.integer; g.write_integer=self.write_integer
         lua.execute('''
 package.path=source_root..'/?.lua;'..package.path
 package.loaded['code/platform']={stdcall=bind}
-core={allocate=allocate,readString=read_string,writeString=write_string,
+core={allocate=allocate,deallocate=deallocate,writeBytes=write_bytes,readString=read_string,writeString=write_string,
  readInteger=read_integer,writeInteger=write_integer}
 hash=require('code/native-hash')
 ''')
@@ -124,12 +135,22 @@ hash=require('code/native-hash')
 
 
 class NativeHashTests(unittest.TestCase):
-    def check_vectors(self,real):
-        backend=Backend(real); lua=backend.runtime()
+    def check_vectors(self,real,truncate=False):
+        backend=Backend(real); backend.truncate=truncate; lua=backend.runtime()
         lua.execute('hash.prepare()')
-        for data in [b'',b'abc',bytes(range(256)),bytes(range(256))*1025]:
+        for data in [b'',b'abc',b'\0',b'a\0b',b'end\0',bytes(range(256)),
+                     *(b'\0'*n for n in (4095,4096,4097,65535,65536,65537)),bytes(range(256))*1025]:
             self.assertEqual(lua.globals().hash.sha256(data.decode('latin-1')),hashlib.sha256(data).hexdigest())
         self.assertFalse(backend.hashes or backend.providers)
+
+        if truncate:
+            self.assertTrue(backend.byte_writes)
+            self.assertLessEqual(max(backend.byte_writes),4096)
+        else:
+            self.assertEqual(backend.byte_writes,[])
+
+    def test_legacy_rps_embedded_nuls_startup_and_streaming(self):
+        self.check_vectors(False,truncate=True)
 
     def test_binary_streaming_vectors(self):
         self.check_vectors(False)
@@ -159,6 +180,7 @@ end
     @unittest.skipUnless(os.name=='nt','Requires Windows CryptoAPI')
     def test_actual_windows_cryptoapi_private_buffers(self):
         self.check_vectors(True)
+        self.check_vectors(True,truncate=True)
 
     def test_each_failure_releases_handles_and_allows_retry(self):
         for name in ['CryptAcquireContextA','CryptCreateHash','CryptHashData','CryptGetHashParam']:
@@ -170,11 +192,12 @@ end
                 self.assertEqual(lua.globals().hash.sha256('abc'),hashlib.sha256(b'abc').hexdigest())
                 self.assertFalse(backend.providers or backend.hashes)
 
-    def test_truncating_framework_is_rejected_before_opening_provider(self):
-        backend=Backend(); backend.truncate=True; lua=backend.runtime()
-        with self.assertRaisesRegex(Exception,'binary string writes'):
+    def test_broken_binary_fallback_is_rejected_before_opening_provider(self):
+        backend=Backend(); backend.truncate=True; backend.broken_bytes=True; lua=backend.runtime()
+        with self.assertRaisesRegex(Exception,'Binary memory transfer verification failed'):
             lua.execute('hash.prepare()')
         self.assertEqual(backend.calls,[])
+        self.assertFalse(backend.allocated)
 
 
 if __name__=='__main__': unittest.main()

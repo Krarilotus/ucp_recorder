@@ -1,11 +1,13 @@
 -- UCP itself imports Advapi32 for signature verification. Reuse its SHA-256
 -- provider rather than hashing tens of MiB in the interpreter on a game tick.
 local platform=require('code/platform')
+local binary=require('code/binary-memory')
 local M={CHUNK=65536}
 local api,buffers,busy
 
 local function initialize()
   if api then return end
+  binary.prepare()
   local functions={}
   for name,count in pairs({CryptAcquireContextA=5,CryptCreateHash=5,CryptHashData=4,
       CryptGetHashParam=5,CryptDestroyHash=1,CryptReleaseContext=2}) do
@@ -14,12 +16,6 @@ local function initialize()
   local storage=core.allocate(M.CHUNK+64,true)
   local allocated={input=storage,provider=storage+M.CHUNK+4,
     hash=storage+M.CHUNK+8,digest=storage+M.CHUNK+12,length=storage+M.CHUNK+44}
-  -- RPS must copy binary Lua strings by length, including embedded NULs.
-  -- Fail before touching game data if an incompatible framework truncates them.
-  local bytes={}; for i=0,255 do bytes[#bytes+1]=string.char(i) end
-  local probe=table.concat(bytes)
-  core.writeString(allocated.input,probe)
-  assert(core.readString(allocated.input,#probe)==probe,'Native hashing requires binary string writes')
   api,buffers=functions,allocated
 end
 
@@ -43,7 +39,7 @@ local function hashChunks(nextChunk)
       local chunk=nextChunk()
       if not chunk then break end
       assert(type(chunk)=='string' and #chunk>0 and #chunk<=M.CHUNK,'Invalid SHA-256 chunk')
-      core.writeString(buffers.input,chunk)
+      binary.write(buffers.input,chunk)
       assert(api.CryptHashData(hash,buffers.input,#chunk,0)~=0,'Cannot update SHA-256 hash')
     end
     core.writeInteger(buffers.length,32)

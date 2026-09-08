@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.43.2
+
+- Fix startup with shipped UCP 3.0.7 runtimes whose string writer stops at zero bytes. Hashing and native world compression now share a verified binary transfer helper, using bounded byte writes when needed. No extra module or framework upgrade is required.
+- Add regression coverage for zero bytes, all byte values, chunk boundaries, failed transfers and native Windows hashing. Include a standalone check against an installation's actual RPS DLLs. Preserve the viewer-pause correction; the historical determinism failure remains under investigation.
+
 ## 0.43.1
 
 - Freeze tick-owned maintenance while viewing a paused replay or a halting game
