@@ -12,7 +12,7 @@ divergence is not yet proven fixed. See the [remaining work](docs/roadmap.md).
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.42.0.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.42.1.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API

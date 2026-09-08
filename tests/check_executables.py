@@ -125,6 +125,8 @@ def check(folder):
         check_spawn_context(reader,lua,root,name)
         check_menu_pause(reader,lua,root,name)
         from check_results_native import check_results
+        from check_tick_boundary_native import check_tick_boundary
+        check_tick_boundary(folder/file,lua,root,name)
         check_results(reader,lua,root,name)
         from check_load_native import check_load
         check_load(reader,lua,root,name)

@@ -26,9 +26,9 @@ function M.install(sites,enabled,mode,seed,offline)
   return returnAddresses
 end
 
-function M.installTick(site,enabled,mode,halt,callback,originalCallback,offline)
+function M.installTick(site,enabled,mode,halt,callback,originalCallback,offline,exitAddress)
   local tick={address=site.address,bytes=site.bytes,kind='raw',patch='tick',
-    halt=halt,callback=callback,originalCallback=originalCallback,skipTick=site.address+0x25}
+    halt=halt,callback=callback,originalCallback=originalCallback,skipTick=assert(exitAddress)}
   M.install({tick},enabled,mode,nil,offline)
 end
 return M

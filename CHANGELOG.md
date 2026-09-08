@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.42.1
+
+- Stop the native tick routine completely after playback finishes or fails,
+  including paused calls that bypass the clock observer. Previously the halt
+  skipped clock advancement but left map/path maintenance reachable.
+- Keep inactive native gates inactive during offline playback. Live multiplayer
+  ignores a stale replay halt; recording continues to use its ordinary scope.
+- Document the execution phases and restore/completion gates. Original Crusader
+  and Extreme checks reproduce paused view refresh reaching world updates
+  without clock advancement, verify the existing local pause guards, and check
+  the new endpoint/entry guards. The earlier RNG2 failures remain unresolved.
+
 ## 0.42.0
 
 - Enable local single-player playback of newly recorded multiplayer matches,

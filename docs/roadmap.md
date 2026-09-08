@@ -3,6 +3,10 @@
 The five implementation areas remain the scope. Code completion and live proof
 are separate; unverified behavior is not marked complete.
 
+Use the [execution-phase and restore audit](execution-phases.md) to order the
+remaining work. The current gate is phase/restoration equivalence and the
+unexplained SP divergence, before claiming full offline-MP completion.
+
 | Area | Implemented | Still required |
 | --- | --- | --- |
 | Native world restoration | SHC/Extreme header, codec, original reader and post-preparation restoration | Live loaded-save and recovery-world comparison |

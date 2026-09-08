@@ -100,8 +100,9 @@ class ScopedCodeTests(unittest.TestCase):
         engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
         for engine in engines.values():
             tick=engine['tick']; tick['patch']='tick'; tick['kind']='raw'
-            tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=tick['address']+0x25
+            tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=engine['tickExit']['address']
             original=self.run_code(tick,0,2,0xa83,False)
+            self.assertEqual(self.run_code(tick,0,2,0xa83,True,halt=1,offline=1),original)
             self.assertEqual(self.run_code(tick,1,2,0xa83,True,halt=1,offline=0),original)
             halted=self.run_code(tick,1,2,0xa83,True,halt=1,offline=1)
             self.assertEqual(halted[-3],tick['skipTick'])
@@ -137,7 +138,7 @@ class ScopedCodeTests(unittest.TestCase):
         engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
         for variant,engine in engines.items():
             tick=engine['tick']; tick['patch']='tick'; tick['kind']='raw'
-            tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=tick['address']+0x25
+            tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=engine['tickExit']['address']
             original=self.run_code(tick,0,0,0xa83,False)
             for enabled,mode in ((0,0),(0,99),(1,1),(1,2)):
                 with self.subTest(variant=variant,enabled=enabled,mode=mode):
@@ -180,7 +181,7 @@ class ScopedCodeTests(unittest.TestCase):
         engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
         for variant,engine in engines.items():
             tick=engine['tick']; tick['patch']='tick'; tick['kind']='raw'
-            tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=tick['address']+0x25
+            tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=engine['tickExit']['address']
             tick['originalCallback']=0x4f0100
             for flags in (0x202,0x242,0xa83):
                 original=self.run_code(tick,0,0,flags,False)

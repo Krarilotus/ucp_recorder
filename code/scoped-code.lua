@@ -22,8 +22,8 @@ function M.build(site,enabled,mode,seed,origin,returnAddresses,offline)
   end
   local function compare(address,value) emit(0x83,0x3d); dword(out,address); emit(value) end
   emit(0x9c) -- pushfd: the conditional branches below must preserve incoming flags
-  if offline then compare(offline,1); rel({0x0f,0x84},'patched') end
   compare(enabled,1); rel({0x0f,0x85},'original')
+  if offline then compare(offline,1); rel({0x0f,0x84},'patched') end
   if mode then
     compare(mode,0); rel({0x0f,0x84},'patched')
     compare(mode,99); rel({0x0f,0x85},'original')

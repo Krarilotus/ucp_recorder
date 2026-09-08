@@ -297,8 +297,8 @@ end
 
 function Session:afterTick()
   if self.nextReplay then
-    -- Called after processGameTick returns, with no simulation stack retaining
-    -- pointers into the old world. Loading from inside onTick would be too early.
+    -- processGameTick has unwound. Outer-loop callbacks still follow this point;
+    -- their replacement-world safety remains part of the execution-phase audit.
     local id,prepared=self.nextReplay,self.preparedWorlds
     self:reset()
     self:startPlayback(id,prepared)
