@@ -11,7 +11,7 @@ gameplay and the recorded-settings restart still need live verification.
 ## Install and try it
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download the
-   `recorder-0.37.0.zip` asset from this PR's test release, not GitHub's source ZIP.
+   `recorder-0.37.1.zip` asset from this PR's test release, not GitHub's source ZIP.
    Release links are posted on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls);
    assets are hosted in the [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API

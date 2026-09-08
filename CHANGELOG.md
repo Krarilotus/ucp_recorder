@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.37.1
+
+- Hash large starting-world sections with Windows CryptoAPI rather than UCP's
+  interpreted Lua SHA-256. Check binary string writes and a known digest before
+  capture; release temporary hash/provider handles on success and failure.
+  This removes a measured isolated hashing bottleneck; complete in-game timing
+  still needs measurement on both PCs.
+
 ## 0.37.0
 
 - Capture all 122 native starting-world sections on each multiplayer peer, with

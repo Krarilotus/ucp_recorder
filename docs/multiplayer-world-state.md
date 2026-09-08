@@ -41,6 +41,20 @@ The synchronous operation can delay the first frame and network polling; its
 runtime cost still needs measurement on both physical PCs. Read-only does not
 mean zero timing overhead or establish thread-level snapshot isolation.
 
+Version 0.37.1 uses Windows CryptoAPI SHA-256 for the large section payloads.
+UCP already imports Advapi32 for its own hashing/signature checks. The recorder
+uses an ephemeral provider context (no stored keys), a reusable 64 KiB scratch
+buffer, explicit byte lengths, and releases hash/provider handles on errors too.
+A binary-string probe and the SHA-256 `abc` vector reject an incompatible bridge
+before capture. Small descriptors/manifests still use UCP's normal SHA-256.
+
+An isolated Lua 5.3 benchmark of 25,168,385 bytes on the development PC took
+4.70 seconds through the shipped pure-Lua implementation and 0.039 seconds
+through CryptoAPI. This used a 64-bit Python address adapter and private buffers;
+it is not an in-game 32-bit frame/network measurement. Windows CI additionally
+checks actual CryptoAPI vectors, while x86 emulation checks the stdcall bridge.
+See Microsoft's [CryptHashData contract](https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-crypthashdata).
+
 Automarket 1.1.0 keeps additional state in its exposed `pAutomarketData` allocation.
 `automarket.bin` copies precisely the version-2, 2416-byte payload used by its
 map-extensions serialization callback: header, nine settings slots, credit and

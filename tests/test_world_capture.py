@@ -71,6 +71,7 @@ class WorldCaptureTests(unittest.TestCase):
 package.path=source_root..'/?.lua;'..package.path
 json={encode=function(_,v) return encode_json(v) end,decode=function(_,v) return decode_json(v) end}
 sha={sha256=hash_string}; core={readString=read_memory}
+package.loaded['code/native-hash']={prepare=function() end,sha256=hash_string}
 package.loaded['code/platform']={replace=replace_file,mkdir=make_directory}
 require('code/native').profile={name='SHC',sha256=string.rep('a',64)}
 local profile=require('code/world-sections').SHC

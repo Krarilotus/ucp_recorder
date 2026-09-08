@@ -2,6 +2,7 @@
 local native=require('code/native')
 local sections=require('code/world-sections')
 local store=require('code/sessions')
+local digest=require('code/native-hash')
 local M={CHUNK=65536}
 
 local function unsigned(data,offset,size)
@@ -30,6 +31,7 @@ function M.layout()
 end
 
 function M.capture(path,engine)
+  digest.prepare()
   local entries,profile,raw=M.layout()
   local manifest={format=1,kind='native-world-evidence',variant=native.profile.name,
     executable=native.profile.sha256,tick=engine:tick(),status='writing',playable=false,
@@ -48,7 +50,7 @@ function M.capture(path,engine)
         assert(type(data)=='string' and #data==size,'Short native world read')
         assert(file:write(data)); chunks[#chunks+1]=data
       end
-      entry.sha256=sha.sha256(table.concat(chunks))
+      entry.sha256=digest.sha256(table.concat(chunks))
     end
     assert(file:flush())
   end)

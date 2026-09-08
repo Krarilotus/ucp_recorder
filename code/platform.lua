@@ -77,9 +77,10 @@ local function bootstrap()
   getProc=wrap(exported('kernel32.dll','GetProcAddress',0),2)
 end
 function M.stdcall(library,name,count)
-  assert(library=='kernel32.dll','Unsupported recorder system library')
+  assert(library=='kernel32.dll' or library=='advapi32.dll','Unsupported recorder system library')
   if not getProc then bootstrap() end
   local handle=getModule(buffer('library',library))
+  assert(handle~=0,'Windows library is unavailable: '..library)
   local address=getProc(handle,buffer('symbol',name))
   assert(address~=0,'Windows function is unavailable: '..name)
   return wrap(address,count)

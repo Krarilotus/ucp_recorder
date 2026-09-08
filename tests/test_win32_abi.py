@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipIf(Uc is None, 'Install unicorn==2.1.4 for 32-bit ABI emulation')
 class Win32ABITests(unittest.TestCase):
     def test_generated_bridges_preserve_argument_order_and_caller_stack(self):
-        for count in (0, 1, 2, 3, 6, 8, 10):
+        for count in (0, 1, 2, 3, 4, 5, 6, 8, 10):
             with self.subTest(arguments=count):
                 lua = LuaRuntime()
                 lua.execute('''
@@ -45,6 +45,7 @@ core={
                 emulator.mem_write(0x100000, bytes(code))
                 emulator.mem_write(0x102000, b'\xb8\x2a\0\0\0\xc2'+struct.pack('<H', count*4))
                 arguments = [0x100+i for i in range(count)]
+                if count: arguments[-1]=0xf0000000  # unsigned CryptoAPI flag through a 32-bit push
                 emulator.mem_write(0x201000, struct.pack('<'+'I'*(count+1), 0x103000, *arguments))
                 emulator.reg_write(UC_X86_REG_ESP, 0x201000)
                 emulator.reg_write(UC_X86_REG_EBP, 0x12345678)
