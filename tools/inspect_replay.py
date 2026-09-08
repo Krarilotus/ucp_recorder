@@ -193,6 +193,9 @@ def multiplayer_capture(folder):
         issues.append('Closed capture is missing its committed ending')
     framing = 'damaged' if issues else ('snapshot' if snapshot else ('sealed' if footer else 'unsealed prefix'))
     return {'capture': manifest['id'], 'playable': False, 'journalFraming': framing,
+            'compiledReplayStatus': manifest.get('replayStatus'),
+            'compiledReplayReason': manifest.get('replayReason'),
+            'note': 'This command inspects the raw capture. The game validates compiled replay streams before playback.',
             'issues': issues, 'validPrefixBytes': valid_bytes, 'fileBytes': size,
             'lastJournalTick': last_tick, 'events': sequence, 'commands': commands,
             'checkpoints': checkpoints, 'coverageGaps': gaps, 'timelineSegments': segments, 'commandCategories': categories,

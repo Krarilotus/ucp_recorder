@@ -11,6 +11,7 @@ class RecordedSettingsTests(unittest.TestCase):
     def prepare(self):
         self.lua.execute('''
 yaml={eval=function(text) return json:decode(text) end}
+package.loaded['code/replay-assets']={capture=function() return {profile='ucp-files-v1',files={}} end,verify=function() end}
 local originalOpen=io.open
 store.write(temp_root..'/version.yml','version: 3.0.7')
 io.open=function(path,mode)

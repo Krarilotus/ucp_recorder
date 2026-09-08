@@ -16,7 +16,7 @@ local M={}
 
 ---@param manifest table A validated, completed replay manifest.
 ---@return ReplayLaunchReadiness
-function M.check(manifest)
+function M.check(manifest,verifyAssets)
   local path=store.path(manifest.id)
   local raw=store.read(path..'/environment.json')
   assert(sha.sha256(raw)==manifest.environmentHash,'Recorded environment is damaged')
@@ -52,14 +52,24 @@ function M.check(manifest)
     end
     assert(next(seen),'Recorded launch settings contain no extensions')
   end
+  -- Selection stays responsive; full file hashing belongs to the explicit
+  -- Play/restart action, not every click or arrow-key movement in the list.
+  if verifyAssets and environment.assets then
+    local ok,reason=pcall(require('code/replay-assets').verify,environment.assets)
+    if not ok then
+      issues[#issues+1]={kind='asset',name=tostring(reason):match('^[^\n]+'):gsub('^.-:%d+: ','')}
+    end
+  end
   local lines={}
   for _,issue in ipairs(issues) do
-    lines[#lines+1]=issue.kind=='framework' and tr('Required UCP framework: %s',issue.version)
+    lines[#lines+1]=issue.kind=='asset' and issue.name
+      or issue.kind=='framework' and tr('Required UCP framework: %s',issue.version)
       or tr('Missing or unreadable: %s %s',issue.name,issue.version)
   end
   local message=''
   if #issues>0 then
-    message=issues[1].kind=='framework' and tr('The recorded UCP framework is required.')
+    message=issues[1].kind=='asset' and issues[1].name
+      or issues[1].kind=='framework' and tr('The recorded UCP framework is required.')
       or tr('Required: %s %s',issues[1].name,issues[1].version)
     if #issues>1 then message=message..tr(' (+%d more)',#issues-1) end
     lines[#lines+1]=tr('Install these exact versions using the UCP launcher or their original releases.')
@@ -70,7 +80,7 @@ function M.check(manifest)
 end
 
 function M.requireReady(manifest)
-  local result=M.check(manifest)
+  local result=M.check(manifest,true)
   if not result.ready then
     store.write(store.ROOT..'/requirements.txt',result.details)
     -- UCP owns the existing Windows error dialog. Display the whole list on an

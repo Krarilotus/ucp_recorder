@@ -37,7 +37,7 @@ class ScopedCodeTests(unittest.TestCase):
         self.emitter=self.lua.execute((ROOT/'code/scoped-code.lua').read_text())
         self.profiles=self.lua.execute((ROOT/'code/scoped-sites.lua').read_text())
 
-    def run_code(self,site,enabled,mode,flags,gated,halt=0):
+    def run_code(self,site,enabled,mode,flags,gated,halt=0,offline=None,local_gate=False):
         machine=Uc(UC_ARCH_X86,UC_MODE_32)
         machine.mem_map(0x400000,0x3000000)
         machine.mem_map(0x4000000,0x1000)
@@ -47,6 +47,7 @@ class ScopedCodeTests(unittest.TestCase):
         counter,scope,mode_pointer=0x600100,0x600104,0x600108
         def put(address,value): machine.mem_write(address,struct.pack('<I',value&0xffffffff))
         put(scope,enabled); put(mode_pointer,mode)
+        put(0x600110,offline or 0)
         if site['patch']=='tick':
             put(site['halt'],halt)
             machine.mem_write(site['callback'],b'\xff\x05'+struct.pack('<I',counter)+b'\xb8\x01\0\0\0\xc3')
@@ -54,7 +55,8 @@ class ScopedCodeTests(unittest.TestCase):
                 machine.mem_write(site['originalCallback'],b'\xff\x05'+struct.pack('<I',counter)
                     + b'\xb8\x11\0\0\0\xb9\x22\0\0\0\xba\x33\0\0\0\xc3')
         if gated:
-            gate=bytes(self.emitter.build(site,scope,mode_pointer,123,0x4000000).values())
+            gate=bytes(self.emitter.build(site,scope,None if local_gate else mode_pointer,123,
+                0x4000000,None,0x600110 if offline is not None else None).values())
             machine.mem_write(0x4000000,gate)
             machine.mem_write(site['address'],bytes(self.emitter.jump(site['address'],0x4000000,len(original)).values()))
         if site['kind'] in ('call','tail'):
@@ -63,7 +65,7 @@ class ScopedCodeTests(unittest.TestCase):
         initial=[0x500000,0x600010,0x600000,0x20,0x600000,0xabcdef00,0x410f000,0x4108000,flags]
         for register,value in zip(REGS,initial): machine.reg_write(register,value)
         stops={site['address']+len(original)}
-        if site['kind']=='tail':
+        if site['kind']=='tail' or site['patch']=='return':
             put(initial[7],0x4f1000)
             stops.add(0x4f1000)
         if site['kind']=='branch': stops.add(site['target'])
@@ -75,6 +77,36 @@ class ScopedCodeTests(unittest.TestCase):
         self.assertIn(machine.reg_read(UC_X86_REG_EIP),stops)
         return tuple(machine.reg_read(r) for r in REGS)+(machine.reg_read(UC_X86_REG_EIP),
             struct.unpack('<I',machine.mem_read(counter,4))[0],struct.unpack('<I',machine.mem_read(0x600004,4))[0])
+
+    def test_offline_boundaries_preserve_live_code_and_callee_stack_contracts(self):
+        profiles=self.lua.execute((ROOT/'code/offline-sites.lua').read_text())
+        for variant,sites in profiles.items():
+            for name,site in sites.items():
+                for flags in (0x202,0xa83):
+                    with self.subTest(variant=variant,site=name,flags=flags):
+                        original=self.run_code(site,0,2,flags,False)
+                        self.assertEqual(self.run_code(site,0,2,flags,True,local_gate=True),original)
+                        active=self.run_code(site,1,2,flags,True,local_gate=True)
+                        self.assertEqual(active[1:7],(0x600010,0x600000,0x20,0x600000,0xabcdef00,0x410f000))
+                        self.assertEqual(active[8],flags)
+                        if site['patch']=='return':
+                            self.assertEqual(active[7],0x4108004+(site['pop'] or 0))
+                            self.assertEqual(active[-3],0x4f1000)
+                        else:
+                            self.assertEqual(active[0],99)
+                            self.assertEqual(active[7],0x4108000)
+
+    def test_offline_tick_can_halt_without_enabling_single_player_rng_fixes(self):
+        engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
+        for engine in engines.values():
+            tick=engine['tick']; tick['patch']='tick'; tick['kind']='raw'
+            tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=tick['address']+0x25
+            original=self.run_code(tick,0,2,0xa83,False)
+            self.assertEqual(self.run_code(tick,1,2,0xa83,True,halt=1,offline=0),original)
+            halted=self.run_code(tick,1,2,0xa83,True,halt=1,offline=1)
+            self.assertEqual(halted[-3],tick['skipTick'])
+            self.assertEqual(halted[-2],1)
+            self.assertEqual(halted[7:9],(0x4108000,0xa83))
 
     def test_multiplayer_and_idle_paths_match_original_registers_flags_stack_and_effects(self):
         for variant,sites in self.profiles.items():

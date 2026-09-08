@@ -7,22 +7,25 @@ function M.new(recorder)
 end
 function M:available()
  local r=self.recorder
- return r.mode=='play' and r.active and r.manifest and r.engine:singlePlayer()
+ return r.mode=='play' and r.active and r.manifest and r.engine:localSession()
    and (r.status=='playing' or r.status=='finished' or r.status=='error')
 end
 function M:players()
  if not self:available() then return {} end
+ self:player()
+ if self.roster then return self.roster end
  local r=self.recorder
  local state=r.engine:networkState()
  local result={}
  for slot=1,8 do
   if slot==r.manifest.player or state.roster[slot].kind~='empty' then result[#result+1]=slot end
  end
- return result
+ self.roster=result
+ return self.roster
 end
 function M:player()
  local r=self.recorder
- if self.session~=r.manifest then self.session=r.manifest; self.selected=nil end
+ if self.session~=r.manifest then self.session=r.manifest; self.selected=nil; self.roster=nil end
  return self.selected or (r.manifest and r.manifest.player)
 end
 function M:select(slot)

@@ -215,6 +215,7 @@ engine={rng=0x1a279c0,
  journal={executed=0},
  setScope=function(_,active) scoped=active end,
  singlePlayer=function() return true end,
+ localSession=function(self) return self.offline~=nil or self:singlePlayer() end,
  tick=function() return now end,
  player=function() return 1 end,
  rngState=function() return {11,22,3,4} end,
@@ -264,7 +265,7 @@ assert(savedManifest.status=='complete' and savedManifest.lastTick==512)
 local r=session(); r.status='playing'; r.mode='play'; r.playedCommands=0; r.manifest={player=1,variant='SHC'}; now=100; space=false
 r.nextCommand=command(110); r:feed()
 assert(scheduled==0 and r.nextCommand.time==110)
-space=true; now=110; r.loadCommand=function() return nil end; r:feed()
+space=true; now=110; r.commandsFile={read=function() return nil end}; r:feed()
 assert(scheduled==1 and not r.nextCommand)
 ''')
 

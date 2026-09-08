@@ -1,6 +1,7 @@
 """Actual Lua file I/O: independent peers, snapshots, failures and recovery triage."""
 import importlib.util
 import json
+import hashlib
 from pathlib import Path
 import unittest
 import test_session_files
@@ -18,6 +19,7 @@ require('code/native').profile=profile
 Capture=require('code/multiplayer-capture'); Capture.ROOT=temp_root..'/captures'
 now=1; single=false; reads={}; nativeWrites=0
 core={readInteger=function(a) return reads[a] or 0 end,readByte=function() return 28 end,
+ readString=function(_,n) return n==4 and string.char(1,0,2,0) or string.char(3,0,0,0,4,0,0,0) end,
  readBytes=function(_,n) local t={}; for i=1,n do t[i]=i%256 end; return t end,
  writeInteger=function() nativeWrites=nativeWrites+1; error('capture mutated game') end}
 network={mode=1,localPlayer=1,syncStatus=0,handles={},roster={}}
@@ -25,7 +27,7 @@ for i=1,8 do
  network.handles[i]=i<=2 and 100+i or -1
  network.roster[i]={slot=i,kind=i<=2 and 'human' or 'empty',ai=0,variation=0}
 end
-engine={base=1000,sites={actorOffset=32},
+engine={base=1000,rng=2000,sites={actorOffset=32},
  tick=function() return now end,player=function() return network.localPlayer end,
  singlePlayer=function() return single end,
  networkState=function() return json:decode(json:encode(network)) end,
@@ -33,11 +35,14 @@ engine={base=1000,sites={actorOffset=32},
  rngState=function() return {1,2,3,4} end,resourceState=function() return resourceState() end}
 store.settings=function()
  local raw='settings'; local env='environment'; local restart='resolved launch settings'
- return {raw=raw,hash=sha.sha256(raw),environment=env,environmentHash=sha.sha256(env),
+ return {raw=raw,hash=sha.sha256(raw),environment=env,environmentHash=sha.sha256(env),settingsCapture='resolved-v1',
  restartSettings=restart,restartSettingsHash=sha.sha256(restart)}
 end
 trace=Capture.new(engine,{multiplayerDiagnosticsEndTick=128,multiplayerDiagnosticsStartTick=64})
-function tick(t) now=t; trace:observe('onTick'); assert(not trace.failed,trace.failureReason) end
+function tick(t)
+ now=t; trace:observe('onTick'); assert(not trace.failed,trace.failureReason)
+ now=t+1; trace:observe('afterTick'); now=t; assert(not trace.failed,trace.failureReason)
+end
 function command()
  reads[engine.base+0x2d824]=0; reads[engine.base+32]=network.localPlayer
  reads[engine.base+0x3c67c]=now; reads[engine.base+0x3c67c+4]=100+network.localPlayer
@@ -48,6 +53,47 @@ end
 
     def path(self):
         return Path(self.lua.eval('trace.path or trace.lastCapture.path'))
+
+    def valid_world(self):
+        def hash_file(path, limit):
+            self.assertLessEqual(Path(path).stat().st_size, limit)
+            with open(path, 'rb') as stream:
+                return hashlib.file_digest(stream, 'sha256').hexdigest()
+        self.lua.globals().hash_file = hash_file
+        self.lua.execute('''
+store.ROOT=Capture.ROOT
+package.loaded['code/native-hash']={file=hash_file}
+core.readByte=function() return 34 end
+engine.rngData=function()
+ return string.char(1,0,2,0,123,0,0,0)..string.rep('a',40000)..string.char(3,0,0,0,4,0,0,0)
+end
+package.loaded['code/world-capture']={capture=function(path)
+ for _,name in ipairs({'world.json','world.bin','world-layout.bin','world-header.bin'}) do store.write(path..'/'..name,'world') end
+ return {status='complete',header=true,hash=sha.sha256('world')}
+end}
+''')
+
+    def test_native_boundaries_seal_host_and_client_into_the_shared_replay_library(self):
+        self.valid_world()
+        self.lua.execute('''
+for player=1,2 do
+ network.localPlayer=player; trace=Capture.new(engine,{})
+ for time=1,129 do
+  if time==50 then now=time; command() end
+  tick(time)
+ end
+ local copy=trace:saveCopy('Named prefix')
+ trace:observe('stop','match exit')
+ local manifest=store.load(trace.lastCapture.id,profile)
+ assert(manifest.multiplayer.localPlayer==player and manifest.commandCount==1)
+ assert(manifest.simulationProfile=='recorder-mp-v1' and manifest.status=='complete')
+ store.preflight(manifest); store.preflight(store.load(copy.id,profile))
+ local original=store.read(store.path(manifest.id)..'/ticks.bin')
+ store.write(store.path(manifest.id)..'/ticks.bin',original:sub(1,-2))
+ assert(not pcall(store.preflight,manifest))
+end
+assert(nativeWrites==0 and #store.list()==4)
+''')
 
     def test_both_peers_capture_from_first_tick_ignore_window_and_save_full_tail(self):
         self.lua.execute('''
@@ -83,9 +129,9 @@ assert(store.read(a.path..'/commands.jsonl')==original)
             self.assertEqual(result['commands'], 1)
         self.assertEqual(inspector.multiplayer_capture(self.path())['commands'], 2)
 
-    def test_roster_sync_and_rewound_clock_are_preserved_as_unsupported_transitions(self):
+    def test_roster_sync_and_rewound_clock_start_a_replacement_world_after_synchronization(self):
         self.lua.execute('''
-tick(1); tick(64); tick(128)
+tick(1); first=trace.path; tick(64); tick(128)
 network.syncStatus=1; tick(129)
 network.handles[2]=-1; tick(130)
 network.syncStatus=0; tick(64); command(); tick(128)
@@ -94,13 +140,16 @@ assert(nativeWrites==0)
 ''')
         result = inspector.multiplayer_capture(self.path())
         self.assertEqual(result['journalFraming'], 'sealed', result)
-        self.assertEqual(result['timelineSegments'], 2)
-        self.assertGreaterEqual(result['coverageGaps'], 4)
+        self.assertEqual(result['timelineSegments'], 1)
         self.assertEqual(result['commands'], 1)
-        self.assertEqual(result['footer']['status'], 'incomplete')
+        first = Path(self.lua.eval('first'))
+        previous = json.loads((first/'capture.json').read_text())
+        self.assertEqual(previous['nextReplay'], self.path().name)
+        self.assertEqual(previous['lastObservedTick'], 128)
+        self.assertGreaterEqual(inspector.multiplayer_capture(first)['coverageGaps'], 3)
 
     def test_crash_tail_is_reported_without_modifying_any_bytes(self):
-        self.lua.execute('tick(1); command(); tick(64); trace.file:close(); trace.file=nil')
+        self.lua.execute('tick(1); command(); tick(64); trace.file:close(); trace.file=nil; trace.tickFile:close(); trace.tickFile=nil')
         path = self.path()
         stream = path/'commands.jsonl'
         valid = stream.read_bytes()
@@ -114,13 +163,34 @@ assert(nativeWrites==0)
 
     def test_command_after_clock_rewind_is_segmented_before_next_checkpoint(self):
         self.lua.execute('''
-tick(1); tick(64); tick(128); tick(190)
+tick(1); first=trace.path; tick(64); tick(128); tick(190)
 now=70; command(); tick(128); trace:observe('stop','exit')
 ''')
         result=inspector.multiplayer_capture(self.path())
         self.assertEqual(result['journalFraming'],'sealed',result)
-        self.assertEqual(result['timelineSegments'],2)
-        self.assertEqual(result['commands'],1)
+        self.assertEqual(result['timelineSegments'],1)
+        self.assertEqual(result['commands'],0)
+        self.assertEqual(inspector.multiplayer_capture(self.lua.eval('first'))['commands'],1)
+
+    def test_recovery_links_and_named_copy_keep_both_worlds_independent(self):
+        self.valid_world()
+        self.lua.execute('''
+for time=1,65 do tick(time) end
+local first=trace.capture.id
+network.syncStatus=1; now=66; trace:observe('immediateCommand','receive')
+network.syncStatus=0
+for time=10,75 do tick(time) end
+local second=trace.capture.id
+assert(first~=second and trace.capture.previousReplay==first)
+local copy=trace:saveCopy('Recovered prefix')
+assert(copy.id~=first and copy.nextReplay~=second)
+trace:observe('stop','exit')
+local root=store.load(first,profile); local nextPart=store.load(root.nextReplay,profile)
+assert(nextPart.id==second and nextPart.previousReplay==root.id)
+store.preflight(root); store.preflight(nextPart)
+store.preflight(store.load(copy.id,profile)); store.preflight(store.load(copy.nextReplay,profile))
+assert(#store.list()==2 and nativeWrites==0)
+''')
 
     def test_size_limit_stops_capture_only_and_preserves_flushed_prefix(self):
         self.lua.execute('''

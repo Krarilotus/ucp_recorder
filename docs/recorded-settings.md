@@ -76,3 +76,20 @@ PR release tests. Full live game exit/restart, graphics initialization and Extre
 playback still require verification. Environment matching is not yet a complete
 content fingerprint: edited extension binaries/assets under unchanged versions
 remain a separate engineering gap. Multiplayer playback remains unavailable.
+
+
+## Asset identity (0.42.0)
+
+New recordings fingerprint active extension contents and readable file/directory
+options at startup, outside simulation hooks. Unpacked extension files are
+hashed individually. UCP 3.0.7 does not enumerate relative ZIP members correctly
+through its virtual directory listing, so packed extensions use their archive
+hash instead. Keep the original package: repacking it or changing between a ZIP
+and unpacked folder requires the recorded layout. A folder silently shadowing a
+recorded ZIP is rejected. Configured assets inside a packed extension are also
+covered by that archive hash.
+
+Version names alone cannot detect edited unpacked code/assets. Missing or changed
+files are reported before loading; no different version or contents are accepted
+as a silent replacement. Arbitrary external state created by other modules is
+not automatically serialized by this inventory.

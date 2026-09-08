@@ -13,22 +13,22 @@ function M.verify(seed)
   return sites
 end
 
-function M.install(sites,enabled,mode,seed)
+function M.install(sites,enabled,mode,seed,offline)
   local returnAddresses={}
   for _,site in ipairs(sites) do
     if site.kind~='seed' or seed~=nil then
-      local size=#emitter.build(site,enabled,mode,seed,0)
+      local size=#emitter.build(site,enabled,mode,seed,0,nil,offline)
       local target=core.allocateCode(size)
-      core.writeCode(target,emitter.build(site,enabled,mode,seed,target,returnAddresses))
+      core.writeCode(target,emitter.build(site,enabled,mode,seed,target,returnAddresses,offline))
       core.writeCode(site.address,emitter.jump(site.address,target,#site.bytes))
     end
   end
   return returnAddresses
 end
 
-function M.installTick(site,enabled,mode,halt,callback,originalCallback)
+function M.installTick(site,enabled,mode,halt,callback,originalCallback,offline)
   local tick={address=site.address,bytes=site.bytes,kind='raw',patch='tick',
     halt=halt,callback=callback,originalCallback=originalCallback,skipTick=site.address+0x25}
-  M.install({tick},enabled,mode)
+  M.install({tick},enabled,mode,nil,offline)
 end
 return M

@@ -15,6 +15,7 @@ function M.createButtons(recorder,sites)
   M.browser=browser
   local view=require('code/replay-view').new(recorder)
   M.view=view
+  local playback=require('code/playback-controls').new(recorder)
   ui.renderScope=function(callback)
     local screen=core.readInteger(native.addr(0x1fe7d1c))
     if ui:activeDialog()~=-1 or (screen~=14 and screen~=16) then return callback() end
@@ -51,7 +52,7 @@ function M.createButtons(recorder,sites)
     ui:text(tr(browser.message),x+300,y+124,1,18,false,552)
   end,function() return tr(editorTitle) end)
   ui:installInput(function()
-    return recorder.engine:singlePlayer() or ui:activeDialog()==M.statusDialog or ui:activeDialog()==nameDialog
+    return recorder.engine:localSession() or ui:activeDialog()==M.statusDialog or ui:activeDialog()==nameDialog
   end,function(message,key)
     if ui:activeDialog()==nameDialog and editor then
       local action=editor:input(message,key)
@@ -76,12 +77,12 @@ function M.createButtons(recorder,sites)
     end
   end)
   ui:extendPause(function()
-    if not recorder.engine:singlePlayer() then return tr('Replay status') end
+    if not recorder.engine:localSession() then return tr('Replay status') end
     if recorder.status=='error' then return tr('Replay failed - details') end
     if recorder.mode=='play' then return tr('Replay controls') end
     return tr(recorder.status=='recording' and 'Save replay as...' or 'Replay status')
   end,function()
-    if not recorder.engine:singlePlayer() then
+    if not recorder.engine:localSession() then
       ui:show(M.statusDialog)
     elseif recorder.status=='recording' and recorder.observedTick then
       openName(require('code/sessions').title(recorder.manifest),function(name)
@@ -95,17 +96,31 @@ function M.createButtons(recorder,sites)
       ui:show(M.statusDialog)
     end
   end,function()
-    return not recorder.engine:singlePlayer() or recorder.mode~='none' or recorder.status=='error'
+    return not recorder.engine:localSession() or recorder.mode~='none' or recorder.status=='error'
   end)
   M.statusDialog=ui:modal({
-    {x=24,y=186,width=180,height=30,label=function() return tr('Back') end,action=function() ui:show(5) end},
-    {x=340,y=186,width=236,height=30,label=function()
+    {x=24,y=208,width=260,height=30,label=function()
+      if playback:available() then return tr(playback:paused() and 'Resume replay' or 'Pause replay') end
+      return tr(recorder.mode=='play' and 'Return to replay' or 'Back')
+    end,action=function()
+      if recorder.mode=='play' then
+        if playback:available() then playback:togglePause() end
+        ui:close()
+      else ui:show(5) end
+    end},
+    {x=206,y=154,width=38,height=30,label=function() return playback:available() and '-' or '' end,
+      enabled=function() return playback:available() and playback:nextSpeed(-1)~=nil end,
+      action=function() playback:stepSpeed(-1) end},
+    {x=356,y=154,width=38,height=30,label=function() return playback:available() and '+' or '' end,
+      enabled=function() return playback:available() and playback:nextSpeed(1)~=nil end,
+      action=function() playback:stepSpeed(1) end},
+    {x=316,y=208,width=260,height=30,label=function()
       local trace=recorder.engine.trace
-      if not recorder.engine:singlePlayer() and trace and trace.file and trace.saveCopy then return tr('Save capture as...') end
-      return view:available() and tr('View player') or ''
+      if not recorder.engine:localSession() and trace and trace.file and trace.saveCopy then return tr('Save capture as...') end
+      return view:available() and tr('View player %d...',view:player()) or ''
     end,action=function()
       local trace=recorder.engine.trace
-      if not recorder.engine:singlePlayer() and trace and trace.file and trace.saveCopy then
+      if not recorder.engine:localSession() and trace and trace.file and trace.saveCopy then
         openName(trace.capture.id,function(name)
           local copy=trace:saveCopy(name)
           browser.message=tr('Saved: %s',copy.displayName)
@@ -113,8 +128,8 @@ function M.createButtons(recorder,sites)
         end,M.statusDialog,'Save capture as...')
       elseif view:available() then ui:show(playerDialog) end
     end}
-  },2,600,240,function(x,y)
-    if not recorder.engine:singlePlayer() then
+  },4,600,262,function(x,y)
+    if not recorder.engine:localSession() then
       local lines=recorder.engine.trace and recorder.engine.trace:statusLines()
         or {'Multiplayer replay recording is not available.', 'Test capture is disabled for this launch.'}
       for i,line in ipairs(lines) do ui:text(tr(line),x+24,y+48+i*26,0,18,false,552) end
@@ -122,7 +137,8 @@ function M.createButtons(recorder,sites)
     end
     local message=browser.message
     if recorder.mode=='play' and recorder.status~='error' then
-      message=recorder.status=='finished' and 'Playback finished.'
+      message=recorder.status=='finished' and (recorder.preparedWorlds and recorder.preparedWorlds.incomplete
+        and 'Playback ended before an unavailable recovery segment.' or 'Playback finished.')
         or (recorder.engine:isPaused() and 'Playback paused.' or 'Playback running.')
     end
     ui:text(tr(message),x+24,y+70,0,18,false,552)
@@ -139,7 +155,7 @@ function M.createButtons(recorder,sites)
       ui:text(tr('%d / %d ticks; %d / %d commands',elapsed,last-first,
         recorder.playedCommands or 0,recorder.manifest.commandCount or 0),x+24,y+126,0,18,false,552)
     end
-    if view:available() then ui:text(tr('Viewing: player %d',view:player()),x+24,y+150) end
+    if playback:available() then ui:text(tr('Speed: %d',playback:speed()),x+300,y+162,1,18,false,104) end
   end,function() return tr(recorder.mode=='play' and 'Replay controls' or 'Replay status') end)
   local players={}
   for index=1,8 do
@@ -147,7 +163,7 @@ function M.createButtons(recorder,sites)
     players[#players+1]={x=24+((row-1)%2)*280,y=74+math.floor((row-1)/2)*38,width=272,height=30,
       label=function() local slot=view:players()[row]; return slot and tr('Player %d',slot) or '' end,
       selected=function() return view:players()[row]==view:player() end,
-      action=function() local slot=view:players()[row]; if slot then view:select(slot); ui:show(5) end end}
+      action=function() local slot=view:players()[row]; if slot then view:select(slot); ui:close() end end}
   end
   players[#players+1]={x=24,y=280,width=180,height=30,label=function() return tr('Back') end,
     action=function() ui:show(M.statusDialog) end}
@@ -162,7 +178,7 @@ function M.createButtons(recorder,sites)
   },2,600,238,function(x,y)
     local item=browser.items[browser.index]
     ui:text(item and require('code/sessions').title(item) or '',x+300,y+80,1)
-    ui:text(tr('The files are kept in ucp/replays/removed.'),x+300,y+120,1)
+    ui:text(tr('Remove this recording from the library?'),x+300,y+120,1)
   end,function() return tr('Remove replay?') end)
   renameSelected=function()
     if not browser.selected then return end
@@ -186,7 +202,14 @@ function M.createButtons(recorder,sites)
       end,
       function() return browser.index==browser:firstRow()+offset end,true)
   end
-  button(24,352,40,function() return browser:firstRow()>1 and '<' or '' end,
+  local function toggleAutomaticRecording()
+    if not recorder.engine:localSession() or recorder.mode=='play' or recorder.active then return end
+    recorder.autoRecord=not recorder.autoRecord
+    if not recorder.autoRecord and recorder.status=='armed' then recorder:guard(function() recorder:reset() end) end
+  end
+  button(24,352,320,function() return tr(recorder.autoRecord and 'Automatic recording: on' or 'Automatic recording: off') end,
+    toggleAutomaticRecording,nil,nil,function() return not recorder.active and recorder.mode~='play' end)
+  button(396,352,40,function() return browser:firstRow()>1 and '<' or '' end,
     function() if browser:firstRow()>1 then browser:page(-1) end end)
   button(616,352,40,function() return browser:firstRow()+Browser.PAGE_SIZE<=#browser.items and '>' or '' end,
     function() if browser:firstRow()+Browser.PAGE_SIZE<=#browser.items then browser:page(1) end end)
@@ -202,36 +225,27 @@ function M.createButtons(recorder,sites)
     ui:text(tr(browser.message),x+340,y+320,1,18,false,632)
     if #browser.items>Browser.PAGE_SIZE then
       ui:text(tr('Page %d / %d',math.floor((browser.index-1)/Browser.PAGE_SIZE)+1,
-        math.ceil(#browser.items/Browser.PAGE_SIZE)),x+340,y+360,1)
+        math.ceil(#browser.items/Browser.PAGE_SIZE)),x+526,y+360,1)
     end
-    ui:text(tr('Enter: play   F2: rename   Delete: remove'),x+340,y+398,1,19)
+    ui:text(tr('Enter: play   F2: rename   Delete: remove'),x+340,y+398,1,18)
   end,function() return tr('Recorded Skirmishes') end)
 
   -- Extend only the original Skirmish menu's item array, retaining its sentinel.
   local originalSize,itemSize=0x1d10,NativeUI.ITEM_SIZE
-  local array=core.allocate(originalSize+2*itemSize,true)
+  local array=core.allocate(originalSize+itemSize,true)
   core.copyMemory(array,native.addr(0x5e9848),originalSize)
-  local record=array+originalSize-itemSize
-  local browse=record+itemSize
-  core.copyMemory(browse+itemSize,record,itemSize)
+  local browse=array+originalSize-itemSize
+  core.copyMemory(browse+itemSize,browse,itemSize)
   -- The native bottom-row sprites occupy x=10..190, 300..345,
   -- 444..489 and 520..800 (including transparent hit-box portions).
-  ui:button(record,195,550,100,30,function()
-    return tr(recorder.autoRecord and 'Auto: on' or 'Auto: off')
-  end,function()
-    if not recorder.engine:singlePlayer() then return end
-    if recorder.mode=='play' or recorder.active then return end
-    recorder.autoRecord=not recorder.autoRecord
-    if not recorder.autoRecord and recorder.status=='armed' then recorder:guard(function() recorder:reset() end) end
-  end,function() return recorder.autoRecord end)
   ui:button(browse,350,550,90,30,function() return tr('Replays') end,function()
-    if not recorder.engine:singlePlayer() then return end
+    if not recorder.engine:localSession() then return end
     browser:refresh(); ui:show(dialog)
   end)
   core.writeCode(native.addr(0x59ab30),{
     core.AssemblyLambda('push array',{array=array})
   })
-  ui:trackVisibility({record,browse},function() return recorder.engine:singlePlayer() end)
+  ui:trackVisibility({browse},function() return recorder.engine:localSession() end)
 end
 
 function M.resetButtons() end -- Labels derive from session state at render time.

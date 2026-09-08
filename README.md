@@ -1,107 +1,69 @@
 # UCP Recorder
 
-Record a single-player Skirmish, save named copies while you play, and watch it
-from the game's **Replays** library. Recording is on by default. Replay buttons
-use the original interface skin, gold font and red dialog frames.
+Record Skirmishes automatically, save named copies while playing, and watch
+recordings from **Single Player > Skirmish > Replays**. Multiplayer matches are
+recorded separately on each PC and played back locally in single-player.
+There is no multiplayer replay session to join or host.
 
-**This is an experimental test build. Multiplayer playback is not implemented.**
-Crusader and Extreme have native ports, but the latest published build, Extreme
-gameplay and the recorded-settings restart still need live verification.
+**Experimental test build:** the code supports Crusader and Extreme. The new
+offline multiplayer/recovery path still needs live verification. Earlier RNG2
+divergence is not yet proven fixed. See the [remaining work](docs/roadmap.md).
 
-## Install and try it
+## Install and play
 
-1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download the
-   `recorder-0.38.0.zip` asset from this PR's test release, not GitHub's source ZIP.
-   Release links are posted on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls);
-   assets are hosted in the [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
+1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
+   `recorder-0.42.0.zip` from this PR's test release, rather than GitHub's source
+   archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
+   and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
-   Replacer enabled if your game needs it. The setup guide covers Ascension and
-   Automarket versions and extension order.
-3. Open **Single Player > Skirmish**, check **Auto: on**, and start a new match.
-4. Use **Pause > Save replay as...** to name a copy of the match so far. Recording
-   continues. **Quit Mission** saves the full recording automatically.
-5. Open **Skirmish > Replays**, select a completed recording and click **Play**.
-   Double-click or Enter also plays; **Rename replay...** (F2) changes its name.
-   **Remove** (Delete) moves a recording out of the library after confirmation,
-   keeping its files in `ucp/replays/removed`.
+   Replacer enabled if needed. The setup guide covers Ascension, Automarket,
+   dependencies and extension order.
+3. Recording is **on by default** for new Skirmishes, loaded single-player
+   Skirmish saves, and multiplayer matches. Its toggle is inside **Replays**.
+4. **Pause > Save replay as...** saves a named prefix without stopping the full
+   recording. During multiplayer use **Replay status > Save capture as...**.
+   Leaving the mission normally saves the automatic recording.
+5. Open **Skirmish > Replays**, select a recording, and click **Play**. Double-click
+   or Enter also plays. F2 renames; Delete removes with confirmation. Removed
+   recordings and their recovery segments remain in `ucp/replays/removed`.
+6. During playback use **Pause > Replay controls** for pause/resume, speed and
+   player inspection. Viewing a player does not change recorded commands.
 
-Recordings have separate folders under `ucp/replays/`. Do not terminate the game
-process to finish a recording. Native game saves/loads during capture are
-unsupported; use **Save replay as...** for a replay copy.
+All new recordings are stored under `ucp/replays`. Earlier multiplayer diagnostic
+captures remain under their original directories; they lack the new tick data
+and are not converted into playable recordings. Do not terminate the process to
+finish a recording. See [multiplayer playback and recovery](docs/offline-multiplayer.md)
+and [menu controls](docs/replay-menus.md).
 
-If Play needs different settings, it queues a restart. Exit normally; the helper
-reopens the same executable with the recorded extension versions, order and
-resolved options. Open **Skirmish > Replays** again and click **Play** on the
-selected recording. Your normal configuration is preserved. Required extension
-versions must already be installed; the helper does not download them.
-See [recorded settings](docs/recorded-settings.md).
+## Recorded settings
 
-Version 0.28.0 adds rally-point replay and fixes disabled controls after a
-recording failure. If recording fails, it pauses once; resume to continue
-the match without recording. See [failure handling](docs/rally-points-and-capture-failures.md).
+Each replay includes its resolved UCP options, exact versions and load order,
+plus fingerprints of extension files and readable configured assets. If Play
+needs another configuration, it queues a restart: exit normally, let the helper
+relaunch, then select Play again. Your normal configuration is preserved.
 
-Version 0.29.0 covers workshop production and nine other omitted native gameplay
-commands. The recorder reuses the original game dispatcher; see the
-[complete command audit and focused test steps](docs/command-coverage.md).
+Required versions must already be installed. Missing versions or changed assets
+are reported; a newer version is not silently substituted. The helper does not
+download unavailable releases. See [recorded settings](docs/recorded-settings.md).
 
-Version 0.31.0 uses native fonts and centered button labels, a simpler localized
-library, and **Pause > Replay controls > View player** for inspecting another
-player's HUD/reports during playback. See [menus and player views](docs/replay-menus.md)
-for controls, language setup, and the remaining test limitations.
+## Troubleshooting
 
-## Troubleshooting and test status
+- Keep a failed replay and its `last-playback.json`, `desync.json` or
+  `last-error.txt`. A playback failure halts the replay; a recording failure
+  detaches recording so the live match can continue.
+- `Recorder session hook conflicts at save` in **0.17.0** was fixed in 0.18.0.
+  Install the published package, not the source ZIP. Switching executables does
+  not update the module.
+- `ucp/recorder-startup.txt` records loaded versions/order and startup status.
+  **READY** means initialization succeeded, not that a replay has been verified.
+- Launcher options cover all nine UCP languages. In-game text currently supports
+  English/German; the original bitmap fonts limit additional script coverage.
 
-Multiplayer matches now save a continuous **capture on each PC** by default,
-under `ucp/multiplayer-recordings`. Use **Pause > Replay status > Save capture as...**
-to name a separate copy while the full capture continues. Captures store settings
-and network evidence, but **cannot yet be played in the replay browser**.
-Do not spend a full match testing playback at this stage; see the
-[multiplayer capture stages and test gates](docs/multiplayer-capture.md).
-
-For a replay that stops with **RNG divergence**, keep the recording and its
-failure report. Version 0.30.0 adds optional caller diagnostics and a read-only
-inspection tool; see [focused RNG diagnosis](docs/rng-attribution.md).
-The reported 0.29.0 mismatch at tick 22,912 is still unresolved.
-
-**`Recorder session hook conflicts at save` in 0.17.0:** update to this PR's
-published package. Version 0.18.0 fixed rejection of map-extensions 1.0.0's CALL
-save wrapper. Switching between Crusader and Extreme does not update the module.
-
-Recorder writes `ucp/recorder-startup.txt` with loaded versions/order and the
-startup result. Failed preflight checks display a UCP error message and allow the
-game to continue **without recording** (`DISABLED`). Installation failures remain
-fatal because native patches may already have been applied. `READY` means
-initialization succeeded, not replay validation. Launcher options are translated
-into all nine UCP languages; in-game font/language coverage remains a separate
-task. See [extension compatibility](docs/extension-compatibility.md),
-[setup and error reporting](docs/setup.md) and the
-[changelog](CHANGELOG.md).
-
-Development 0.18.0 Crusader playback completed twice with two AIs. A separate
-Automarket match replayed 69,573 ticks and 13 commands with matching RNG/resource
-checkpoints; named-save controls were exercised. These earlier tests do not
-establish that every subsequent build or mod combination works.
-
-A published 0.19.0 two-peer Ascension test captured 63 identical timed commands
-and 241 matching resource checkpoints, but RNG stream 1 differed and immediate
-messages left coverage incomplete. **Multiplayer diagnostics** is an opt-in
-investigation tool, not a playable multiplayer recording. See
-[multiplayer findings](docs/multiplayer-findings.md),
-[capture instructions](docs/multiplayer-diagnostics.md) and the
-[harder test matrix](docs/multiplayer-test-matrix.md).
-
-Version 0.27.0 prevents the church wedding announcement from consuming gameplay
-random numbers during recording/playback. This fixes a code-confirmed source of
-desync from inspecting religious buildings; a fresh in-game comparison is still
-needed. See [the evidence and test steps](docs/wedding-rng.md).
-
-Fresh recordings use simulation profile `recorder-sp-v10`. Keep older packages for
-older captures. Further details: [session limitations](docs/replay-sessions.md),
-[Automarket integration](docs/automarket-replay.md), [native port](docs/native-port.md),
-[library flow](docs/replay-library.md), [dispatch](docs/replay-dispatch.md),
-[world hashes](docs/native-world-hashes.md) and
-[paired capture analysis](docs/multiplayer-comparison.md).
-Requested menu, inspection and player-view work is tracked in [the roadmap](docs/roadmap.md).
+Further details: [compatibility](docs/extension-compatibility.md),
+[RNG diagnosis](docs/rng-attribution.md), [command coverage](docs/command-coverage.md),
+[Automarket](docs/automarket-replay.md), [native world conversion](docs/multiplayer-world-state.md),
+and [changelog](CHANGELOG.md). Older successful live tests do not establish that
+this build or every module combination works.
 
 ## Development
 
@@ -112,8 +74,5 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-VERSION.zip` with a flat module layout,
-using the extension version from `definition.yml`.
-`definition.yml` uses metadata schema version `1.0.0`; that is separate from
-the extension version. Optional full original-codec and save-loader checks are
-documented in [native world conversion](docs/multiplayer-world-state.md).
+The builder creates `dist/recorder-VERSION.zip` with a flat module layout.
+The extension version and `meta.version: 1.0.0` (definition schema) are separate.

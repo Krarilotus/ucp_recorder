@@ -1,6 +1,5 @@
 -- Opt-in observation only: never pause, patch state, inject or suppress commands.
 local store=require('code/sessions')
-local platform=require('code/platform')
 local native=require('code/native')
 local validation=require('code/validation')
 local utils=require('code/utils')
@@ -28,13 +27,8 @@ end
 function M:open()
   if self.file then return end
   local root=self.root or M.ROOT
-  platform.mkdir(root)
-  local prefix=os.date('!%Y%m%d-%H%M%S')
-  for i=1,9999 do
-    local path=root..'/'..prefix..'-'..string.format('%04d',i)
-    if platform.mkdir(path) then self.path=path; break end
-    assert(i<9999,'Cannot allocate multiplayer trace folder')
-  end
+  local _,path=store.reserve(root)
+  self.path=path
   self.file=assert(io.open(self.path..'/commands.jsonl',self.fileMode or 'w'))
   self.count=0; self.events=0; self.gaps=0; self.rngCalls={}; self.lastResult=nil
   self.pendingNativeHashes={}
@@ -187,9 +181,9 @@ function M:record(event)
   self:write(event)
 end
 
-function M:onTick()
+function M:onTick(networkChecked)
   local now=self.engine:tick()
-  if self.file then self:checkNetwork() end
+  if self.file and not networkChecked then self:checkNetwork() end
   if now%64~=0 or now==self.lastTick then return end
   self:open()
   self.lastTick=now
@@ -247,6 +241,8 @@ function M:afterCommand()
   self:record(event)
 end
 
+function M:afterTick() end -- Only full captures retain per-tick RNG boundaries.
+
 function M:stop(reason)
   local f=self.file
   if f then
@@ -273,9 +269,10 @@ end
 
 function M:observe(event,...)
   if (self.failed or self.closed) and event~='stop' then return end
+  if event~='stop' and self.enabled and not self.enabled() then return end
   local args={...}
   local ok,reason=pcall(function()
-    if event~='stop' and self.engine:singlePlayer() then
+    if event~='stop' and (self.engine.offline or self.engine:singlePlayer()) then
       if self.simulationObserved or self.file or next(self.received) then self:stop('left multiplayer') end
       return
     end

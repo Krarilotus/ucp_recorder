@@ -29,8 +29,8 @@ function M.prepare()
     'Windows SHA-256 self-test failed')
 end
 
-function M.sha256(data)
-  assert(type(data)=='string' and not busy,'Invalid or nested native hashing')
+local function hashChunks(nextChunk)
+  assert(not busy,'Nested native hashing')
   initialize(); busy=true
   local provider,hash
   local ok,result=pcall(function()
@@ -39,8 +39,10 @@ function M.sha256(data)
     provider=core.readInteger(buffers.provider)
     assert(api.CryptCreateHash(provider,0x800c,0,0,buffers.hash)~=0,'Cannot create SHA-256 hash')
     hash=core.readInteger(buffers.hash)
-    for offset=1,#data,M.CHUNK do
-      local chunk=data:sub(offset,offset+M.CHUNK-1)
+    while true do
+      local chunk=nextChunk()
+      if not chunk then break end
+      assert(type(chunk)=='string' and #chunk>0 and #chunk<=M.CHUNK,'Invalid SHA-256 chunk')
       core.writeString(buffers.input,chunk)
       assert(api.CryptHashData(hash,buffers.input,#chunk,0)~=0,'Cannot update SHA-256 hash')
     end
@@ -57,6 +59,31 @@ function M.sha256(data)
   busy=false
   assert(ok,result)
   assert(hashClosed and providerClosed,'Cannot release SHA-256 context')
+  return result
+end
+function M.sha256(data)
+  assert(type(data)=='string','Invalid native hashing input')
+  local offset=1
+  return hashChunks(function()
+    if offset>#data then return end
+    local chunk=data:sub(offset,offset+M.CHUNK-1); offset=offset+#chunk
+    return chunk
+  end)
+end
+function M.file(path,limit)
+  local file=assert(io.open(path,'rb'),'Missing file: '..path)
+  local ok,result=pcall(function()
+    local count=0
+    local digest=hashChunks(function()
+      local chunk,reason=file:read(M.CHUNK)
+      assert(not reason,reason)
+      if chunk then count=count+#chunk; assert(count<=limit,'File exceeds replay size limit: '..path) end
+      return chunk
+    end)
+    return digest
+  end)
+  local closed=file:close()
+  assert(ok and closed,result or 'Cannot close hashed file')
   return result
 end
 return M

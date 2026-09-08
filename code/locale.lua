@@ -1,6 +1,15 @@
 -- GUI language is passed at launch. Older launchers fall back to the game language.
 local M={}
 local de={
+ ['Automatic recording: on']='Automatische Aufnahme: ein',
+ ['Automatic recording: off']='Automatische Aufnahme: aus',
+ ['Pause replay']='Wiedergabe pausieren', ['Resume replay']='Wiedergabe fortsetzen',
+ ['Return to replay']='Zur Wiedergabe', ['Speed: %d']='Tempo: %d',
+ ['View player %d...']='Spieler %d ansehen...',
+ ['Saved on this PC. Open Replays in single-player after the match.']='Auf diesem PC gespeichert. Danach Replays im Einzelspieler öffnen.',
+ ['Open Replays in single-player to watch this match.']='Zum Ansehen Replays im Einzelspieler öffnen.',
+ ['Recordings are saved separately on each PC.']='Jeder PC speichert seine eigene Aufnahme.',
+ ['Playback ended before an unavailable recovery segment.']='Wiedergabe vor einem fehlenden Wiederherstellungsabschnitt beendet.',
  ['Required UCP framework: %s']='Benötigtes UCP-Framework: %s',
  ['Missing or unreadable: %s %s']='Fehlt oder ist nicht lesbar: %s %s',
  ['The recorded UCP framework is required.']='Das UCP-Framework der Aufnahme wird benötigt.',

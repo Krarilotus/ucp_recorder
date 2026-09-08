@@ -2,7 +2,7 @@
 
 ## Library
 
-Open **Single Player > Skirmish > Replays**. **Auto: on** records new Skirmishes
+Open **Single Player > Skirmish > Replays**. **Automatic recording: on** in this library records new Skirmishes
 and **Quit Mission** seals the full recording. A named copy made during the
 match is labeled **Snapshot**; the automatic source is **Full match**. Returning
 to the library after finishing selects the full source recording once. Later
@@ -28,13 +28,20 @@ overwritten, and their IDs are reserved when creating another recording.
 To restore a removed recording, close the game and move that folder back one
 level into `ucp/replays`, provided no folder with its ID already exists.
 
+## Playback controls
+
+The replay control dialog provides pause/resume and speed steps (20?300), plus
+the player being viewed. Automatic recording belongs in the library, not a
+second permanent Skirmish-menu button. These controls never set a live
+multiplayer match speed.
+
 ## Viewing players
 
 During playback, open **Pause > Replay controls > View player**, select an
-occupied player slot, then resume. The native gold, popularity, population and
+occupied player slot, then return to the replay. The native gold, popularity, population and
 report rendering use that player's view. The recorded player is selected when
 a new replay starts. The selector is unavailable during normal recording,
-loading, or multiplayer.
+loading, or a live multiplayer match. It is available while watching a multiplayer recording locally.
 
 The view is temporary around rendering only. Input, command ownership, replay
 manifest and simulation remain tied to the original recording. The ordinary

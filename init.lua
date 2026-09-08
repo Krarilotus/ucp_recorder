@@ -30,10 +30,17 @@ local function enable(self,config,stage,install)
     local engine=Engine.new(sites)
     if multiplayerCapture then engine.trace=require('code/multiplayer-capture').new(engine,config)
     elseif config.multiplayerDiagnostics then engine.trace=require('code/multiplayer-trace').new(engine,config) end
-    local rngReturnAddresses=fixes.install(fixSites,engine.scope,engine.base+0x618,seed)
+    local simulation,controls={},{}
+    for _,site in ipairs(fixSites) do
+      local group=(site.name=='pause' or site.name=='pausedCamera') and controls or simulation
+      group[#group+1]=site
+    end
+    local rngReturnAddresses=fixes.install(simulation,engine.scope,engine.base+0x618,seed)
+    fixes.install(controls,engine.scope,engine.base+0x618,nil,engine.offlineFlag)
     if engine.trace then engine.trace.rngReturnAddresses=rngReturnAddresses end
     local recorder=Session:new(engine,config)
-    fixes.install({sites.resultsTimer},recorder.resultsHold,engine.base+0x618)
+    if multiplayerCapture then engine.trace.enabled=function() return recorder.autoRecord end end
+    fixes.install({sites.resultsTimer},recorder.resultsHold,engine.base+0x618,nil,engine.offlineFlag)
     if recorder.rngTrace then recorder.rngTrace.returnAddresses=rngReturnAddresses end
     self.recorder=recorder
     local loadLifecycle=require('code/load-lifecycle').new(recorder)
@@ -87,7 +94,14 @@ local function enable(self,config,stage,install)
         return registers
       end,multiplayerTick,5)
     end
-    fixes.installTick(sites.tick,engine.scope,engine.base+0x618,recorder.halt,tickCallback,multiplayerTick)
+    fixes.installTick(sites.tick,engine.scope,engine.base+0x618,recorder.halt,tickCallback,multiplayerTick,engine.offlineFlag)
+    core.detourCode(function(registers)
+      if engine.trace then engine.trace:observe('afterTick') end
+      if recorder.active and recorder.mode=='play' and recorder.afterTick then
+        recorder:guard(function() recorder:afterTick() end)
+      end
+      return registers
+    end,sites.tickReturned.address,#sites.tickReturned.bytes)
   end)
 end
 

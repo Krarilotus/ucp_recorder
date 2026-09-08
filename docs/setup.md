@@ -93,8 +93,10 @@ Each session has its own folder under `<test game>/ucp/replays/`. Named copies
 preserve recording in the background; duplicate display names cannot overwrite
 sessions. In multiplayer use **Replay status > Save capture as...** to name a
 copy of the capture so far. The full capture continues until mission exit.
-Multiplayer captures live under `ucp/multiplayer-recordings` and are not yet
-playable replays.
+New multiplayer recordings also live under `ucp/replays` and can be selected
+for local single-player playback. Older captures in `ucp/multiplayer-recordings`
+lack the required tick data. The 0.42.0 playback/recovery path is experimental;
+see [current validation and recovery behavior](offline-multiplayer.md).
 
 To check recorded settings, change an ordinary gameplay option after recording
 and relaunch. Select the recording and click **Play**. If a restart is requested,

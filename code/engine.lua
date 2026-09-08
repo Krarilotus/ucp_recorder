@@ -2,13 +2,6 @@ local native = require('code/native')
 local allSites = require('code/engine-sites')
 local M = {}
 
--- Always restore temporary native state, including when a Lua/native wrapper fails.
-local function temporarily(run, restore)
-  local ok, reason=xpcall(run,debug.traceback)
-  restore()
-  assert(ok,reason)
-end
-
 function M.verify()
   local sites = assert(allSites[native.profile.name])
   local adapter=require('code/automarket-replay')
@@ -23,7 +16,7 @@ function M.verify()
       -- We call that entry, never bypass or overwrite its five-byte hook.
       -- RPS hookCode uses CALL rel32 in the shipped framework; other supported
       -- wrappers use JMP rel32. Keep the untouched sixth byte checked below.
-      local wrappedSave=name=='save' and adapter.saveHookAvailable()
+      local wrappedSave=(name=='save' or name=='readWorld') and adapter.saveHookAvailable()
         and (actual[1]==0xE8 or actual[1]==0xE9)
       require('code/hook-check').verify(site,'Recorder session hook conflicts at '..name,
         actual,wrappedSave and 5 or 0)
@@ -37,11 +30,13 @@ function M.new(sites)
   e.schedule=core.exposeCode(native.addr(0x480210),5,1)
   e.saveNative=core.exposeCode(sites.save.address,2,1)
   e.loadNative=core.exposeCode(sites.load.address,1,0)
+  e.readWorldNative=core.exposeCode(sites.readWorld.address,2,1)
   e.haltingMenuNative=core.exposeCode(sites.haltingMenu.address,1,1)
   e.buffer=core.allocate(1260,true)
   e.pathBuffer=core.allocate(512,true)
   e.pathOverride=core.allocate(4,true)
   e.scope=core.allocate(4,true)
+  e.offlineFlag=core.allocate(4,true)
   M.resetCommands(e)
   return setmetatable(e,{__index=M})
 end
@@ -59,19 +54,31 @@ function M:singlePlayer()
   local mode=core.readInteger(self.base+0x618)
   return mode==0 or mode==99
 end
+function M:localSession() return self.offline~=nil or self:singlePlayer() end
 function M:loadedSkirmish()
   return self:singlePlayer() and core.readInteger(self.sites.gameCore+0xc)==14
     and core.readInteger(self.sites.gameCore+0x68)==3
 end
 function M:setScope(active)
-  assert(not active or self:singlePlayer(),'Replay simulation scope requires single-player')
+  assert(not active or self:localSession(),'Replay simulation scope requires a local session')
   core.writeInteger(self.scope,active and 1 or 0)
 end
 function M:pause()
-  if self:singlePlayer() then core.writeInteger(self.sites.paused,1) end
+  if self:localSession() then self:setPaused(true) end
 end
+function M:setPaused(value)
+  assert(type(value)=='boolean' and self:localSession(),'Pause control requires a local session')
+  core.writeInteger(self.sites.paused,value and 1 or 0)
+end
+function M:isLogicallyPaused() return core.readInteger(self.sites.paused)~=0 end
 function M:isPaused()
-  return core.readInteger(self.sites.paused)~=0 or self.haltingMenuNative(self.sites.gameCore)~=0
+  return self:isLogicallyPaused() or self.haltingMenuNative(self.sites.gameCore)~=0
+end
+function M:presentationSpeed() return core.readInteger(self.sites.gameCore+0xc8) end
+function M:setPresentationSpeed(value)
+  assert(self:localSession(),'Replay speed control requires a local session')
+  require('code/validation').integer(value,20,300,'presentation speed')
+  core.writeInteger(self.sites.gameCore+0xc8,value)
 end
 
 function M:rngState()
@@ -88,8 +95,11 @@ end
 function M:resourceState()
   local values={}
   for player=1,8 do
+    local bytes=core.readBytes(self.sites.playerResources+player*0x39f4,100)
     for resource=0,24 do
-      values[#values+1]=core.readInteger(self.sites.playerResources+player*0x39f4+resource*4)
+      local i=resource*4+1
+      local value=bytes[i]+bytes[i+1]*256+bytes[i+2]*65536+bytes[i+3]*16777216
+      values[#values+1]=value>=2147483648 and value-4294967296 or value
     end
   end
   return values
@@ -108,48 +118,8 @@ function M:networkState()
   return state
 end
 
-function M:saveSnapshot(path)
-  assert(#path<500 and self:singlePlayer(), 'Snapshot requires a single-player game')
-  local resource=self.sites.resources
-  local oldType=core.readInteger(resource+0xbc4)
-  local filename=resource+0x7aee0+1001
-  local oldName=core.readBytes(filename,1001)
-  local oldProgress=core.readInteger(self.sites.packager+0x20)
-  core.writeInteger(resource+0xbc4,1)
-  core.writeString(filename,path..'\0')
-  core.writeInteger(self.sites.packager+0x20,0) -- no progress callback/audio during capture
-  temporarily(function() self.saveNative(self.sites.packager,self.sites.sections) end,function()
-    core.writeBytes(filename,oldName) -- Restore all bytes of the fixed native array.
-    core.writeInteger(resource+0xbc4,oldType)
-    core.writeInteger(self.sites.packager+0x20,oldProgress)
-  end)
-  local f=assert(io.open(path,'rb'),'Native save did not produce a starting snapshot')
-  local size=f:seek('end'); local closed=f:close()
-  assert(size and size>1000 and closed,'Native starting snapshot is incomplete')
-end
-
-function M:loadSnapshot(path)
-  assert(#path<500 and self:singlePlayer(), 'Snapshot requires a single-player game')
-  local state=self.sites.menuText
-  local old={}
-  for _,offset in ipairs({0x58,0x7c,0x80,0x884}) do old[offset]=core.readInteger(state+offset) end
-  self.overridePath=path
-  core.writeString(self.pathBuffer,path..'\0')
-  core.writeInteger(state+0x58,31) -- native Load action
-  core.writeInteger(state+0x7c,1)
-  core.writeInteger(state+0x80,0)
-  core.writeInteger(state+0x884,0)
-  self.loading=true
-  core.writeInteger(self.pathOverride,1)
-  temporarily(function() self.loadNative(0) end,function()
-    core.writeInteger(self.pathOverride,0)
-    self.loading=false
-    self.overridePath=nil
-    -- These four fields belong to the load dialog; preserve the game's menu transition.
-    for offset,value in pairs(old) do core.writeInteger(state+offset,value) end
-  end)
-  self:resetCommands()
-end
+M.saveSnapshot=require('code/native-snapshots').saveSnapshot
+M.loadSnapshot=require('code/native-snapshots').loadSnapshot
 
 function M:canSchedule()
   local index=core.readInteger(self.base+self.sites.writeIndexOffset)
@@ -171,7 +141,7 @@ end
 
 function M:scheduleCommand(command)
   require('code/validation').command(command)
-  assert(self:singlePlayer(),'Replay enqueue requires single-player')
+  assert(self:localSession(),'Replay enqueue requires a local session')
   assert(self.expectedSize==nil,'Nested replay enqueue is unsupported')
   assert(self:canSchedule(),'Native command ring is full')
   local bytes=require('code/utils').hexToTable(command.data)
@@ -215,7 +185,7 @@ function M:scheduleCommand(command)
 end
 
 function M:selectPlayback(recorder)
-  assert(self:singlePlayer() and recorder.status=='playing','Replay dispatch is not active')
+  assert(self:localSession() and recorder.status=='playing','Replay dispatch is not active')
   recorder:feed()
   local entries=self.journal:select(self:tick())
   -- Reject unknown pending entries before *any* handler in this batch runs.
@@ -244,7 +214,7 @@ function M:commandsPending()
 end
 
 function M:abortPlayback()
-  if not self:singlePlayer() then return end
+  if not self:localSession() then return end
   core.writeInteger(self.base+self.sites.selectedCountOffset,0)
   for slot in pairs(self.journal.slots) do
     core.writeByte(self.base+0x3c67c+slot*1272+9,10)
@@ -260,6 +230,10 @@ function M:beforeCommand(recorder)
   local command=source.command
   local actual={commandCategory=core.readByte(address+8),time=self:tick(),player=core.readInteger(self.base+self.sites.actorOffset),
     size=command.size,data=require('code/utils').tableToHex(core.readBytes(address+10,command.size))}
+  if recorder.mode=='play' and recorder.manifest.multiplayer then
+    actual.beforeRng=command.beforeRng; actual.afterRng=command.afterRng
+    require('code/tick-journal').input(self,command.beforeRng)
+  end
   require('code/validation').sessionCommand(actual,recorder.manifest)
   assert(core.readInteger(address)==command.time,'Native command scheduling tick changed')
   assert(actual.commandCategory==command.commandCategory and actual.data:upper()==command.data:upper(),
@@ -281,7 +255,11 @@ function M:afterCommand(recorder)
   local current=self.executing
   self.executing=nil
   if not current then return end
-  if recorder.mode=='play' then self.journal:after(current.slot,current.source)
+  if recorder.mode=='play' then
+    if recorder.manifest.multiplayer then
+      require('code/tick-journal').check(self,current.source.command.afterRng,'after command')
+    end
+    self.journal:after(current.slot,current.source)
   else
     self.received[current.slot]=nil
     recorder:onExecutedCommand(current.command)
@@ -295,12 +273,13 @@ function M:install(recorder)
   local dummy=core.allocate(16,true); core.writeString(dummy,'replay\0')
   resources.install(self.sites.mapName,self.pathOverride,dummy,false)
   originalQueue=core.hookCode(function(this,category)
-    if recorder.mode=='play' and self:singlePlayer() and not self.loading then return 0 end
+    if self.offlineLoading then return 0 end
+    if recorder.mode=='play' and self:localSession() and not self.loading then return 0 end
     return originalQueue(this,category)
   end,self.sites.queue.address,2,1,#self.sites.queue.bytes)
   local originalSelect
   originalSelect=core.hookCode(function(this)
-    if recorder.mode~='play' or not self:singlePlayer() or self.loading then return originalSelect(this) end
+    if recorder.mode~='play' or not self:localSession() or self.loading then return originalSelect(this) end
     core.writeInteger(self.base+self.sites.selectedCountOffset,0)
     if recorder.status~='playing' then return 0 end
     local result=0
@@ -353,7 +332,7 @@ function M:install(recorder)
     local category=core.readByte(registers.ESI+registers.ECX+0x3c684)
     registers.EDX=category<128 and category or category-256 -- original MOVSX
     if self.trace then self.trace:observe('beforeCommand') end
-    if self:singlePlayer() and not self.loading and recorder.active then
+    if self:localSession() and not self.loading and recorder.active then
       local ok=recorder:guard(function()
         assert(recorder.status=='playing' or recorder.status=='recording','Replay session is stopped')
         self:beforeCommand(recorder)
@@ -364,7 +343,7 @@ function M:install(recorder)
   end,self.sites.execute.address,8)
   core.detourCode(function(registers)
     if self.trace then self.trace:observe('afterCommand') end
-    if self:singlePlayer() and not self.loading and recorder.active then
+    if self:localSession() and not self.loading and recorder.active then
       recorder:guard(function() self:afterCommand(recorder) end)
     end
     return registers

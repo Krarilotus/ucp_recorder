@@ -29,7 +29,8 @@ end
 ---@field automarket string|nil
 ---@return RecordedWorldReader
 function M.open(path)
-  assert(type(path)=='string' and path:match('^ucp/multiplayer%-recordings/[%w_-]+$'),
+  assert(type(path)=='string' and (path:match('^ucp/multiplayer%-recordings/[%w_-]+$')
+    or path:match('^ucp/replays/[%w_-]+$')),
     'Invalid multiplayer capture path')
   local capture=json:decode(read(path..'/capture.json',1024*1024))
   assert(type(capture)=='table' and capture.kind=='multiplayer-capture' and capture.format==1,

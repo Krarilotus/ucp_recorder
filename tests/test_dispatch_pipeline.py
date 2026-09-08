@@ -185,7 +185,7 @@ for _,state in ipairs({0,10}) do bytes[address]=state; assert(engine:canSchedule
 core.writeBytes=function() error('unexpected native write') end
 memory[engine.base+0x618]=1
 local ok,reason=pcall(engine.scheduleCommand,engine,command(10))
-assert(not ok and tostring(reason):find('requires single%-player'))
+assert(not ok and tostring(reason):find('requires a local session',1,true))
 memory[engine.base+0x618]=0; engine.expectedSize=4
 ok,reason=pcall(engine.scheduleCommand,engine,command(10))
 assert(not ok and tostring(reason):find('Nested replay enqueue',1,true))

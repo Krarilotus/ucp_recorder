@@ -45,7 +45,11 @@ function M.sessionCommand(command, manifest)
       'Unsupported replay command category '..command.commandCategory..' (not in the verified timed-command layouts)')
     assert(command.size==expected,'Replay command payload size differs from the native '..manifest.variant..' layout')
   end
-  assert(command.player==manifest.player,'Replay command uses a different player slot')
+  if manifest.multiplayer then
+    local row=manifest.multiplayer.roster[command.player]
+    assert(row and row.kind=='human','Replay command is not owned by a recorded human')
+    M.rng(command.beforeRng); M.rng(command.afterRng)
+  else assert(command.player==manifest.player,'Replay command uses a different player slot') end
   return command
 end
 

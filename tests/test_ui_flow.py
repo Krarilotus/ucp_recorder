@@ -58,8 +58,8 @@ input(0x102,13); assert(played=='replay1' and shown==-1)
 local roster={}; for i=1,8 do roster[i]={kind=i==4 and 'ai' or 'empty'} end
 recorder.engine.networkState=function() return {roster=roster} end
 recorder.mode='play'; recorder.active=true; recorder.status='playing'; recorder.manifest={player=1}
-pauseAction(); click('View player'); click('Player 4')
-assert(shown==5 and menu.view:player()==4 and recorder.manifest.player==1)
+pauseAction(); click('View player 1...'); click('Player 4')
+assert(shown==-1 and menu.view:player()==4 and recorder.manifest.player==1)
 recorder.mode='record'; assert(not menu.view:available())
 ''')
 
@@ -95,7 +95,10 @@ ui={
  trackVisibility=function() end,
 }
 package.loaded['code/native-ui']={ITEM_SIZE=80,new=function() return ui end}
-recorder.engine={singlePlayer=function() return true end,isPaused=function() return false end}
+recorder.engine={singlePlayer=function() return true end,isPaused=function() return false end,
+ localSession=function(self) return self:singlePlayer() end,
+ presentationSpeed=function() return 90 end,
+ isLogicallyPaused=function(self) return self:isPaused() end}
 recorder.status='idle'; recorder.autoRecord=true
 menu=require('code/ui'); menu.createButtons(recorder,{})
 function click(label)

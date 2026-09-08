@@ -15,6 +15,7 @@ function M.begin(path,engine,settings)
     variant=native.profile.name,executable=native.profile.sha256,startTick=engine:tick(),
     initialNetwork=engine:networkState(),settingsHash=settings.hash,
     environmentHash=settings.environmentHash,restartSettingsHash=settings.restartSettingsHash,
+    settingsCapture=settings.settingsCapture,automarket=require('code/automarket-replay').current(),
     missing={'initial-world-snapshot','offline-network-identity','immediate-and-system-playback','resynchronization-restoration'}}
   -- Commit a non-playable manifest first; interrupted setup remains identifiable.
   M.save(capture)
@@ -66,6 +67,7 @@ function M.copy(source,name,bytes,events,commands,tick)
   for k,v in pairs(source) do copy[k]=v end
   copy.id=path:match('([^/]+)$'); copy.path=path; copy.sourceId=source.id
   copy.displayName=name; copy.created=os.date('!%Y-%m-%dT%H:%M:%SZ'); copy.status='copying'
+  copy.previousReplay=nil; copy.nextReplay=nil
   copy.bytes=bytes; copy.events=events; copy.commands=commands; copy.lastObservedTick=tick
   M.save(copy)
   local ok,err=pcall(function()
@@ -81,9 +83,48 @@ function M.copy(source,name,bytes,events,commands,tick)
       if source.world.automarket then prefix(source.path..'/automarket.bin',path..'/automarket.bin') end
     end
     prefix(source.path..'/commands.jsonl',path..'/commands.jsonl',bytes)
+    if source.tickProfile then prefix(source.path..'/ticks.bin',path..'/ticks.bin',source.tickBytes) end
     copy.status='snapshot'; M.save(copy)
   end)
   if not ok then copy.status='interrupted'; pcall(M.save,copy); error(err) end
   return copy
+end
+
+function M.seal(capture)
+  local replay=require('code/multiplayer-session').seal(capture)
+  capture.replayStatus=replay.status; capture.replayReason=replay.reason
+  capture.playable=replay.status=='complete'
+  capture.missing=capture.playable and {} or {replay.reason}
+  M.save(capture)
+  return replay
+end
+
+-- A named prefix owns copies of every earlier recovery world, so removing the
+-- automatic source later cannot break the named recording halfway through.
+function M.copyChain(source,name,bytes,events,commands,tick)
+  local originals={source}; local seen={[source.id]=true}
+  local current=source
+  while current.previousReplay do
+    assert(#originals<32 and not seen[current.previousReplay],'Invalid replay recovery chain')
+    seen[current.previousReplay]=true
+    local previous=json:decode(store.read(store.path(current.previousReplay)..'/capture.json'))
+    assert(previous.id==current.previousReplay and previous.nextReplay==current.id
+      and previous.status=='closed','Previous recovery segment is unavailable')
+    originals[#originals+1]=previous; current=previous
+  end
+  local copies={}
+  for i=#originals,1,-1 do
+    local original=originals[i]
+    local copy=M.copy(original,name,i==1 and bytes or original.bytes,
+      i==1 and events or original.events,i==1 and commands or original.commands,
+      i==1 and tick or original.lastObservedTick)
+    local previous=copies[#copies]
+    if previous then previous.nextReplay=copy.id; copy.previousReplay=previous.id end
+    copies[#copies+1]=copy
+  end
+  for _,copy in ipairs(copies) do
+    M.seal(copy)
+  end
+  return copies[1]
 end
 return M

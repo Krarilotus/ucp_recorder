@@ -134,6 +134,28 @@ class NativeHashTests(unittest.TestCase):
     def test_binary_streaming_vectors(self):
         self.check_vectors(False)
 
+    def test_file_hash_streams_without_seeking_and_closes_on_limit_and_read_error(self):
+        backend=Backend(); lua=backend.runtime()
+        lua.execute('''
+closed=0
+io.open=function()
+ local remaining=70000
+ return {read=function(_,n)
+   if failRead then return nil,'disk read failed' end
+   if remaining==0 then return end
+   local size=math.min(n,remaining); remaining=remaining-size; return string.rep('x',size)
+ end,close=function() closed=closed+1; return true end}
+end
+''')
+        self.assertEqual(lua.globals().hash.file('virtual',70000),hashlib.sha256(b'x'*70000).hexdigest())
+        with self.assertRaisesRegex(Exception,'size limit'):
+            lua.globals().hash.file('virtual',69999)
+        lua.execute('failRead=true')
+        with self.assertRaisesRegex(Exception,'disk read failed'):
+            lua.globals().hash.file('virtual',70000)
+        self.assertEqual(lua.globals().closed,3)
+        self.assertFalse(backend.hashes or backend.providers)
+
     @unittest.skipUnless(os.name=='nt','Requires Windows CryptoAPI')
     def test_actual_windows_cryptoapi_private_buffers(self):
         self.check_vectors(True)

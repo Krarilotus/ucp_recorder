@@ -12,7 +12,7 @@ function M.jump(from,to,size)
   return bytes
 end
 
-function M.build(site,enabled,mode,seed,origin,returnAddresses)
+function M.build(site,enabled,mode,seed,origin,returnAddresses,offline)
   local out,labels,refs={},{},{}
   local function emit(...) for _,value in ipairs({...}) do out[#out+1]=value end end
   local function rel(op,target)
@@ -22,11 +22,16 @@ function M.build(site,enabled,mode,seed,origin,returnAddresses)
   end
   local function compare(address,value) emit(0x83,0x3d); dword(out,address); emit(value) end
   emit(0x9c) -- pushfd: the conditional branches below must preserve incoming flags
+  if offline then compare(offline,1); rel({0x0f,0x84},'patched') end
   compare(enabled,1); rel({0x0f,0x85},'original')
-  compare(mode,0); rel({0x0f,0x84},'patched')
-  compare(mode,99); rel({0x0f,0x85},'original')
+  if mode then
+    compare(mode,0); rel({0x0f,0x84},'patched')
+    compare(mode,99); rel({0x0f,0x85},'original')
+  end
   labels.patched=#out; emit(0x9d)
-  if site.patch=='return' then emit(0xc3) -- suppressed tail call: return to the original caller
+  if site.patch=='return' then
+    if site.pop then emit(0xc2,site.pop,0) else emit(0xc3) end
+  elseif site.patch=='constant' then emit(0xb8); dword(out,site.value)
   elseif site.patch=='cleanup' then emit(0x8d,0x64,0x24,0x2c) -- lea esp,[esp+44], no flag changes
   elseif site.patch=='taken' then rel({0xe9},site.target)
   elseif site.patch=='equalFlags' then emit(0x39,0xc0) -- cmp eax,eax: take the following JGE without changing a register

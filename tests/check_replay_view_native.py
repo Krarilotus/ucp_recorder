@@ -39,7 +39,7 @@ def check_replay_view(reader, lua, native, root, variant):
     lua.globals().viewModule = view_module
     lua.execute('''
 viewRecorder={mode='play',active=true,status='playing',manifest={player=1},engine={
- singlePlayer=function() return true end,networkState=function()
+ localSession=function() return true end,networkState=function()
   local slots={}; for i=1,8 do slots[i]={kind='ai'} end; return {roster=slots}
  end}}
 nativeView=viewModule.new(viewRecorder)

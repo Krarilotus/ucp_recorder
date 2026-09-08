@@ -3,7 +3,7 @@ local Trace=require('code/multiplayer-trace')
 local files=require('code/capture-files')
 local store=require('code/sessions')
 local tr=require('code/locale').text
-local M={ROOT='ucp/multiplayer-recordings',MAX_BYTES=256*1024*1024}
+local M={ROOT='ucp/replays',MAX_BYTES=256*1024*1024,MAX_TICK_BYTES=128*1024*1024}
 setmetatable(M,{__index=Trace})
 
 function M.new(engine,config)
@@ -27,8 +27,12 @@ function M:open()
   self.bytes=0
   self.lastNamedCopy=nil
   self.clock=nil
+  self.pendingTick=nil; self.tickBytes=0
+  self.recoveryPending=nil; self.boundaryEvents=nil
   Trace.open(self)
   self.capture=files.begin(self.path,self.engine,store.settings())
+  self.tickFile=assert(io.open(self.path..'/ticks.bin','wb'))
+  self.capture.tickProfile='native-tick-rng-v1'
   self.capture.traceHeaderBytes=self.bytes
   files.save(self.capture)
 end
@@ -41,6 +45,7 @@ function M:timeline(now)
     Trace.record(self,{kind='gap',time=now,reason='simulation clock moved backwards',
       details={previousTick=self.clock}})
     self.lastTick=nil
+    self.recoveryPending='simulation clock moved backwards'
   end
   self.clock=now
 end
@@ -52,15 +57,80 @@ end
 
 function M:onTick()
   self:open() -- first *simulation* callback, not the next 64-tick boundary
+  self:checkNetwork()
   self:timeline(self.engine:tick())
-  self.observedTick=self.engine:tick()
-  Trace.onTick(self)
+  if self.recoveryPending then
+    if self.network.syncStatus~=0 then return end
+    self:recover()
+  end
+  self.clock=self.engine:tick()
+  self.observedTick=self.clock
+  Trace.onTick(self,true)
+  assert(not self.pendingTick,'Native simulation tick did not return to the game loop')
+  self.pendingTick={time=self.observedTick,before=require('code/tick-journal').state(self.engine)}
+  self.capture.finalRng=self.engine:rngState()
+  self.capture.finalResources=self.engine:resourceState()
+  self.finalRngData=self.engine:rngData()
+  self.boundaryEvents=self.events
+end
+
+function M:gap(reason,details)
+  Trace.gap(self,reason,details)
+  if not require('code/multiplayer-session').presentationOrTransport({reason=reason,details=details}) then
+    self.recoveryPending=reason
+  end
+end
+
+function M:recover()
+  -- The prior recording ends at its last complete observed boundary. Network
+  -- waiting, host migration and replacement-world commands remain in its raw
+  -- journal, but never run against the previous world during local playback.
+  local previous=self.capture
+  local received=self.received
+  previous.replayEvents=self.boundaryEvents or 0
+  self:stop('native world or player roster changed')
+  self:open()
+  self.simulationObserved=true
+  self.received=received
+  self.capture.previousReplay=previous.id
+  previous.nextReplay=self.capture.id
+  files.seal(previous); files.save(self.capture)
+end
+
+function M:afterTick()
+  -- Synchronization can return before the simulation hook. Observe that path
+  -- too; otherwise a complete replacement could happen between two observed
+  -- gameplay ticks without ever marking the previous world as superseded.
+  if self.file and core.readInteger(self.engine.base+0xb98)~=self.network.syncStatus then self:checkNetwork() end
+  local pending=self.pendingTick
+  if not pending then return end -- halted native ticks never reached our start
+  self.pendingTick=nil
+  assert(self.engine:tick()==pending.time+1,'Native simulation tick advanced unexpectedly')
+  local journal=require('code/tick-journal')
+  assert(self.tickBytes+journal.SIZE<=M.MAX_TICK_BYTES,'Multiplayer tick journal reached its 128 MiB limit')
+  assert(self.tickFile:write(journal.frame(pending.time,pending.before,journal.state(self.engine))))
+  self.tickBytes=self.tickBytes+journal.SIZE
+  if pending.time%64==0 then assert(self.tickFile:flush()) end
+end
+
+function M:beforeCommand()
+  Trace.beforeCommand(self)
+  self.executing.beforeRng=self.engine:rngState()
+end
+
+function M:sealBoundary()
+  assert(not self.pendingTick,'Cannot save inside a simulation tick')
+  if self.tickFile then assert(self.tickFile:flush()) end
+  self.capture.tickBytes=self.tickBytes
+  if self.recoveryPending then self.capture.replayEvents=self.boundaryEvents or 0 end
+  if self.finalRngData then self.capture.finalRngHash=sha.sha256(self.finalRngData) end
 end
 
 function M:captureFailure(reason)
   if not self.capture then return end
   self.capture.status='interrupted'; self.capture.reason=reason
   self.capture.bytes=self.bytes; self.capture.lastObservedTick=self.observedTick
+  if self.tickFile then pcall(self.tickFile.close,self.tickFile); self.tickFile=nil end
   files.save(self.capture)
 end
 
@@ -71,7 +141,8 @@ end
 function M:saveCopy(name)
   assert(self.file and self.capture and not self.executing,'No active multiplayer capture to save')
   assert(self.file:flush())
-  local copy=files.copy(self.capture,name,self.bytes,self.events,self.count,self.observedTick)
+  self:sealBoundary()
+  local copy=files.copyChain(self.capture,name,self.bytes,self.events,self.count,self.observedTick)
   self.lastNamedCopy=copy.displayName
   return copy
 end
@@ -81,6 +152,11 @@ function M:stop(reason)
   local hadFile=self.file~=nil
   local wasFailed=self.failed
   local tick=self.observedTick
+  if capture and self.tickFile then
+    local sealed,sealError=pcall(self.sealBoundary,self)
+    local closed,closeError=self.tickFile:close(); self.tickFile=nil
+    if not sealed or not closed then wasFailed=true; capture.tickError=tostring(sealError or closeError) end
+  end
   local ok,err=pcall(Trace.stop,self,reason)
   if capture and hadFile then
     capture.status=ok and not wasFailed and 'closed' or 'interrupted'
@@ -88,9 +164,10 @@ function M:stop(reason)
     capture.events=self.events; capture.commands=self.count; capture.bytes=self.bytes
     capture.coverageGaps=self.gaps or 0
     files.save(capture)
+    files.seal(capture)
     self.lastCapture=capture
   end
-  self.capture=nil; self.observedTick=nil
+  self.capture=nil; self.observedTick=nil; self.pendingTick=nil; self.finalRngData=nil
   assert(ok,err)
 end
 
@@ -102,10 +179,11 @@ function M:statusLines()
       or tr('Automatic capture continues until you leave the match.'),
     self.capture and self.capture.world and self.capture.world.status=='failed'
       and tr('Start state unavailable; see capture.json for details.')
-      or tr('Saved on this PC. Offline playback is not available yet.')} end
+      or tr('Saved on this PC. Open Replays in single-player after the match.')} end
   if self.lastCapture then return {tr('Multiplayer capture saved: %s',self.lastCapture.id),
-    tr('Saved on this PC. Offline playback is not available yet.')} end
-  return {tr('Waiting for the multiplayer match.'),tr('Saved on this PC. Offline playback is not available yet.')}
+    self.lastCapture.replayStatus=='complete' and tr('Open Replays in single-player to watch this match.')
+      or tostring(self.lastCapture.replayReason or tr('Existing capture files are preserved.'))} end
+  return {tr('Waiting for the multiplayer match.'),tr('Recordings are saved separately on each PC.')}
 end
 
 return M

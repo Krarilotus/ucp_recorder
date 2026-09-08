@@ -42,6 +42,7 @@ function M.captureSettings()
   end
   local raw=read(CONFIG_FILE)
   local environment=canonical({extensions=extensions,config=resolved,
+    assets=require('code/replay-assets').capture(allActiveExtensions,resolved),
     framework=read('ucp/ucp-version.yml')})
   activeSettings={raw=raw,hash=sha.sha256(raw),environment=environment,environmentHash=sha.sha256(environment),
     settingsCapture='resolved-v1',restartSettings=restartSettings,restartSettingsHash=sha.sha256(restartSettings)}
@@ -53,11 +54,11 @@ function M.settings()
   return {raw=raw,hash=sha.sha256(raw),environment='{}',environmentHash=sha.sha256('{}')}
 end
 
-function M.new(profile)
-  platform.mkdir(M.ROOT)
+function M.reserve(root)
+  platform.mkdir(root)
   local prefix = os.date('!%Y%m%d-%H%M%S')
   local removed={}
-  local ok,entries=pcall(function() return ucp.internal.io.directories(M.ROOT..'/removed') or {} end)
+  local ok,entries=pcall(function() return ucp.internal.io.directories(root..'/removed') or {} end)
   if ok then
     for _,entry in ipairs(entries) do
       local old=entry:gsub('[/\\]+$',''):match('([^/\\]+)$')
@@ -67,10 +68,15 @@ function M.new(profile)
   local id, path
   for i=1,9999 do
     id=prefix .. '-' .. string.format('%04d', i)
-    path=M.path(id)
+    path=root..'/'..id
     if not removed[id] and platform.mkdir(path) then break end
     assert(i < 9999, 'Cannot allocate replay name')
   end
+  return id,path
+end
+
+function M.new(profile)
+  local id,path=M.reserve(M.ROOT)
   local settings=M.settings()
   write(path .. '/ucp-config.yml', settings.raw)
   write(path .. '/environment.json',settings.environment)
@@ -107,11 +113,30 @@ end
 function M.remove(id)
   -- Do not require a playable profile: incomplete and old captures also need
   -- library management. Check identity and state before moving the whole folder.
-  local manifest=json:decode(read(M.path(id)..'/manifest.json'))
-  assert(type(manifest)=='table' and manifest.id==id,'Replay identity differs')
-  assert(manifest.status~='recording' and manifest.status~='copying',
-    'An active recording cannot be removed')
-  platform.removeReplay(M.ROOT,id)
+  local chain,seen={},{}
+  while id do
+    assert(#chain<32 and not seen[id],'Invalid replay recovery chain')
+    seen[id]=true
+    local ok,manifest=pcall(function() return json:decode(read(M.path(id)..'/manifest.json')) end)
+    if not ok and #chain>0 then break end -- missing continuation cannot prevent removing a surviving prefix
+    assert(ok and type(manifest)=='table' and manifest.id==id,'Replay identity differs')
+    assert(#chain==0 or manifest.previousReplay==chain[#chain],'Replay recovery link differs')
+    assert(manifest.status~='recording' and manifest.status~='copying','An active recording cannot be removed')
+    chain[#chain+1]=id
+    id=manifest.multiplayer and manifest.nextReplay or nil
+  end
+  local moved={}
+  local ok,reason=pcall(function()
+    for _,part in ipairs(chain) do platform.removeReplay(M.ROOT,part); moved[#moved+1]=part end
+  end)
+  if not ok then
+    local rollback
+    for i=#moved,1,-1 do
+      local restored,err=pcall(platform.removeReplay,M.ROOT,moved[i],true)
+      if not restored then rollback=tostring(err) end
+    end
+    error(tostring(reason)..(rollback and '; archived parts could not be restored: '..rollback or ''))
+  end
 end
 
 -- Seal a separate copy at the last observed boundary without stopping capture or
@@ -154,15 +179,22 @@ function M.list()
     if ok and type(manifest)=='table' and manifest.id==id then result[#result+1]=manifest end
   end
   table.sort(result, function(a,b) return a.id>b.id end)
-  return result
+  local byId,visible={},{}
+  for _,item in ipairs(result) do byId[item.id]=item end
+  for _,item in ipairs(result) do
+    local previous=item.previousReplay and byId[item.previousReplay]
+    if not previous or previous.status~='complete' then visible[#visible+1]=item end
+  end
+  return visible
 end
 
 function M.load(id, profile)
   local manifest=json:decode(read(M.path(id) .. '/manifest.json'))
   assert(type(manifest)=='table' and manifest.format==M.FORMAT and manifest.id==id, 'Unsupported replay format')
   assert(manifest.variant==profile.name and manifest.executable==profile.sha256, 'Replay requires ' .. tostring(manifest.variant))
-  assert(manifest.simulationProfile==M.PROFILE, 'Replay uses a different simulation profile')
-  assert(manifest.status=='complete', 'Recording was not completed')
+  assert(manifest.simulationProfile==(manifest.multiplayer and require('code/multiplayer-session').PROFILE or M.PROFILE),
+    'Replay uses a different simulation profile')
+  assert(manifest.status=='complete', manifest.reason or 'Recording was not completed')
   validation.manifest(manifest)
   assert(sha.sha256(read(M.path(id)..'/ucp-config.yml'))==manifest.settingsHash, 'Recorded settings are damaged')
   assert(sha.sha256(read(M.path(id)..'/environment.json'))==manifest.environmentHash,'Recorded environment is damaged')
@@ -207,6 +239,7 @@ end
 function M.preflight(manifest)
   validation.manifest(manifest)
   local path=M.path(manifest.id)
+  if manifest.multiplayer then require('code/multiplayer-session').preflight(manifest,path) end
   local data={}
   for name,file in pairs(streams) do
     data[name]=read(path..'/'..file)

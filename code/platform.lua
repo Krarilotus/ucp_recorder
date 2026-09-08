@@ -109,7 +109,7 @@ end
 
 -- Removing a replay is a recoverable, non-overwriting directory rename. Never
 -- recurse through files or follow a reparse point supplied in the replay folder.
-function M.removeReplay(root,id)
+function M.removeReplay(root,id,restore)
   assert(root=='ucp/replays' and type(id)=='string' and #id<80 and id:match('^[%w_-]+$'),
     'Invalid replay removal path')
   getAttributes=getAttributes or M.stdcall('kernel32.dll','GetFileAttributesA',1)
@@ -118,8 +118,9 @@ function M.removeReplay(root,id)
     assert(value>=0 and value~=0xffffffff and math.floor(value/16)%2==1
       and math.floor(value/1024)%2==0,'Replay directory is missing or is a link')
   end
-  directory(root); directory(root..'/'..id)
+  directory(root)
   M.mkdir(root..'/removed'); directory(root..'/removed')
+  directory(root..(restore and '/removed/' or '/')..id)
   local full=M.stdcall('kernel32.dll','GetFullPathNameA',4)
   local function absolute(path)
     local input=buffer('fullInput',path); local output=buffer('fullOutput','')
@@ -131,6 +132,7 @@ function M.removeReplay(root,id)
   local source,destination=absolute(root..'/'..id),absolute(root..'/removed/'..id)
   assert(source:lower()==(base..'\\'..id):lower()
     and destination:lower()==(base..'\\removed\\'..id):lower(),'Replay removal escaped its directory')
+  if restore then source,destination=destination,source end
   move=move or M.stdcall('kernel32.dll','MoveFileExA',3)
   assert(move(buffer('source',source),buffer('destination',destination),8)~=0,
     'Cannot remove replay; a removed copy may already exist')

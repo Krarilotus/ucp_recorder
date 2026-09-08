@@ -6,6 +6,7 @@ class SettingsCaptureTests(unittest.TestCase):
     def setUp(self):
         test_session_files.SessionFileTests.setUp(self)
         self.lua.execute('yaml={eval=function(text) return json:decode(text) end}')
+        self.lua.execute("package.loaded['code/replay-assets']={capture=function() return {profile='ucp-files-v1',files={}} end}")
     def test_config_changed_on_disk_does_not_change_running_game_identity(self):
         self.lua.execute('''
 local originalOpen=io.open

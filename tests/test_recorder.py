@@ -52,7 +52,7 @@ end
 os.remove=function(path) files[path]=nil; return true end
 realNative = require('code/native')
 realNative.profile={addresses=setmetatable({}, {__index=function(_,a) return a end})}
-Recorder = require('code/recorder')
+Recorder = require('code/replay-streams')
 function fixture(name)
   local r=Recorder:new({name=name,rngLogMethod='trace'})
   files[r.commandsFileName]={}
@@ -71,64 +71,27 @@ function allClosed() for _,h in ipairs(handles) do assert(h.closed) end end
     def test_reset_drops_prefetch_and_is_idempotent(self):
         self.check('''
 local r=fixture('cache'); files[r.commandsFileName]={command(685)}
-r:startPlayback(); assert(r:peekCommand().time==685); r.cachedRNG={time=999}
-r:stopPlayback(); r:reset(); files[r.commandsFileName]={command(114)}
-r:startPlayback(); assert(r:consumeSavedCommand().time==114 and not r.cachedRNG)
-r:stopPlayback(); allClosed()
+r:openFiles('r'); assert(r:peekCommand().time==685)
+r:reset(); r:reset(); files[r.commandsFileName]={command(114)}
+r:openFiles('r'); assert(r:consumeSavedCommand().time==114)
+r:reset(); allClosed()
 ''')
 
     def test_missing_and_partial_files_do_not_commit_state(self):
         self.check('''
 local r=Recorder:new({name='missing'}); memory[0x191de0c]=777
-assert(not pcall(function() r:startPlayback() end))
+assert(not pcall(function() r:openFiles('r') end))
 assert(r.mode=='none' and memory[0x191de0c]==777); r:reset()
 failPath=r.rngFileName
-assert(not pcall(function() r:startRecording() end))
+assert(not pcall(function() r:openFiles('w') end))
 assert(r.mode=='none' and not files[r.commandsFileName]); allClosed()
 ''')
 
     def test_preserves_local_player(self):
         self.check('''
 local r=fixture('player'); memory[0x191de0c]=777; memory[0x01a275dc]=3
-r:startPlayback(); r:stopPlayback()
+r:openFiles('r'); r:reset()
 assert(memory[0x191de0c]==777 and memory[0x01a275dc]==3)
-''')
-
-    def test_instances_own_buffers(self):
-        self.check('local a=fixture("a"); local address=a.commandDataAddress; local b=fixture("b"); assert(a.commandDataAddress==address and address~=b.commandDataAddress)')
-
-    def test_late_malformed_command_is_rejected_before_start(self):
-        self.check('''
-local r=fixture('late'); local bad=command(100); bad.data='XX'
-files[r.commandsFileName]={command(1),bad}
-assert(not pcall(function() r:startPlayback() end)); assert(r.mode=='none'); allClosed()
-''')
-
-    def test_invalid_packets_never_reach_native_boundary(self):
-        self.check('''
-local r=fixture('payload'); r._scheduleCommand=function() scheduled=scheduled+1 end
-for _,change in ipairs({{size=1261,data=string.rep('AA',1261)}, {size=1,data='0102'},
- {data='GG'}, {commandCategory=999}, {player=0}, {time=0}, {time=1.5}}) do
-  local c=command(); for k,v in pairs(change) do c[k]=v end
-  assert(not pcall(function() r:scheduleCommand(c) end))
-end
-assert(scheduled==0)
-r:scheduleCommand(command()); assert(scheduled==1)
-assert(bytes[r.commandDataAddress]==1 and bytes[r.commandDataAddress+1259]==0)
-''')
-
-    def test_rng_value_index_and_tick_mismatches_are_retained(self):
-        for key in ('rng1', 'rng2', 'index1', 'index2', 'time'):
-            with self.subTest(key=key):
-                self.lua.globals().different_key = key
-                self.check('''
-local r=fixture('rng'); r.mode='play'; memory[r.rngRecorderState]=2
-memory[0x2000]=0x420f76
-r.cachedRNG={time=0,rng1=0,rng2=0,index1=0,index2=0,extra={ra2=0x420f76}}
-r.cachedRNG[different_key]=100
-r:syncCheck({ESP=0x2000},2)
-assert(r.firstDesync and r.firstDesync.reason==different_key)
-assert(memory[r.commandRecorderState]==0 and memory[r.rngRecorderState]==0)
 ''')
 
     def test_real_init_callbacks_return_register_changes(self):

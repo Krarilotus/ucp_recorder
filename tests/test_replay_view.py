@@ -10,7 +10,7 @@ class ReplayViewTests(unittest.TestCase):
         self.check('''
 local roster={}; for i=1,8 do roster[i]={kind=i==4 and 'ai' or 'empty'} end
 r={mode='play',active=true,status='playing',manifest={player=1},engine={
- singlePlayer=function() return not multiplayer end,
+ localSession=function() return not multiplayer end,
  networkState=function() return {roster=roster} end}}
 view=require('code/replay-view').new(r)
 memory[0x1a275dc]=1; memory[0x1a275d8]=7 -- native command actor is separate

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.42.0
+
+- Enable local single-player playback of newly recorded multiplayer matches,
+  from either peer. Preserve native multiplayer simulation and human command
+  ownership while disabling live transport only during offline playback.
+- Capture per-tick and per-command RNG boundaries. Restore presentation-coupled
+  RNG1 input between boundaries; verify both streams after simulation/commands.
+  RNG2 divergence stops playback instead of being overwritten.
+- Keep a verified prefix across synchronization, roster changes and clock
+  rewinds; begin a linked segment from the replacement world. Prepare recovery
+  worlds before playback. Named copies own the whole preceding recovery chain;
+  removing a replay archives its linked segments together.
+- Reuse the native file reader after map/UI preparation to retain saved
+  simulation fields reset by the normal loader. Recovery loads use the same
+  single-player browser context as initial playback. Preserve map-extensions
+  save/load wrappers, including Automarket state.
+- Fingerprint installed extension files/archives and readable configured assets
+  alongside exact UCP versions, order and options. Report changed/missing assets
+  before replay loading or settings restart.
+- Add pause/resume and speed controls to the native replay menu, keep the player
+  view selector replay-only, and move automatic recording into the library.
+- Replace the unused prototype recorder/native hooks with a small stream owner.
+  Share native save/load handling and remove duplicate whole-stream preflight.
+- Experimental: original Crusader/Extreme native checks and file/recovery tests
+  pass; fresh in-game offline multiplayer, recovery, loaded-save and UI tests
+  are still required. Earlier RNG2 divergence is not yet proven resolved.
+
 ## 0.41.0
 
 - Include the native save header in new multiplayer starting-world captures,

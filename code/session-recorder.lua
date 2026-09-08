@@ -1,11 +1,11 @@
-local Base = require('code/recorder')
+local Base = require('code/replay-streams')
 local store = require('code/sessions')
 local native = require('code/native')
 local validation = require('code/validation')
 local Session = setmetatable({}, {__index=Base})
 
 function Session:new(engine,config)
-  local o=Base:new({name='unused',rngLogMethod='checkpoints'})
+  local o=Base:new({name='unused'})
   o.engine=engine
   o.halt=core.allocate(4,true)
   o.resultsHold=core.allocate(4,true)
@@ -46,7 +46,7 @@ function Session:guard(callback)
     self.status='error'; self.error=tostring(reason)
     if self.rngTrace then self.rngTrace:observe('finish','session failed') end
     local recordingFailed=self.mode=='record'
-    local pauseGame=self.engine:singlePlayer() and (self.active or self.mode=='play')
+    local pauseGame=self.engine:localSession() and (self.active or self.mode=='play')
     local stopSimulation=pauseGame and not recordingFailed
     core.writeInteger(self.halt,stopSimulation and 1 or 0)
     if pauseGame then self.engine:pause() end
@@ -68,7 +68,7 @@ function Session:guard(callback)
         pcall(self.playbackResult,self,'failed',{error=self.error})
       end
     end
-    for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do
+    for _,key in ipairs({'commandsFile','rngFile','infoFile','tickFile'}) do
       local file=self[key]; self[key]=nil
       if file then pcall(file.close,file) end
     end
@@ -95,6 +95,7 @@ function Session:startRecording()
   self:openFiles('w')
   self.mode='record'; self.status='armed'; self.active=false
   self.error=nil; self.observedTick=false
+  self.firstDesync=nil
   self.finalRngData=nil
   self.executedTick=nil; self.executedBatchSize=0
   self.engine:resetCommands()
@@ -130,7 +131,7 @@ function Session:prepareRecording()
   if self.mode=='record' and self.status=='armed' then self.capturePending=true end
 end
 
-function Session:startPlayback(id)
+function Session:startPlayback(id,prepared)
   assert(self.mode=='none','A replay session is already active')
   assert(self.engine:singlePlayer(),'Replay playback is single-player only')
   if not id then
@@ -143,13 +144,24 @@ function Session:startPlayback(id)
   assert(store.compatible(manifest),'Replay requires its recorded UCP settings')
   store.preflight(manifest)
   local path=store.path(id)
-  local snapshot=store.read(path..'/start.sav')
+  local environment=json:decode(store.read(path..'/environment.json'))
+  if type(environment)=='table' and environment.assets then require('code/replay-assets').verify(environment.assets) end
+  local snapshotPath,snapshotHash=path..'/start.sav',manifest.snapshotHash
+  if manifest.multiplayer then
+    prepared=prepared or require('code/multiplayer-session').prepareChain(manifest,self.engine)
+    local world=assert(prepared[id],'Recovery world was not prepared')
+    snapshotPath,snapshotHash=world.path,world.hash
+  end
+  local snapshot=store.read(snapshotPath)
   local rng=store.read(path..'/rng.bin')
-  assert(sha.sha256(snapshot)==manifest.snapshotHash,'Starting save is damaged')
+  assert(sha.sha256(snapshot)==snapshotHash,'Starting save is damaged')
   assert(#rng==0x9c50 and sha.sha256(rng)==manifest.rngHash,'Starting RNG state is damaged')
   self:setName(path..'/stream')
   self:openFiles('r')
+  if manifest.multiplayer then self.tickFile=assert(io.open(path..'/ticks.bin','rb')) end
   self.manifest=manifest
+  self.firstDesync=nil
+  self.preparedWorlds=prepared
   self.mode='play'; self.status='loading'; self.active=false
   -- The native victory/defeat banner leaves the simulation after eight real
   -- seconds. Hold that presentation transition throughout playback, including
@@ -163,7 +175,10 @@ function Session:startPlayback(id)
   self:playbackResult('loading')
   self.engine:setScope(true)
   core.writeInteger(self.halt,0)
-  self.engine:loadSnapshot(path..'/start.sav')
+  if manifest.multiplayer then
+    local offline=require('code/offline-runtime')
+    offline.load(self.engine,snapshotPath,offline.roster(manifest.multiplayer))
+  else self.engine:loadSnapshot(snapshotPath) end
   local bytes={}; for i=1,#rng do bytes[i]=rng:byte(i) end
   core.writeBytes(self.engine.rng,bytes)
   self:checkRngData(manifest.rngHash,'starting save')
@@ -232,6 +247,17 @@ function Session:onTick()
     end
   elseif self.status=='playing' then
     assert(now<=self.manifest.lastTick,'Replay passed its ending tick')
+    if self.manifest.multiplayer then
+      local ticks=require('code/tick-journal')
+      if now==self.manifest.lastTick then ticks.input(self.engine,self.manifest.finalRng)
+      else
+        assert(not self.pendingTick,'Previous replay simulation tick did not return')
+        local frame=ticks.decode(assert(self.tickFile:read(ticks.SIZE),'Replay tick journal ended early'))
+        assert(frame.time==now,'Replay simulation tick differs')
+        ticks.input(self.engine,frame.before)
+        self.pendingTick=frame
+      end
+    end
     if now%64==0 then
       local line=self.rngFile:read()
       assert(line,'Replay verification data ended early')
@@ -256,12 +282,33 @@ function Session:onTick()
       for i=1,4 do assert(actual[i]==self.manifest.finalRng[i],'Final RNG state differs at tick '..now) end
       self:checkResources(self.manifest.finalResources,'ending state')
       self:checkRngData(self.manifest.finalRngHash,'ending state')
-      self.status='finished'; core.writeInteger(self.halt,1); self.engine:pause()
+      core.writeInteger(self.halt,1)
+      if self.manifest.multiplayer and self.manifest.nextReplay
+        and self.preparedWorlds[self.manifest.nextReplay] then
+        self.status='transition'; self.nextReplay=self.manifest.nextReplay
+      else self.status='finished'; self.engine:pause() end
       if self.rngTrace then self.rngTrace:observe('finish','playback finished') end
-      self:playbackResult('finished',{rngCheckpoints='matched',
-        fullRngCheckpoints='matched',resourceCheckpoints='matched'})
+      local incomplete=self.preparedWorlds and self.preparedWorlds.incomplete
+      self:playbackResult(self.nextReplay and 'segment-finished' or (incomplete and 'finished-prefix' or 'finished'),
+        {rngCheckpoints='matched',fullRngCheckpoints='matched',resourceCheckpoints='matched',recovery=incomplete})
     end
   end
+end
+
+function Session:afterTick()
+  if self.nextReplay then
+    -- Called after processGameTick returns, with no simulation stack retaining
+    -- pointers into the old world. Loading from inside onTick would be too early.
+    local id,prepared=self.nextReplay,self.preparedWorlds
+    self:reset()
+    self:startPlayback(id,prepared)
+    return
+  end
+  local frame=self.pendingTick
+  if not frame then return end
+  self.pendingTick=nil
+  assert(self.engine:tick()==frame.time+1,'Replay simulation tick advanced unexpectedly')
+  require('code/tick-journal').check(self.engine,frame.after,'after simulation')
 end
 
 function Session:checkRngData(expected,phase)
@@ -298,6 +345,10 @@ function Session:reset()
     reportOk,reportError=pcall(self.playbackResult,self,'interrupted')
   end
   if self.mode=='play' then self.engine:abortPlayback() end
+  if self.tickFile then local file=self.tickFile; self.tickFile=nil; assert(file:close()) end
+  self.pendingTick=nil
+  self.nextReplay=nil; self.preparedWorlds=nil
+  require('code/offline-runtime').leave(self.engine)
   self.engine:setScope(false)
   self.engine:resetCommands()
   core.writeInteger(self.halt,0)
@@ -331,7 +382,7 @@ function Session:reset()
 end
 
 function Session:reconcileMode()
-  if self.mode~='none' and not self.engine:singlePlayer() then
+  if self.mode~='none' and not self.engine:localSession() then
     self.status='error'
     self.error='Replay session ended when entering multiplayer'
     self:reset()

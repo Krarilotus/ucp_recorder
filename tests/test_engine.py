@@ -61,6 +61,30 @@ assert(not engine.loading and not engine.overridePath)
 for _,offset in ipairs({0x58,0x7c,0x80,0x884}) do assert(memory[state+offset]==offset) end
 ''')
 
+    def test_prepared_world_is_reapplied_before_exposing_playback_and_override_is_restored_on_failure(self):
+        self.check('''
+local s=engine.sites; local prepared=false
+engine.loadNative=function()
+ assert(engine.loading and memory[engine.pathOverride]==1)
+ assert(memory[s.gameCore+0xc]==20); memory[s.gameCore+0xc]=14
+ memory[s.packager+0x20]=1234; prepared=true
+end
+local calls=0
+engine.readWorldNative=function(packager,sections)
+ assert(prepared and engine.loading and engine.overridePath=='test.sav')
+ assert(packager==s.packager and sections==s.sections and memory[s.packager+0x20]==0)
+ calls=calls+1
+ if calls==2 then error('native reader failed') end
+end
+engine:loadSnapshot('test.sav')
+assert(calls==1 and memory[s.packager+0x20]==1234 and not engine.loading)
+assert(memory[s.gameCore+0xc]==14)
+assert(not pcall(engine.loadSnapshot,engine,'test.sav'))
+assert(calls==2 and memory[s.packager+0x20]==1234 and not engine.loading)
+assert(memory[engine.pathOverride]==0 and not engine.overridePath)
+assert(memory[s.gameCore+0xc]==14)
+''')
+
     def test_full_ring_rejects_write_and_pending_slot_requires_native_completion(self):
         self.check('''
 local slot=engine.base+0x3c67c+9
@@ -327,14 +351,19 @@ bytes[engine.sites.execute.address+8]=0xE9; assert(Engine.verify())
         self.check('''
 for _,sites in pairs(require('code/engine-sites')) do
  local e=Engine.new(sites)
+ local function resource(player,index,value)
+  local address=sites.playerResources+player*0x39f4+index*4
+  value=value%4294967296
+  for i=0,3 do bytes[address+i]=value%256; value=math.floor(value/256) end
+ end
  for player=0,8 do
-  for resource=0,24 do memory[sites.playerResources+player*0x39f4+resource*4]=player*1000+resource end
+  for index=0,24 do resource(player,index,player*1000+index) end
  end
  local state=e:resourceState(); assert(#state==200)
  for player=1,8 do
   for resource=0,24 do assert(state[(player-1)*25+resource+1]==player*1000+resource) end
  end
- memory[sites.playerResources+0x39f4+15*4]=-123
+ resource(1,15,-123)
  assert(e:resourceState()[16]==-123 and state[16]==1015)
 end
 ''')

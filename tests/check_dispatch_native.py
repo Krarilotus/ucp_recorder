@@ -31,7 +31,7 @@ def check_dispatch(reader,variant):
     names=('EAX','EBX','ECX','EDX','ESI','EDI','EBP','ESP','EFLAGS')
     registers={name:getattr(reg,'UC_X86_REG_'+name) for name in names}
 
-    def scenario(replay,capture=False):
+    def scenario(replay,capture=False,offline=None):
         machine=Uc(UC_ARCH_X86,UC_MODE_32)
         machine.mem_map(0x400000,0x3e00000)
         def read(a,n): return bytes(machine.mem_read(int(a),int(n)))
@@ -66,6 +66,8 @@ def check_dispatch(reader,variant):
         g.native_address=lambda a: {0x191d768:base,0x1a279c0:0x1a279c0 if shc else 0x24baec0,
             0x480210:schedule,0x1a275dc:base+actor+4,0x1fe7da8:tick}[a]
         g.read_integer=get; g.write_integer=put
+        g.read_short=lambda a: struct.unpack('<H',read(a,2))[0]
+        g.write_short=lambda a,v: write(a,struct.pack('<H',int(v)&0xffff))
         g.read_bytes=lambda a,n: lua.table_from(list(read(a,n)))
         g.write_bytes=lambda a,b: write(a,list(b.values()))
         g.read_byte=lambda a: read(a,1)[0]
@@ -78,6 +80,7 @@ package.path=source_root..'/?.lua;'..package.path
 package.loaded['code/native']={profile={name=variant},addr=native_address}
 core={allocate=allocate,allocateCode=allocate,exposeCode=expose,hookCode=hook,detourCode=detour,
  readInteger=read_integer,writeInteger=write_integer,readBytes=read_bytes,writeBytes=write_bytes,
+ readSmallInteger=read_short,writeSmallInteger=write_short,
  readByte=read_byte,writeByte=write_byte,writeCode=write_bytes,writeString=write_string}
 engine=require('code/engine').new(require('code/engine-sites')[variant])
 recorder={mode='play',status='playing',active=true,manifest={player=3,variant=variant}}
@@ -90,6 +93,20 @@ end
 engine:install(recorder)
 ''')
         engine=g.engine
+        if offline:
+            g.recorded_mode=offline
+            lua.execute('''
+local state={mode=recorded_mode,localPlayer=3,syncStatus=0,handles={},roster={}}
+for i=1,8 do
+ local human=i==1 or i==3 or i==8
+ state.handles[i]=human and 100+i or -1
+ state.roster[i]={slot=i,kind=human and 'human' or 'empty',ai=0,variation=0}
+end
+engine.offlineInstalled=true
+local runtime=require('code/offline-runtime')
+runtime.enter(engine,runtime.roster(state))
+recorder.manifest.multiplayer=state
+''')
         if capture:
             lua.execute('''
 recorder.mode='record'; recorder.status='recording'; recorder.commands={}
@@ -158,8 +175,12 @@ function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=com
             count=100 if replay or capture else 2
             for _ in range(count):
                 sequence+=1
-                command=lua.table_from(dict(commandCategory=15,player=3,time=now,size=4,
+                player=(1,3,8)[(sequence-1)%3] if offline else 3
+                command=lua.table_from(dict(commandCategory=15,player=player,time=now,size=4,
                     data=struct.pack('<I',sequence).hex()))
+                if offline:
+                    command['beforeRng']=lua.table_from([0,0,0,0])
+                    command['afterRng']=lua.table_from([0,0,0,0])
                 if capture:
                     call(local_queue,(base,15),1)
                 else:
@@ -171,7 +192,7 @@ function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=com
                 assert not engine.commandsPending(engine)
         if replay:
             assert [r[3] for r in observed]==list(range(1,601))
-            assert all(r[2]==3 for r in observed)
+            assert [r[2] for r in observed]==[(1,3,8)[i%3] if offline else 3 for i in range(600)]
             assert [r[0] for r in observed]==[t for t in range(10,16) for _ in range(100)]
             # Actual native enqueue mutates scratch/index before returning.
             # A rejected inferred length must restore every saved queue byte.
@@ -199,9 +220,15 @@ function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=com
             assert not list(engine['received'].items())
         else:
             assert [r[3] for r in observed]==[2,1],observed
+        if offline:
+            lua.execute("require('code/offline-runtime').leave(engine)")
+            assert get(base+0x618)==99
+            assert [get(base+0x6a8+i*4) for i in range(9)]==[-1,-1,-1,1,-1,-1,-1,-1,-1]
         return observed
 
     scenario(False)
     scenario(True)
     scenario(False,True)
-    print(f'PASS: {variant} native ring-wrap reorder reproduced; 600 replay dispatches and 600 local captures; native size-failure rollback verified')
+    scenario(True,offline=1)
+    scenario(True,offline=2)
+    print(f'PASS: {variant} native ring-wrap/rollback; 600 SP and 1200 offline MP dispatches with original actor translation; 600 local captures')
