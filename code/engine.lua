@@ -186,6 +186,9 @@ end
 
 function M:selectPlayback(recorder)
   assert(self:localSession() and recorder.status=='playing','Replay dispatch is not active')
+  -- Viewer pause belongs to playback, independently of whether the original
+  -- recording accepted commands while paused. Do not consume its stream yet.
+  if self:isPaused() then return 0 end
   recorder:feed()
   local entries=self.journal:select(self:tick())
   -- Reject unknown pending entries before *any* handler in this batch runs.

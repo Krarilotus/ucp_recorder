@@ -1,4 +1,4 @@
--- Own the three replay streams and one prefetched command. Session validation,
+-- Own replay file handles and one prefetched command. Session validation,
 -- native buffers, scheduling and RNG state belong to their respective owners.
 local Streams={}
 local keys={'commands','rng','info'}
@@ -16,17 +16,21 @@ function Streams:setName(name)
   self.infoFileName=name..'-infself.json'
 end
 
-function Streams:reset()
-  self.mode='none'; self.nextCommand=nil
+function Streams:closeFiles()
   local failure
-  for _,key in ipairs(keys) do
-    local field=key..'File'; local file=self[field]; self[field]=nil
+  for _,field in ipairs({'commandsFile','rngFile','infoFile','tickFile'}) do
+    local file=self[field]; self[field]=nil
     if file then
       local ok,closed,reason=pcall(file.close,file)
       if not ok or not closed then failure=failure or reason or closed or 'Cannot close replay file' end
     end
   end
   assert(not failure,tostring(failure))
+end
+
+function Streams:reset()
+  self.mode='none'; self.nextCommand=nil
+  self:closeFiles()
 end
 
 -- Commit handles only after all opens succeed. Preflight belongs to sessions;

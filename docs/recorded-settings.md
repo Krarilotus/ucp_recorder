@@ -73,12 +73,12 @@ ctest --test-dir build-framework-settings -C Release --output-on-failure
 
 The Windows/Linux compatibility workflow runs this check separately from the
 PR release tests. Full live game exit/restart, graphics initialization and Extreme
-playback still require verification. Environment matching is not yet a complete
-content fingerprint: edited extension binaries/assets under unchanged versions
-remain a separate engineering gap. Multiplayer playback remains unavailable.
+playback still require verification. Asset identity is described below; it does
+not establish restoration of extension-owned runtime state. Local multiplayer
+playback is experimental; see [its current status](offline-multiplayer.md).
 
 
-## Asset identity (0.42.0)
+## Asset identity (0.43.0)
 
 New recordings fingerprint active extension contents and readable file/directory
 options at startup, outside simulation hooks. Unpacked extension files are
@@ -93,3 +93,15 @@ Version names alone cannot detect edited unpacked code/assets. Missing or change
 files are reported before loading; no different version or contents are accepted
 as a silent replacement. Arbitrary external state created by other modules is
 not automatically serialized by this inventory.
+
+Inventory `ucp-files-v2` also retains the traversed extension/configuration roots.
+Before Play or restart, the same traversal checks membership again. Adding a
+script or map to an existing directory is therefore detected even when every
+previous file is unchanged. Physical folders alongside nested archives are
+included; synthetic ZIP directory entries are skipped. Traversal and file sizes
+are bounded, and neither traversal nor hashing runs on the simulation path.
+
+Older inventories do not contain this coverage and require their recorded
+recorder version. Do not edit an old manifest to claim the new inventory profile.
+Configured path discovery is still a heuristic: this does not claim to inventory
+every external namespace that an arbitrary module might read.

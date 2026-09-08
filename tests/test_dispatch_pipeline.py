@@ -23,6 +23,7 @@ end
 function recorder:feed() end
 engine:install(recorder)
 engine.schedule=simulatedSchedule
+engine.haltingMenuNative=function() return 0 end
 memory[engine.base+engine.sites.actorOffset+4]=1
 memory[0x1fe7da8]=10
 function selectCommands() return hooks[engine.sites.select.address](engine.base) end

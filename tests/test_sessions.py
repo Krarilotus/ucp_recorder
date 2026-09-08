@@ -104,6 +104,32 @@ assert(not pcall(function() r:reset() end))
 assert(aborted and r.mode=='none' and not r.active and not scoped and memory[r.halt]==0)
 ''')
 
+    def test_tick_journal_close_failure_cannot_leave_offline_mode_or_other_handles_active(self):
+        self.check('''
+for _,throws in ipairs({false,true}) do
+ local r=session(); r.mode='play'; r.status='playing'; r.active=true; r.manifest={id='test'}
+ engine.offline={}; scoped=true; memory[r.halt]=1; memory[r.resultsHold]=1
+ require('code/offline-runtime').leave=function(e) e.offline=nil end
+ local closed=0
+ for _,key in ipairs({'commandsFile','rngFile','infoFile','tickFile'}) do
+  local field=key
+  r[key]={close=function()
+   closed=closed+1
+   if field=='tickFile' then
+    if throws then error('tick close failed') else return nil,'tick close failed' end
+   end
+   return true
+  end}
+ end
+ local ok,reason=pcall(r.reset,r)
+ assert(not ok and tostring(reason):find('tick close failed',1,true))
+ assert(closed==4 and not engine.offline and not scoped and not r.active and r.mode=='none')
+ assert(memory[r.halt]==0 and memory[r.resultsHold]==0)
+ assert(not r.commandsFile and not r.rngFile and not r.infoFile and not r.tickFile)
+ r:reset(); assert(r.status=='idle')
+end
+''')
+
     def test_default_recording_arms_before_seed_and_saves_each_match(self):
         self.check('''
 local r=session(); assert(r.autoRecord and not scoped)

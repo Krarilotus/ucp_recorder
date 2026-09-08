@@ -68,10 +68,7 @@ function Session:guard(callback)
         pcall(self.playbackResult,self,'failed',{error=self.error})
       end
     end
-    for _,key in ipairs({'commandsFile','rngFile','infoFile','tickFile'}) do
-      local file=self[key]; self[key]=nil
-      if file then pcall(file.close,file) end
-    end
+    pcall(Base.closeFiles,self) -- cleanup must not replace the first failure
   end
   return ok
 end
@@ -345,7 +342,6 @@ function Session:reset()
     reportOk,reportError=pcall(self.playbackResult,self,'interrupted')
   end
   if self.mode=='play' then self.engine:abortPlayback() end
-  if self.tickFile then local file=self.tickFile; self.tickFile=nil; assert(file:close()) end
   self.pendingTick=nil
   self.nextReplay=nil; self.preparedWorlds=nil
   require('code/offline-runtime').leave(self.engine)

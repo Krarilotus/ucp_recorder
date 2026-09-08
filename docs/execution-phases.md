@@ -42,6 +42,13 @@ order of native execution, not network receipt. The ending checkpoint currently
 describes the last observed **pre-clock** boundary, after its preceding commands;
 the following clock step is outside that prefix.
 
+Native command construction chooses the larger of the match clock and
+synchrony's local clock, then adds command delay. Its selector accepts due
+commands without consulting logical pause. Acceptance of user input while
+paused therefore does not by itself prove immediate execution. Playback's
+**viewer** pause stops the selector before it consumes the saved stream; this
+is independent of record-time paused inputs.
+
 ## Paused viewing and stopped playback
 
 Space selects flat view in the original window handler. A completed height/view

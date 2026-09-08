@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.43.0
+
+- Keep recorded commands pending while playback is paused, including a halting
+  game menu. Resume dispatches them in their recorded order. This viewer rule
+  does not prevent the original game from accepting commands during recording.
+- Detect newly added files in recorded extension and configured directories,
+  including physical folders beside nested ZIPs. Capture and verification share
+  the same bounded traversal. Asset inventory v2 records its directory roots;
+  older recordings retain their original recorder/environment requirements.
+- Release offline playback state even if closing its tick journal fails. One
+  file owner attempts all closes and retains the first failure, avoiding leaked
+  handles and duplicated cleanup paths.
+- Portable and original SHC/Extreme dispatcher checks pass, including pause/
+  resume with pending commands. Full live replay equivalence and the earlier
+  RNG2 divergences remain open; this is not a completed-match certification.
+
 ## 0.42.1
 
 - Stop the native tick routine completely after playback finishes or fails,

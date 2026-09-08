@@ -83,6 +83,7 @@ core={allocate=allocate,allocateCode=allocate,exposeCode=expose,hookCode=hook,de
  readSmallInteger=read_short,writeSmallInteger=write_short,
  readByte=read_byte,writeByte=write_byte,writeCode=write_bytes,writeString=write_string}
 engine=require('code/engine').new(require('code/engine-sites')[variant])
+engine.haltingMenuNative=function() return 0 end -- UI query checked separately
 recorder={mode='play',status='playing',active=true,manifest={player=3,variant=variant}}
 function recorder:feed() end
 function recorder:guard(f)
@@ -185,6 +186,12 @@ function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=com
                     call(local_queue,(base,15),1)
                 else:
                     engine.scheduleCommand(engine,command)
+            if replay:
+                before_count=len(observed)
+                put(engine['sites']['paused'],1)
+                call(dispatch,(base,),1)
+                assert len(observed)==before_count and engine.commandsPending(engine)
+                put(engine['sites']['paused'],0)
             call(dispatch,(base,),1)
             if replay:
                 assert g.recorder['status']=='playing',g.recorder['error']

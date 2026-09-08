@@ -125,6 +125,40 @@ memory[engine.base+0x618]=0
 assert(hooks[1](engine.base,28)==0 and forwarded==1)
 ''')
 
+    def test_viewer_pause_keeps_due_commands_pending_until_resume(self):
+        self.check('''
+local hooks={}
+core.hookCode=function(callback,address)
+ hooks[address]=callback; return function() return 42 end
+end
+local recorder={mode='play',status='playing',active=true,manifest={player=1,variant='SHC'}}
+local feeds=0
+function recorder:feed() feeds=feeds+1 end
+function recorder:guard(f) f(); return true end
+local menuPaused=0
+engine.haltingMenuNative=function() return menuPaused end
+engine:install(recorder)
+engine.schedule=simulatedSchedule
+memory[0x1fe7da8]=10
+engine:scheduleCommand(command(10))
+local select=hooks[engine.sites.select.address]
+for _,kind in ipairs({'logical','menu'}) do
+ memory[engine.sites.paused]=kind=='logical' and 1 or 0
+ menuPaused=kind=='menu' and 1 or 0
+ memory[engine.base+engine.sites.selectedCountOffset]=99
+ assert(select(engine.base)==0 and feeds==0)
+ assert(memory[engine.base+engine.sites.selectedCountOffset]==0)
+ assert(engine:commandsPending() and engine.journal.executed==0)
+end
+memory[engine.sites.paused]=0; menuPaused=0
+assert(select(engine.base)==1 and feeds==1)
+assert(memory[engine.base+engine.sites.selectedCountOffset]==1)
+assert(engine:commandsPending() and engine.journal.executed==0)
+-- Live recording delegates to the original selector even while paused.
+recorder.mode='record'; memory[engine.sites.paused]=1
+assert(select(engine.base)==42)
+''')
+
     def test_multiplayer_cannot_enable_scope_or_be_paused_by_recorder(self):
         self.check('''
 memory[engine.base+0x618]=1; memory[engine.sites.paused]=0

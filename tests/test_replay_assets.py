@@ -56,3 +56,50 @@ listing['ucp/modules/packed-1.0.0/']={'ucp/modules/packed-1.0.0/definition.yml'}
 local ok,reason=pcall(assets.verify,snapshot)
 assert(not ok and reason:find('layout changed',1,true))
 ''')
+
+    def test_added_files_and_nested_directories_cannot_silently_change_the_profile(self):
+        self.lua.execute('''
+local root='ucp/plugins/unpacked-1.0.0'
+local path=root..'/code/new.lua'
+listing[root..'/code/'][2]=path; contents[path]=string.rep('f',64)
+local ok,reason=pcall(assets.verify,snapshot)
+assert(not ok and reason:find('New asset',1,true) and reason:find(path,1,true))
+listing[root..'/code/'][2]=nil
+children[root..'/'][3]=root..'/new/'
+listing[root..'/new/']={root..'/new/extra.lua'}; children[root..'/new/']={}
+assert(not pcall(assets.verify,snapshot))
+children[root..'/'][3]=nil
+assets.verify(snapshot)
+''')
+
+    def test_configured_directory_membership_is_preserved_without_hashing_unrelated_files(self):
+        self.lua.execute('''
+listing['maps/custom/']={'maps/custom/a.map'}; children['maps/custom/']={}
+contents['maps/custom/a.map']=string.rep('f',64)
+snapshot=assets.capture(extensions,{directory='maps/custom/'})
+assert(snapshot.roots['maps/custom'])
+contents['unrelated.map']='not part of this configuration'
+assets.verify(snapshot)
+listing['maps/custom/'][2]='maps/custom/b.map'
+local ok,reason=pcall(assets.verify,snapshot)
+assert(not ok and reason:find('maps/custom/b.map',1,true))
+''')
+
+    def test_directory_listing_cannot_escape_its_recorded_root(self):
+        self.lua.execute('''
+listing['ucp/plugins/unpacked-1.0.0/code/'][1]='outside.lua'
+local ok,reason=pcall(assets.verify,snapshot)
+assert(not ok and reason:find('escaped its parent',1,true))
+''')
+
+    def test_physical_folder_beside_a_nested_archive_is_not_skipped(self):
+        self.lua.execute('''
+local path='ucp/plugins/unpacked-1.0.0/data/'
+listing[path]={path..'new.lua'}; children[path]={}
+contents[path..'new.lua']=string.rep('f',64)
+local ok,reason=pcall(assets.verify,snapshot)
+assert(not ok and reason:find(path..'new.lua',1,true))
+snapshot=assets.capture(extensions,{})
+assert(snapshot.files[path..'new.lua'])
+assets.verify(snapshot)
+''')
