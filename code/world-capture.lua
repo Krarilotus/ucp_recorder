@@ -5,28 +5,10 @@ local store=require('code/sessions')
 local digest=require('code/native-hash')
 local M={CHUNK=65536}
 
-local function unsigned(data,offset,size)
-  local value=0
-  for i=size,1,-1 do value=value*256+assert(data:byte(offset+i)) end
-  return value
-end
-
 function M.layout()
   local profile=assert(sections[native.profile.name],'Unsupported world capture executable')
   local raw=core.readString(profile.address,profile.bytes)
-  assert(#raw==profile.bytes and sha.sha256(raw)==profile.hash,'Native save section table changed')
-  local entries,total={},0
-  for offset=0,#raw-17,16 do
-    local address,skip,size=unsigned(raw,offset,4),unsigned(raw,offset+4,4),unsigned(raw,offset+8,4)
-    assert(address>=0x400000 and size>0 and size<=32*1024*1024 and address+size<0x80000000,
-      'Invalid native save section range')
-    if skip==0 then
-      entries[#entries+1]={address=address,size=size,section=unsigned(raw,offset+14,2),
-        compressed=unsigned(raw,offset+12,2),offset=total}
-      total=total+size
-    end
-  end
-  assert(unsigned(raw,#raw-16,4)==0 and total==profile.total,'Invalid native save section ending')
+  local entries=require('code/world-layout').decode(raw,native.profile.name)
   return entries,profile,raw
 end
 
@@ -40,6 +22,9 @@ function M.capture(path,engine)
       'unregistered-extension-state','resynchronization-world-restoration'}}
   store.write(path..'/world.json',json:encode(manifest))
   store.write(path..'/world-layout.bin',raw)
+  local header,descriptor=require('code/world-header').read()
+  store.write(path..'/world-header.bin',header)
+  manifest.header=descriptor
   local file=assert(io.open(path..'/world.bin','wb'))
   local ok,reason=pcall(function()
     for _,entry in ipairs(entries) do
@@ -65,7 +50,7 @@ function M.capture(path,engine)
     local pointer=modules.automarket.pAutomarketData
     require('code/validation').integer(pointer,0x10000,0x7fffffff-2416,'Automarket data pointer')
     local data=core.readString(pointer,2416)
-    assert(#data==2416 and unsigned(data,0,4)==2,'Unsupported Automarket saved data layout')
+    assert(#data==2416 and data:sub(1,4)=='\2\0\0\0','Unsupported Automarket saved data layout')
     store.write(path..'/automarket.bin',data)
     manifest.automarket={version=descriptor.version,protocol=descriptor.protocol,
       format=2,bytes=#data,sha256=sha.sha256(data)}
@@ -76,6 +61,6 @@ function M.capture(path,engine)
   store.write(path..'/world.json.tmp',encoded)
   require('code/platform').replace(path..'/world.json.tmp',path..'/world.json')
   return {status='complete',hash=sha.sha256(encoded),bytes=profile.total,
-    automarket=manifest.automarket~=nil}
+    automarket=manifest.automarket~=nil,header=true}
 end
 return M

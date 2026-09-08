@@ -112,6 +112,8 @@ python tests/check_executables.py "PATH/TO/ORIGINAL/GAME"
 python tools/build.py
 ```
 
-The builder creates `dist/recorder-0.29.0.zip` with a flat module layout.
+The builder creates `dist/recorder-VERSION.zip` with a flat module layout,
+using the extension version from `definition.yml`.
 `definition.yml` uses metadata schema version `1.0.0`; that is separate from
-the extension version `0.29.0`.
+the extension version. Optional full original-codec and save-loader checks are
+documented in [native world conversion](docs/multiplayer-world-state.md).

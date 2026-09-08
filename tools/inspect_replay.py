@@ -10,6 +10,7 @@ WORLD_TABLES = {
     'SHC': ('0d29f28ecf7ea55c4f1598a78b2a7e30796c8534f0a48a3f5d0313b682773450', 13776465),
     'Extreme': ('b82cc2d084a6e1afa2ee3e38630561a8783e3952c6073add339bc4bb79f3eeab', 25168385),
 }
+WORLD_HEADER_FIELDS = [('description',1008),('timeAndHash',8),('players',28),('scenario',1017),('skirmish',80)]
 
 
 def world_capture(folder, capture=None):
@@ -48,6 +49,19 @@ def world_capture(folder, capture=None):
             if len(data) != size or hashlib.sha256(data).hexdigest() != entry.get('sha256'):
                 raise ValueError(f'Native world section {section} is damaged')
             offset += size
+    header = world.get('header')
+    if bool(header) != bool(descriptor.get('header')):
+        raise ValueError('Native header presence differs')
+    if header:
+        data = (folder / 'world-header.bin').read_bytes()
+        fields=[]
+        offset=0
+        for name,size in WORLD_HEADER_FIELDS:
+            fields.append(dict(name=name,offset=offset,size=size))
+            offset+=size
+        if (header.get('format') != 1 or header.get('bytes') != offset or len(data) != offset
+                or header.get('fields') != fields or hashlib.sha256(data).hexdigest() != header.get('sha256')):
+            raise ValueError('Native save header is damaged')
     market = world.get('automarket')
     if bool(market) != bool(descriptor.get('automarket')):
         raise ValueError('Automarket snapshot presence differs')
@@ -58,7 +72,7 @@ def world_capture(folder, capture=None):
                 or hashlib.sha256(data).hexdigest() != market.get('sha256')):
             raise ValueError('Automarket world state is damaged')
     return {'status': 'verified evidence', 'tick': world['tick'], 'bytes': total,
-            'sections': entries, 'automarket': market, 'omissions': world.get('omissions', []),
+            'sections': entries, 'header': header, 'automarket': market, 'omissions': world.get('omissions', []),
             'caution': 'Raw native sections include local presentation state and padding. '
                        'Equal bytes do not establish complete extension coverage or working restoration.'}
 

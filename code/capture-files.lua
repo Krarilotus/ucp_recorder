@@ -77,6 +77,7 @@ function M.copy(source,name,bytes,events,commands,tick)
       prefix(source.path..'/world.json',path..'/world.json')
       prefix(source.path..'/world-layout.bin',path..'/world-layout.bin')
       prefix(source.path..'/world.bin',path..'/world.bin')
+      if source.world.header then prefix(source.path..'/world-header.bin',path..'/world-header.bin') end
       if source.world.automarket then prefix(source.path..'/automarket.bin',path..'/automarket.bin') end
     end
     prefix(source.path..'/commands.jsonl',path..'/commands.jsonl',bytes)

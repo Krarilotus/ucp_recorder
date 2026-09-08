@@ -78,6 +78,13 @@ local profile=require('code/world-sections').SHC
 profile.hash=table_hash; profile.total=total_bytes
 store=require('code/sessions'); files=require('code/capture-files')
 world=require('code/world-capture'); now=1
+require('code/world-header').read=function()
+ local data=string.rep('h',2141)
+ return data,{format=1,bytes=2141,sha256=sha.sha256(data),fields={
+  {name='description',offset=0,size=1008},{name='timeAndHash',offset=1008,size=8},
+  {name='players',offset=1016,size=28},{name='scenario',offset=1044,size=1017},
+  {name='skirmish',offset=2061,size=80}}}
+end
 engine={tick=function() return now end,networkState=function() return {mode=1} end,
  rngData=function() return string.rep('a',64) end,resourceState=function() return {} end}
 settings={raw='settings',environment='environment',hash=sha.sha256('settings'),
@@ -106,6 +113,7 @@ copy=files.copy(capture,'name',24,0,0,1)
         copied = Path(self.lua.eval('copy.path'))
         self.addCleanup(lambda: __import__('shutil').rmtree(copied))
         self.assertEqual((copied/'world.bin').read_bytes(), self.expected)
+        self.assertEqual((copied/'world-header.bin').read_bytes(),b'h'*2141)
         self.assertEqual(inspector.compare_worlds(self.root, copied)['differences'], [])
 
     def test_corrupt_descriptor_rejected_before_dereferencing_world(self):
@@ -194,6 +202,22 @@ end
         capture=self.capture()
         self.assertEqual(capture['world']['status'],'failed')
         self.assertIn('Short native world read',capture['world']['reason'])
+
+    def test_missing_or_changed_header_is_not_verified_evidence(self):
+        self.capture()
+        (self.root/'world-header.bin').write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError,'header'):
+            inspector.world_capture(self.root)
+
+    def test_old_world_capture_remains_inspectable_without_header(self):
+        capture=self.capture()
+        manifest=json.loads((self.root/'world.json').read_text())
+        del manifest['header']; del capture['world']['header']
+        raw=json.dumps(manifest).encode()
+        (self.root/'world.json').write_bytes(raw)
+        capture['world']['hash']=hashlib.sha256(raw).hexdigest()
+        (self.root/'capture.json').write_text(json.dumps(capture))
+        self.assertIsNone(inspector.world_capture(self.root)['header'])
 
 
 if __name__ == '__main__':

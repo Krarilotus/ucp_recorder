@@ -45,6 +45,8 @@ def check(folder):
         entries=list(struct.iter_unpack('<IIIHH',table[:-16]))
         assert len(entries)==122 and all(not skip for _,skip,_,_,_ in entries)
         assert sum(size for _,_,size,_,_ in entries)==world['total']
+        from test_world_header import check_references
+        check_references(reader,name)
         rng = native.addr(0x1a279c0)
         assert native.addr(0x1a3160c) == rng+0x9c4c
         synchrony = native.addr(0x191d768)
@@ -140,4 +142,13 @@ def check(folder):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('game_directory', type=Path)
-    check(parser.parse_args().game_directory)
+    parser.add_argument('--world-container', action='store_true',
+        help='Also run full original-codec and FilePackager round trips (requires pefile; takes several minutes)')
+    arguments = parser.parse_args()
+    check(arguments.game_directory)
+    if arguments.world_container:
+        from check_world_codec_native import check_codec
+        source_root = Path(__file__).resolve().parents[1]
+        for variant, filename in [('SHC', 'Stronghold Crusader.exe'),
+                                  ('Extreme', 'Stronghold_Crusader_Extreme.exe')]:
+            check_codec(arguments.game_directory / filename, source_root, variant)

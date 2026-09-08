@@ -1,4 +1,4 @@
-# Read-only multiplayer starting-world evidence (0.37.0)
+# Multiplayer starting-world capture and native file conversion
 
 This stage preserves the native world at the first simulation callback and makes
 host/client starting differences inspectable. **It does not restore multiplayer
@@ -88,11 +88,76 @@ and capture tick and reports each differing section's first byte address.
 These are investigation leads: native sections include presentation state and
 padding, while omitted extension state cannot be validated through these hashes.
 
+## Native header and file conversion (0.41.0)
+
+New captures include `world-header.bin`: 2,141 bytes of description, cached
+time/hash, player, scenario and Skirmish metadata absent from the 122 sections.
+`world-header.lua` verifies all 18 native writer argument references before
+reading any field. The world manifest hashes these bytes and describes their
+five groups. Cached time/hash fields are preserved as native metadata; they are
+not reported as fresh measurements of the captured tick. The actual simulation
+tick remains part of the section data.
+
+`world-layout.lua` owns descriptor decoding. Capture owns live memory access;
+`world-reader.lua` owns bounded disk reads and integrity validation. The reader
+checks the capture identity, executable, manifest hash, original descriptor
+table, exact section metadata, header and each payload before conversion.
+Old captures without the header remain inspectable, but need a new recording
+for native conversion.
+
+`world-container.prepare(path, engine)` can run only at the single-player
+Skirmish menu. It builds `world-native.sav` and a hashed `world-native.json`
+descriptor, without entering a match or writing game world/transport state.
+Conversion is an internal prerequisite, not a new Play button or a supported
+way to load multiplayer captures through the ordinary save menu.
+
+The writer uses the game's existing PKWARE `DecoderState::doImplode` and
+`doExplode` with a private decoder and scoped buffers. It checks compression
+status, CRC and full byte equality by decoding each result, falling back to
+raw section storage when compression gives no benefit. It never invokes the
+live multiplayer save routine or borrows its global decoder state. The complete
+stored payload must fit the original loader's 6,000,000-byte allocation.
+
+The native header requires a nonzero preview block to reach the following
+metadata. Conversion supplies an explicitly neutral 200-by-200 indexed preview;
+it does not render the current world or claim a recorded map thumbnail.
+Automarket's captured payload is encoded as
+`automarket/automarketplayerdata.bin` using map-extensions' existing MemoryZip
+library in custom section 1337. Current-game serializers are not called.
+An isolated Windows check uses the shipped x86 Lua and MemoryZip DLLs plus the
+actual map-extensions read handle, then verifies the resulting ZIP bytes with
+.NET's independent ZIP reader. The UCP library-loader bridge is a stand-in;
+the actual map-extensions loading wrapper still needs integration verification.
+
+Temporary output is validated before replacing a previous prepared file.
+Conversion failures preserve the original capture. Both capture and prepared
+metadata continue to state `playable=false`.
+
+The optional original-executable check runs the actual Lua capture, reader,
+container and codec against both supported executables. It independently
+decodes every stored section, then runs the original FilePackager reader with
+all section destinations overwritten first. File, heap, clock, resource-name
+and audio calls are simulated; directory parsing, initialization, decompression,
+section routing and native completion execute original instructions. This is
+a static format fixture, not a playable match or an outer UI/network test.
+
+```text
+python -m pip install pefile
+python tests/check_executables.py "PATH/TO/ORIGINAL/GAME" --world-container
+```
+
+On Windows, the shipped-library adapter check also runs without a game process:
+
+```powershell
+C:/Windows/SysWOW64/WindowsPowerShell/v1.0/powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/check_automarket_zip_windows.ps1 -GameDirectory "PATH/TO/INSTALLED/UCP/GAME"
+```
+
+This requires the installed `lua.dll` and `map-extensions-1.0.0.zip`. The policy
+flag applies only to that test process. It does not change machine policy.
+
 ## Remaining restoration work
 
-These raw bytes are not a native `.sav`. Native container metadata, load-time
-fixups and extension restoration still need a checked conversion/restore path.
-The original section table also excludes runtime networking fields. For example,
+The original section table excludes runtime networking fields. For example,
 the active mode, eight transport IDs and resolved command actor are not saved;
 the saved mode copy (section 1106), AI slots (1100) and local player (1051) are.
 `capture.json.initialNetwork` preserves observed identities separately, but

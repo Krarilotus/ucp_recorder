@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.41.0
+
+- Include the native save header in new multiplayer starting-world captures,
+  with checked Crusader/Extreme references, field layout and hashes. Preserve
+  it in named copies and validate it in the offline inspector. Older captures
+  remain inspectable but lack the metadata needed for native conversion.
+- Add bounded native-file conversion outside active matches. Reuse the game's
+  original compression/decompression with private buffers, CRC and byte checks,
+  raw fallback and the original loader's payload limit. Preserve Automarket's
+  captured state using map-extensions' existing ZIP format and library.
+- Separate live capture, native schema, disk validation and file construction.
+  Check every section through the original codec and original FilePackager on
+  both executables, including restoration into overwritten destination memory.
+  Verify the Automarket ZIP with the shipped x86 Lua/library and native module
+  read handle as well as an independent ZIP reader.
+- This completes a file-format prerequisite, not multiplayer playback. Offline
+  identities, immediate/system events, replacement worlds and in-game restore
+  integration remain pending. Captures and prepared files stay non-playable.
+
 ## 0.40.0
 
 - Automatically start a separate replay when a saved single-player Skirmish
