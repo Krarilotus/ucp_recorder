@@ -6,6 +6,27 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_return_from_results_seals_last_observed_tick_and_selects_full_match(self):
+        self.check('''
+for _,view in ipairs({20,41,61}) do
+ local r=session(); r:beginMatch(); r:prepareRecording(); now=1; r:onTick()
+ now=128; r:onTick(); now=99999 -- a transition must not resample the world
+ r:onMenuView(view)
+ assert(savedManifest.status=='complete' and savedManifest.lastTick==128)
+ assert(r.lastCompletedReplay==savedManifest.id and r.mode=='none' and not scoped)
+ r:onMenuView(view); assert(r.mode=='none')
+end
+''')
+
+    def test_report_navigation_and_snapshot_loading_do_not_end_capture(self):
+        self.check('''
+local r=session(); r:beginMatch(); r:prepareRecording(); now=1; r:onTick()
+for _,view in ipairs({14,16,58}) do r:onMenuView(view); assert(r.active and r.status=='recording') end
+engine.loading=true
+for _,view in ipairs({20,41,61}) do r:onMenuView(view); assert(r.active and r.status=='recording') end
+engine.loading=false; r:onMenuView(20); assert(r.mode=='none')
+''')
+
     def test_attribution_starts_after_snapshot_and_flushes_before_desync(self):
         self.check('''
 local r=session(); local events={}

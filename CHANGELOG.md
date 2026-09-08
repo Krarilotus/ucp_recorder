@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.33.1
+
+- Finalize automatic recordings when match results return directly to the
+  Skirmish lobby or main menu. Natural match endings no longer leave a recording
+  unavailable in the replay browser until game exit. Retain the last simulation
+  boundary and leave in-game reports and snapshot loading unaffected.
+
 ## 0.33.0
 
 - Use the original red banner, shields and heading font in replay dialogs on

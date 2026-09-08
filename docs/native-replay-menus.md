@@ -21,3 +21,15 @@ two dialog widths and checks tile positions, shield calls, stack cleanup and
 preserved registers. Texture blitting is a stand-in; it does not establish
 actual pixel output. Menu-flow tests cover pause/completion/failure precedence
 and the layout offsets. Live visual checks must use the installed build.
+
+Live 0.33.0 checks passed for the German library, rename/cancel and removal
+confirmation/cancel with Ascension and Automarket loaded. A natural defeat
+exposed a separate lifecycle gap: returning from results to the Skirmish lobby
+left the session open and the new recording unavailable. The existing checked
+`GameCore::switchToMenuView` observer only handled manual quit's view 61.
+
+Version 0.33.1 also finalizes on lobby view 20 and main-menu view 41, using the
+last observed simulation boundary. It does not treat the in-game build/report
+views (14/16) or rankings (58) as exits, and does nothing during snapshot loading.
+No new native detour is installed. The regression covers finalization, selection
+of the full recording, repeated transitions and the excluded views/loading path.

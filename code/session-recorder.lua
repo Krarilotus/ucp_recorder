@@ -23,6 +23,13 @@ function Session:beginMatch()
   if self.autoRecord and self.mode=='none' then self:startRecording() end
 end
 
+function Session:onMenuView(view)
+  -- Natural match results return directly to the lobby (20), bypassing the
+  -- manual Quit Mission transition (61). Seal from the last observed tick;
+  -- the result/lobby screens are not additional simulation boundaries.
+  if not self.engine.loading and (view==20 or view==41 or view==61) then self:reset() end
+end
+
 function Session:saveCopy(name)
   assert(self.engine:singlePlayer() and self.mode=='record' and self.status=='recording'
     and self.active and self.observedTick,'No active recording to save yet')
