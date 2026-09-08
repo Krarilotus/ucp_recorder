@@ -40,6 +40,17 @@ class RestartHelperTests(unittest.TestCase):
         (self.root/'runner.ps1').write_text('''
 $ErrorActionPreference = 'Stop'
 function Get-FileHash { throw 'Optional PowerShell script module is unavailable' }
+function New-Object {
+    param($ComObject)
+    if ($ComObject -ne 'WScript.Shell') { throw 'Unexpected COM object' }
+    $dialog = [pscustomobject]@{}
+    $dialog | Add-Member -MemberType ScriptMethod -Name Popup -Value {
+        param($message,$timeout,$title,$icon)
+        Set-Content -LiteralPath 'error-dialog.txt' -Value $message -Encoding UTF8
+        return 1
+    }
+    return $dialog
+}
 function Get-Process {
     param($Id,$ErrorAction)
     $process = [pscustomobject]@{ Path = (Join-Path (Get-Location).Path 'Crusader test.exe') }
@@ -105,9 +116,14 @@ exit $LASTEXITCODE
 
     def pinned_profile(self):
         pinned=self.session/'replay-config.yml'
-        pinned.write_text('{"active":true,"config-full":{"load-order":[{"extension":"recorder","version":"0.25.0"}]}}')
+        pinned.write_text(json.dumps({'active':True,'config-full':{'modules':{'recorder':{}},'plugins':{},
+            'load-order':[{'extension':'recorder','version':'0.25.0'}]}}))
         environment=self.session/'environment.json'
         environment.write_text('{"framework":"test framework"}')
+        (self.root/'ucp/ucp-version.yml').write_text('test framework')
+        installed=self.root/'ucp/modules/recorder-0.25.0'
+        installed.mkdir(parents=True,exist_ok=True)
+        (installed/'definition.yml').write_text('name: recorder\nversion: 0.25.0\n')
         self.manifest.update(settingsCapture='resolved-v1',restartSettingsHash=hashlib.sha256(pinned.read_bytes()).hexdigest(),
                              environmentHash=hashlib.sha256(environment.read_bytes()).hexdigest())
         (self.session/'manifest.json').write_text(json.dumps(self.manifest))
@@ -139,3 +155,26 @@ exit $LASTEXITCODE
         self.run_helper()
         self.assertFalse((self.root/'waited.txt').exists())
         self.assertFalse((self.root/'launch.json').exists())
+
+    def test_missing_extension_is_visible_and_does_not_launch(self):
+        self.pinned_profile()
+        (self.root/'ucp/modules/recorder-0.25.0/definition.yml').unlink()
+        result=self.run_helper()
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse((self.root/'launch.json').exists())
+        self.assertIn('recorder 0.25.0',(self.root/'error-dialog.txt').read_text(encoding='utf-8-sig'))
+
+    def test_zip_installation_is_left_to_ucp_to_open_and_validate(self):
+        self.pinned_profile()
+        (self.root/'ucp/modules/recorder-0.25.0/definition.yml').unlink()
+        (self.root/'ucp/modules/recorder-0.25.0.zip').write_bytes(b'package presence fixture')
+        result=self.run_helper()
+        self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_framework_changed_while_waiting_is_visible(self):
+        self.pinned_profile()
+        (self.root/'ucp/ucp-version.yml').write_text('another framework')
+        result=self.run_helper()
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse((self.root/'launch.json').exists())
+        self.assertIn('framework',(self.root/'error-dialog.txt').read_text(encoding='utf-8-sig'))

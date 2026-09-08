@@ -21,6 +21,7 @@ package.loaded['code/platform']={
  identity=function() return {executable='C:/game/Crusader.exe',processId=123} end,
  spawnHidden=function(exe,args) spawned=spawned+1; executable=exe; arguments=args end,
 }
+package.loaded['code/launch-readiness']={requireReady=function() assert(requirementsOK~=false,'missing version') end}
 os.getenv=function(key) if key=='SystemRoot' then return 'C:\\\\Windows' end end
 restart=require('code/restart')
 ''')
@@ -50,3 +51,10 @@ assert(not pcall(restart.queue,'recording1')); assert(spawned==0 and next(writte
             with self.subTest(value=value):
                 ok, _ = self.lua.eval('function(v) return pcall(restart.quote,v) end')(value)
                 self.assertFalse(ok)
+
+    def test_missing_requirement_never_queues_or_changes_settings(self):
+        self.check('''
+requirementsOK=false
+assert(not pcall(restart.queue,'recording1'))
+assert(spawned==0 and next(written)==nil and not restart.queued)
+''')

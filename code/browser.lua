@@ -33,8 +33,14 @@ function Browser:select(index)
   self.selected=ok and manifest or nil
   if not ok then self.message=tostring(manifest):match('^[^\n]+'):gsub('^.-:%d+: ','')
   elseif store.compatible(manifest) then self.message='Ready to play with your current settings.'
-  elseif store.settings().hash==(manifest.restartSettingsHash or manifest.settingsHash) then self.message='Install the recorded extension and framework versions to play.'
-  else self.message='Play will queue a restart with the recorded settings.' end
+  else
+    local checked,readiness=pcall(require('code/launch-readiness').check,manifest)
+    self.message=checked and (readiness.ready and 'Play will queue a restart with the recorded settings.'
+      or readiness.message) or tostring(readiness):match('^[^\n]+'):gsub('^.-:%d+: ','')
+    if checked and readiness.ready and store.settings().hash==(manifest.restartSettingsHash or manifest.settingsHash) then
+      self.message='Install the recorded extension and framework versions to play.'
+    end
+  end
 end
 
 -- Native load-list behavior: the same row twice within 500 ms activates it.
@@ -97,8 +103,10 @@ end
 function Browser:restart()
   assert(self.selected,'Choose a completed recording')
   assert(self.recorder.mode=='none','Finish or cancel the active recording first')
-  assert(store.settings().hash~=(self.selected.restartSettingsHash or self.selected.settingsHash),
-    'Installed extensions or framework differ. Install the recorded versions before playing.')
+  if store.settings().hash==(self.selected.restartSettingsHash or self.selected.settingsHash) then
+    require('code/launch-readiness').requireReady(self.selected)
+    error('Installed extensions or framework differ. Install the recorded versions before playing.')
+  end
   require('code/restart').queue(self.selected.id)
   self.message='Restart queued. Exit the game to reopen with recorded settings.'
 end

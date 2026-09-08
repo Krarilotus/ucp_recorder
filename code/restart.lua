@@ -15,6 +15,7 @@ function M.queue(id)
   assert(not M.queued,'A restart is already waiting for the game to close')
   local manifest=store.load(id,native.profile)
   store.preflight(manifest)
+  require('code/launch-readiness').requireReady(manifest)
   local identity=platform.identity()
   store.write(store.ROOT..'/restart-helper.ps1',require('code/restart-script'))
   store.write(store.ROOT..'/restart-request.json',json:encode({

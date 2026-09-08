@@ -100,6 +100,19 @@ and relaunch. Select the recording and click **Play**. If a restart is requested
 exit normally and let the helper reopen the game. Return to the library and click
 Play on the selected recording. Recorded extension versions must remain installed;
 the helper does not download them. Your normal configuration is preserved.
+Since 0.39.0, missing or unreadable exact versions are shown before a restart is
+queued. Clicking Play displays the full list, also saved as
+`ucp/replays/requirements.txt`. Install those versions using the launcher's
+extension list, or install their original release ZIPs using **+**. A newer
+version does not replace the required one. If the required version is no longer
+available from the store or its original releases, this replay cannot be played
+on that installation. Recorder does not claim that a missing local version has
+also disappeared from the internet.
+
+If the framework or packages change while the helper waits for game exit, it
+shows a Windows error dialog and saves `ucp/replays/restart-error.txt`. Restore
+the listed requirements and try again. A present package still passes through
+UCP's normal format and security checks on launch.
 This path has automated parser/helper tests but still needs live verification.
 See [recorded settings](recorded-settings.md).
 

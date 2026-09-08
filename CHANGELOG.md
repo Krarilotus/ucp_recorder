@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.39.0
+
+- Check the recorded UCP framework and exact extension versions before queuing
+  a replay restart. Read installed definitions through UCP's virtual filesystem
+  so ZIP packages and inactive installed versions are supported. Show missing
+  or unreadable versions in the library and the full list when Play is selected.
+- Preserve the existing hashed, resolved launch configuration and normal user
+  settings. Explain how to obtain exact versions and that playback is unavailable
+  if those versions cannot be obtained; do not silently substitute newer modules.
+- Recheck framework and package presence after the game exits. Show restart
+  failures in a Windows dialog as well as saving the error report, instead of
+  leaving the player with an unexplained closed game. Module security and ZIP
+  validation remain owned by UCP. No automatic download is added in this release.
+
 ## 0.38.0
 
 - Let the game continue without recorder hooks when a startup check fails. Use

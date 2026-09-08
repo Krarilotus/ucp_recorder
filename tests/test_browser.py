@@ -43,6 +43,7 @@ package.loaded['code/sessions']={
  rename=function(id,name) for _,item in ipairs(entries) do if item.id==id then item.displayName=name end end end,
 }
 package.loaded['code/restart']={queue=function(id) restarted=id end}
+package.loaded['code/launch-readiness']={check=function() return {ready=true} end,requireReady=function() end}
 recorder={mode='none',guard=function(_,fn) fn(); return true end,
  startPlayback=function(_,id) played=id end}
 Browser=require('code/browser'); browser=Browser:new(recorder)
@@ -96,6 +97,18 @@ assert(browser.message:find('Install'))
 entries={entry('one'),entry('two')}; browser:refresh('two')
 browser:rename('Stream match'); assert(browser.selected.id=='two' and browser.index==2)
 assert(browser:row(2):find('Stream match',1,true))
+''')
+
+    def test_missing_version_is_shown_even_when_config_text_matches(self):
+        self.check('''
+package.loaded['code/launch-readiness']={
+ check=function() return {ready=false,message='Required: ui 1.0.1'} end,
+ requireReady=function() error('Required: ui 1.0.1') end,
+}
+entries={entry('missing')}; entries[1].different=true; currentSettings='recorded'
+browser:refresh(); assert(browser.message=='Required: ui 1.0.1')
+local ok,reason=pcall(function() browser:play() end)
+assert(not ok and reason:find('ui 1.0.1',1,true) and not restarted and not played)
 ''')
 
     def test_paging_bounds_and_active_recording(self):

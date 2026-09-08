@@ -1,6 +1,14 @@
 -- GUI language is passed at launch. Older launchers fall back to the game language.
 local M={}
 local de={
+ ['Required UCP framework: %s']='Benötigtes UCP-Framework: %s',
+ ['Missing or unreadable: %s %s']='Fehlt oder ist nicht lesbar: %s %s',
+ ['The recorded UCP framework is required.']='Das UCP-Framework der Aufnahme wird benötigt.',
+ ['Required: %s %s']='Benötigt: %s %s',
+ [' (+%d more)']=' (+%d weitere)',
+ ['Install these exact versions using the UCP launcher or their original releases.']='Diese genauen Versionen über den UCP-Launcher oder ihre ursprünglichen Releases installieren.',
+ ['If a required version is no longer available, this replay cannot be played here. Newer versions are not substituted.']='Ist eine benötigte Version nicht mehr verfügbar, kann diese Aufnahme hier nicht abgespielt werden. Neuere Versionen werden nicht als Ersatz verwendet.',
+ ['Your normal settings have not been changed.']='Die normalen Einstellungen wurden nicht verändert.',
  ['Save capture as...']='Mitschnitt benennen',
  ['Named copy saved: %s']='Benannter Zwischenstand gespeichert: %s',
  ['Capture stopped: %s']='Mitschnitt abgebrochen: %s',
