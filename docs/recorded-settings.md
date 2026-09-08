@@ -119,3 +119,10 @@ place a matching 32-bit Lua 5.4 interpreter beside copies of its `lua.dll` and
 `RPS.dll`, then run `tests/check_binary_memory_windows.lua` with the recorder
 source directory and that installation's `ucp/code` directory as arguments.
 This standalone check uses private memory and needs no running game.
+
+UCP normalizes option structure without expanding path aliases inside those
+values. Its file/directory listing functions expand aliases before returning
+entries. The asset inventory therefore resolves configured paths with UCP's
+`resolveAliasedPath` API first, including a trailing slash for directory-root
+aliases, and stores versioned parent/file identities. The directory containment
+check remains active and reports the offending entry and expected parent.

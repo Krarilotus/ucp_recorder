@@ -18,7 +18,7 @@ contents={[module..'.zip']=string.rep('a',64),[plugin..'/definition.yml']=string
 listing={[module..'/']={},[plugin..'/']={plugin..'/definition.yml',plugin..'/data.zip'},
  [plugin..'/code/']={plugin..'/code/init.lua'}}
 children={[module..'/']={},[plugin..'/']={plugin..'/code/',plugin..'/data/'},[plugin..'/code/']={}}
-ucp={internal={io={files=function(path) return assert(listing[path],'Invalid path: '..path) end,
+ucp={internal={resolveAliasedPath=function(path) return path end,io={files=function(path) return assert(listing[path],'Invalid path: '..path) end,
  directories=function(path) return assert(children[path],'Invalid directory: '..path) end}}}
 io.open=function(path)
  if path:find('://',1,true) then error('Invalid path') end
@@ -103,3 +103,31 @@ snapshot=assets.capture(extensions,{})
 assert(snapshot.files[path..'new.lua'])
 assets.verify(snapshot)
 ''')
+
+    def test_configured_ucp_aliases_use_resolved_parent_and_file_identity(self):
+        self.lua.execute(r"""
+local root='ucp/plugins/unpacked-1.0.0'
+local aliases={['ucp/plugins/unpacked/']=root..'/', ['ucp/plugins/unpacked-*/']=root..'/'}
+ucp.internal.resolveAliasedPath=function(path)
+ for alias,target in pairs(aliases) do
+  if path:sub(1,#alias)==alias then return target..path:sub(#alias+1) end
+ end
+ return path
+end
+-- UCP's file and directory APIs resolve aliases before returning versioned paths.
+local files,dirs=ucp.internal.io.files,ucp.internal.io.directories
+ucp.internal.io.files=function(path) return files(ucp.internal.resolveAliasedPath(path)) end
+ucp.internal.io.directories=function(path) return dirs(ucp.internal.resolveAliasedPath(path)) end
+for _,directory in ipairs({'ucp/plugins/unpacked/code/', 'ucp/plugins/unpacked-*/code/',
+ 'ucp/plugins/unpacked/', 'ucp/plugins/unpacked', 'ucp\\plugins\\unpacked\\code\\'}) do
+ local captured=assets.capture(extensions,{directory=directory,file='ucp/plugins/unpacked-*/code/init.lua'})
+ assert(captured.files[root..'/code/init.lua'])
+ for path in pairs(captured.roots) do assert(not path:find('unpacked/',1,true) and not path:find('*',1,true)) end
+ for path in pairs(captured.files) do assert(not path:find('unpacked/',1,true) and not path:find('*',1,true)) end
+ assets.verify(captured)
+end
+-- Aliases do not grant permission to accept an unrelated listing result.
+listing[root..'/code/'][1]='elsewhere/init.lua'
+local ok,reason=pcall(assets.capture,extensions,{directory='ucp/plugins/unpacked/code/'})
+assert(not ok and reason:find('escaped its parent',1,true) and reason:find('elsewhere/init.lua',1,true))
+""")

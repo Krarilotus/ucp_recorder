@@ -150,6 +150,7 @@ when using Ascension. Crusader and Extreme both need this live check.
 | --- | --- |
 | `Recorder session hook conflicts at save` with 0.17.0 | Install this PR's ZIP and select its version. 0.17.0 rejected map-extensions 1.0.0's CALL save wrapper; 0.18.0 fixed it on both variants. Switching executables does not update the module. |
 | `Native hashing requires binary string writes` with 0.43.1 | Install 0.43.2 or newer and select that version. Older UCP 3.0.7 runtimes truncate binary string writes; the recorder now uses the compatible byte API. Restart before recording. |
+| `Asset file escaped its parent` with 0.43.2 and configured UCP aliases | Install 0.43.3 or newer and restart. UCP returns versioned directory entries for unversioned or wildcard aliases; recorder now resolves the parent through the same API. |
 | `DISABLED` in the startup report | Recorder failed a check before installing its hooks. UCP displays a message and lets the game continue **without recording**. Correct the reported conflict/order and restart. |
 | A hook conflict with the current version | Preserve the guard. Send the startup report and `ucp3.log`; addresses and expected/found bytes help identify a different patch. Do not NOP the check or remove map-extensions from an Automarket game. |
 | Recorder missing from the list | Check `ucp/modules`, the exact `recorder-<version>.zip` name and root-level `definition.yml`. Reload the list and use the published asset. |

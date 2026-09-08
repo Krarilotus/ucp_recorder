@@ -20,12 +20,12 @@ local function walker(add)
     local present={}
     for _,file in ipairs(ucp.internal.io.files(path..'/')) do
       file=normalized(file)
-      assert(file:sub(1,#path+1)==path..'/','Asset file escaped its parent')
+      assert(file:sub(1,#path+1)==path..'/','Asset file escaped its parent: '..file..' (parent '..path..')')
       present[file]=true; add(file)
     end
     for _,child in ipairs(ucp.internal.io.directories(path..'/')) do
       child=normalized(child)
-      assert(child:sub(1,#path+1)==path..'/','Asset directory escaped its parent')
+      assert(child:sub(1,#path+1)==path..'/','Asset directory escaped its parent: '..child..' (parent '..path..')')
       -- Folder handles list ZIPs as synthetic directories, but listFiles on
       -- such a child fails unless a physical folder of that name also exists.
       -- Include that folder: its files can shadow the sibling archive.
@@ -46,7 +46,10 @@ function M.capture(extensions,config)
   end
   local walk=walker(add)
   local function directory(path)
-    path=normalized(path); roots[path]=true; walk(path)
+    -- Listing resolves aliases internally and returns the resolved child paths.
+    -- Retain that same parent identity, including aliases naming a folder root.
+    path=normalized(ucp.internal.resolveAliasedPath(normalized(path)..'/'))
+    roots[path]=true; walk(path)
   end
   digest.prepare()
   for _,extension in ipairs(extensions) do
@@ -59,12 +62,12 @@ function M.capture(extensions,config)
     layouts[root]=unpacked and 'folder' or 'archive'
     if unpacked then directory(root) else add(root..'.zip') end
   end
-  -- Resolved option values include aliased paths after the framework's normal
-  -- configuration pass. Fingerprint additional readable files/directories too.
+  -- Normalized options still contain UCP aliases (both name/ and name-*/).
+  -- Resolve through their framework owner before fingerprinting or containment.
   local function options(value)
     if type(value)=='table' then for _,item in pairs(value) do options(item) end
     elseif type(value)=='string' and value:find('[/\\]') and not value:find('[%z\r\n]') then
-      local path=normalized(value)
+      local path=normalized(ucp.internal.resolveAliasedPath((value:gsub('\\','/'))))
       local opened,file=pcall(io.open,path,'rb')
       if opened and file then assert(file:close()); add(path)
       else

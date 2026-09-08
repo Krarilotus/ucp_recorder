@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.43.3
+
+- Fix recorded-settings startup with configured UCP path aliases, including Ascension map and AI directories. Resolve aliases through UCP before comparing a directory with its returned entries, and store the resolved asset identity.
+- Cover unversioned and wildcard aliases, folder roots, Windows separators, capture/playback verification and unrelated-entry rejection. Path errors now identify both the entry and its parent. Binary-transfer and viewer-pause corrections are preserved.
+
 ## 0.43.2
 
 - Fix startup with shipped UCP 3.0.7 runtimes whose string writer stops at zero bytes. Hashing and native world compression now share a verified binary transfer helper, using bounded byte writes when needed. No extra module or framework upgrade is required.
