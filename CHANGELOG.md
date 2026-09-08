@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.40.0
+
+- Automatically start a separate replay when a saved single-player Skirmish
+  finishes loading, with Auto recording enabled. Seal any previous recording
+  before replacing its world, then snapshot the loaded world and full RNG at
+  the first simulation boundary. Do not restart the seed sequence.
+- Observe the native file-reader completion path separately from the outer
+  menu/player reconstruction on Crusader and Extreme. Allocation/open failures,
+  unrelated packagers, recorder-owned playback loads and non-Skirmish worlds
+  do not start a recording. Keep map-extensions' custom load callbacks intact.
+- Add repeat-load lifecycle tests and original-executable checks for failure
+  exits, completion and player reconstruction. In-game loaded-save replay tests
+  remain outstanding; this does not enable campaign or multiplayer playback.
+
 ## 0.39.0
 
 - Check the recorded UCP framework and exact extension versions before queuing

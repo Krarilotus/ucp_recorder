@@ -36,6 +36,7 @@ local function enable(self,config,stage,install)
     fixes.install({sites.resultsTimer},recorder.resultsHold,engine.base+0x618)
     if recorder.rngTrace then recorder.rngTrace.returnAddresses=rngReturnAddresses end
     self.recorder=recorder
+    local loadLifecycle=require('code/load-lifecycle').new(recorder)
     engine:install(recorder)
     if engine.trace then
       require('code/network-observer').install(engine.trace)
@@ -60,7 +61,7 @@ local function enable(self,config,stage,install)
         return registers
       end,address,size)
     end
-    observe(native.addr(0x442877),5,function() recorder:beginMatch() end)
+    observe(native.addr(0x442877),5,function() loadLifecycle:cancel(); recorder:beginMatch() end)
     observe(native.addr(0x4428c6),10,function()
       if engine.trace then engine.trace:observe('stop','new match') end
       recorder:prepareRecording()
@@ -70,8 +71,10 @@ local function enable(self,config,stage,install)
       recorder:onMenuView(registers.EBP)
     end)
     observe(native.addr(0x495337),6,function()
-      if not engine.loading then recorder:reset() end
+      loadLifecycle:begin()
     end)
+    observe(sites.loadWorldComplete.address,6,function(registers) loadLifecycle:readComplete(registers.ESI) end)
+    observe(sites.loadHandlerComplete.address,5,function() loadLifecycle:finish() end)
     observe(native.addr(0x494ba5),5,function() recorder:reset() end)
 
     local tickCallback=core.allocateCode({0x90,0x90,0x90,0x90,0x90,0xC3})

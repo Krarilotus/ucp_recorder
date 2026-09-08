@@ -59,6 +59,10 @@ function M:singlePlayer()
   local mode=core.readInteger(self.base+0x618)
   return mode==0 or mode==99
 end
+function M:loadedSkirmish()
+  return self:singlePlayer() and core.readInteger(self.sites.gameCore+0xc)==14
+    and core.readInteger(self.sites.gameCore+0x68)==3
+end
 function M:setScope(active)
   assert(not active or self:singlePlayer(),'Replay simulation scope requires single-player')
   core.writeInteger(self.scope,active and 1 or 0)

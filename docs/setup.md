@@ -83,8 +83,9 @@ See [adapter details](automarket-replay.md).
 3. Open **Pause > Save replay as...**, enter a name, and continue playing so you
    can distinguish this shorter copy from the full recording.
 4. Use **Quit Mission** to finalize the recording automatically. Killing the
-   process does not finalize it. Native game saves/loads during capture are
-   unsupported; the recorder's named-copy action is separate.
+   process does not finalize it. The recorder's named-copy action is separate
+   from saving a native game. Since 0.40.0, loading a saved single-player Skirmish
+   closes the previous recording and automatically begins a new one after loading.
 5. Return to **Skirmish > Replays**. Play both the named copy and full recording;
    check that the shorter copy ends earlier.
 
@@ -115,6 +116,31 @@ the listed requirements and try again. A present package still passes through
 UCP's normal format and security checks on launch.
 This path has automated parser/helper tests but still needs live verification.
 See [recorded settings](recorded-settings.md).
+
+## Recording after loading a saved Skirmish
+
+With **Auto: on**, load the save normally. Recording starts at the loaded game's
+first simulation boundary, using its actual tick, full RNG state and current
+UCP configuration. The next mission exit seals that recording; named copies
+continue to preserve the full recording in the background. Repeated loads
+produce separate recordings, even when loading an earlier point in the match.
+The recorder's own replay load does not create another recording.
+
+The original `.sav` file does not contain a complete historical UCP profile.
+Recorder therefore stores the settings actually active when you load it; it
+cannot recover unknown settings used before that save existed. Use the correct
+modules when loading your save, just as you would without Recorder.
+
+This path currently covers saved **single-player Skirmishes**. Campaigns, map
+editor sessions, and multiplayer restoration/playback need separate work. The
+native reader's completion marker is not a replacement for save-file validation:
+Crusader itself does not report every corrupt-read or decompression failure.
+
+For the next in-game check, load a saved Skirmish, issue a troop order and change
+production, save a named replay copy, then continue and quit the mission. Play
+both recordings. Repeat with another save in the same game process and verify
+that the two loaded matches appear separately. Add Automarket threshold changes
+when using Ascension. Crusader and Extreme both need this live check.
 
 ## Troubleshooting
 

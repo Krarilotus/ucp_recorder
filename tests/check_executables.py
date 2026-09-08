@@ -124,6 +124,8 @@ def check(folder):
         check_menu_pause(reader,lua,root,name)
         from check_results_native import check_results
         check_results(reader,lua,root,name)
+        from check_load_native import check_load
+        check_load(reader,lua,root,name)
         from check_replay_view_native import check_replay_view
         check_replay_view(reader,lua,native,root,name)
         from check_header_native import check_header
