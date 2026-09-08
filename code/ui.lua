@@ -48,9 +48,8 @@ function M.createButtons(recorder,sites)
     {x=24,y=166,width=160,height=30,label=function() return tr('Cancel') end,action=cancelName},
     {x=416,y=166,width=160,height=30,label=function() return tr('Save name') end,action=saveName},
   },3,600,240,function(x,y)
-    ui:text(tr(editorTitle),x+300,y+24,1,16)
     ui:text(tr(browser.message),x+300,y+124,1,18,false,552)
-  end)
+  end,function() return tr(editorTitle) end)
   ui:installInput(function()
     return recorder.engine:singlePlayer() or ui:activeDialog()==M.statusDialog
   end,function(message,key)
@@ -103,7 +102,6 @@ function M.createButtons(recorder,sites)
     {x=340,y=186,width=236,height=30,label=function() return view:available() and tr('View player') or '' end,
       action=function() if view:available() then ui:show(playerDialog) end end}
   },2,600,240,function(x,y)
-    ui:text(tr(recorder.mode=='play' and 'Replay controls' or 'Replay status'),x+300,y+24,1,16)
     if not recorder.engine:singlePlayer() then
       local lines=recorder.engine.trace and recorder.engine.trace:statusLines()
         or {'Multiplayer replay recording is not available.', 'Test capture is disabled for this launch.'}
@@ -112,7 +110,8 @@ function M.createButtons(recorder,sites)
     end
     local message=browser.message
     if recorder.mode=='play' and recorder.status~='error' then
-      message=recorder.status=='finished' and 'Playback finished.' or 'Playback running.'
+      message=recorder.status=='finished' and 'Playback finished.'
+        or (recorder.engine:isPaused() and 'Playback paused.' or 'Playback running.')
     end
     ui:text(tr(message),x+24,y+70,0,18,false,552)
     if recorder.status=='error' and recorder.mode=='record' then
@@ -122,8 +121,14 @@ function M.createButtons(recorder,sites)
       ui:text(tr('Playback failed. Leave the mission to return to the library.'),x+24,y+98)
     end
     if recorder.status=='recording' then ui:text(tr('Automatic recording continues until you leave the match.'),x+24,y+98) end
+    if recorder.mode=='play' and recorder.manifest then
+      local first,last=recorder.manifest.startTick,recorder.manifest.lastTick
+      local elapsed=math.max(0,math.min(recorder.engine:tick(),last)-first)
+      ui:text(tr('%d / %d ticks; %d / %d commands',elapsed,last-first,
+        recorder.playedCommands or 0,recorder.manifest.commandCount or 0),x+24,y+126,0,18,false,552)
+    end
     if view:available() then ui:text(tr('Viewing: player %d',view:player()),x+24,y+150) end
-  end)
+  end,function() return tr(recorder.mode=='play' and 'Replay controls' or 'Replay status') end)
   local players={}
   for index=1,8 do
     local row=index
@@ -135,20 +140,18 @@ function M.createButtons(recorder,sites)
   players[#players+1]={x=24,y=280,width=180,height=30,label=function() return tr('Back') end,
     action=function() ui:show(M.statusDialog) end}
   playerDialog=ui:modal(players,#players,600,334,function(x,y)
-    ui:text(tr('View player'),x+300,y+24,1,16)
     ui:text(tr('Viewing does not change recorded actions.'),x+300,y+240,1)
-  end)
+  end,function() return tr('View player') end)
   removeDialog=ui:modal({
     {x=24,y=172,width=180,height=30,label=function() return tr('Cancel') end,action=function() ui:show(dialog) end},
     {x=396,y=172,width=180,height=30,label=function() return tr('Remove') end,action=function()
       browser:remove(); ui:show(dialog)
     end}
   },2,600,238,function(x,y)
-    ui:text(tr('Remove replay?'),x+300,y+24,1,16)
     local item=browser.items[browser.index]
     ui:text(item and require('code/sessions').title(item) or '',x+300,y+80,1)
     ui:text(tr('The files are kept in ucp/replays/removed.'),x+300,y+120,1)
-  end)
+  end,function() return tr('Remove replay?') end)
   renameSelected=function()
     if not browser.selected then return end
     openName(require('code/sessions').title(browser.selected),function(name) browser:rename(name) end,dialog,'Rename replay...')
@@ -183,7 +186,6 @@ function M.createButtons(recorder,sites)
   button(516,434,140,function() return tr('Play') end,playSelected,nil,nil,
     function() return browser.selected~=nil and recorder.mode=='none' end)
   dialog=ui:modal(items,#items,680,496,function(x,y)
-    ui:text(tr('Recorded Skirmishes'),x+340,y+22,1,16)
     ui:text(native.profile.name..'  |  '..tr('%d recordings',#browser.items),x+340,y+50,1)
     ui:text(tr(browser.message),x+340,y+320,1,18,false,632)
     if #browser.items>Browser.PAGE_SIZE then
@@ -191,7 +193,7 @@ function M.createButtons(recorder,sites)
         math.ceil(#browser.items/Browser.PAGE_SIZE)),x+340,y+360,1)
     end
     ui:text(tr('Enter: play   F2: rename   Delete: remove'),x+340,y+398,1,19)
-  end)
+  end,function() return tr('Recorded Skirmishes') end)
 
   -- Extend only the original Skirmish menu's item array, retaining its sentinel.
   local originalSize,itemSize=0x1d10,NativeUI.ITEM_SIZE

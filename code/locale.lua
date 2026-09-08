@@ -30,6 +30,7 @@ local de={
  ['Viewing does not change recorded actions.']='Die Ansicht verändert keine aufgezeichneten Aktionen.',
  ['Playback finished.']='Wiedergabe abgeschlossen.', ['Playback paused.']='Wiedergabe pausiert.',
  ['Playback running.']='Wiedergabe läuft.',
+ ['%d / %d ticks; %d / %d commands']='%d / %d Ticks; %d / %d Befehle',
  ['Playback failed. Leave the mission to return to the library.']='Wiedergabe fehlgeschlagen. Mission beenden, um zur Liste zurückzukehren.',
  ['Recording stopped. This match is no longer being recorded.']='Aufnahme abgebrochen. Dieses Spiel wird nicht mehr aufgezeichnet.',
  ['Resume the game to continue playing normally.']='Spiel fortsetzen, um normal weiterzuspielen.',

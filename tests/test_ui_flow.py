@@ -6,6 +6,24 @@ import test_browser
 class UIFlowTests(unittest.TestCase):
     check = test_browser.BrowserTests.check
 
+    def test_paused_finished_and_failed_replay_show_distinct_status_and_progress(self):
+        self.check('''
+recorder.mode='play'; recorder.status='playing'; recorder.playedCommands=3
+recorder.manifest={startTick=100,lastTick=900,commandCount=5}
+recorder.engine.tick=function() return 300 end
+local paused=true; recorder.engine.isPaused=function() return paused end
+pauseAction(); renders[shown](0,0)
+assert(texts[2]=='Playback paused.' and texts[3]=='200 / 800 ticks; 3 / 5 commands')
+paused=false; texts={}; renders[shown](0,0); assert(texts[2]=='Playback running.')
+recorder.status='finished'; paused=true; texts={}; renders[shown](0,0)
+assert(texts[2]=='Playback finished.')
+recorder.status='error'; recorder.error='RNG divergence at tick 300'; texts={}
+pauseAction(); renders[shown](0,0)
+assert(texts[2]==recorder.error and texts[3]=='Playback failed. Leave the mission to return to the library.')
+assert(texts[4]=='200 / 800 ticks; 3 / 5 commands')
+assert(recorder.manifest.player==nil and recorder.status=='error' and paused)
+''')
+
     def test_keyboard_navigation_rename_and_remove_cancel_preserve_selection(self):
         self.check('''
 entries={}; for i=1,9 do entries[i]=entry('replay'..i) end
@@ -37,7 +55,7 @@ local nextId=300
 controls={}; dialogs={}; renders={}; texts={}; shown=-1
 ui={
  installViewRender=function() end,
- modal=function(_,items,count,width,height,render)
+ modal=function(_,items,count,width,height,render,title)
   assert(count==#items)
   for i,a in ipairs(items) do
    assert(a.x>=0 and a.y>=0 and a.x+a.width<=width and a.y+a.height<=height)
@@ -45,7 +63,12 @@ ui={
     if i~=j then assert(a.x+a.width<=b.x or b.x+b.width<=a.x or a.y+a.height<=b.y or b.y+b.height<=a.y) end
    end
   end
-  local id=nextId; nextId=nextId+1; dialogs[id]=items; renders[id]=render; return id
+  local id=nextId; nextId=nextId+1; dialogs[id]=items
+  renders[id]=function(x,y)
+   if title then texts[#texts+1]=title() end
+   render(x,y+(title and 32 or 0))
+  end
+  return id
  end,
  text=function(_,value) texts[#texts+1]=value end,
  installInput=function(_,predicate,handler) input=handler; inputAllowed=predicate end,
@@ -57,7 +80,7 @@ ui={
  trackVisibility=function() end,
 }
 package.loaded['code/native-ui']={ITEM_SIZE=80,new=function() return ui end}
-recorder.engine={singlePlayer=function() return true end}
+recorder.engine={singlePlayer=function() return true end,isPaused=function() return false end}
 recorder.status='idle'; recorder.autoRecord=true
 menu=require('code/ui'); menu.createButtons(recorder,{})
 function click(label)

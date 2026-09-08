@@ -65,6 +65,7 @@ end
 function M:pause()
   if self:singlePlayer() then core.writeInteger(self.sites.paused,1) end
 end
+function M:isPaused() return core.readInteger(self.sites.paused)~=0 end
 
 function M:rngState()
   return {core.readSmallInteger(self.rng),core.readSmallInteger(self.rng+2),

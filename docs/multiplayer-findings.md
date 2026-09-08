@@ -121,7 +121,7 @@ Both PCs passed the runtime/profile/extension and base-file hash check. Steam
 friends-only host creation, second-account discovery/join and match start worked
 with recorder 0.31.2, Ascension 1.0.11, Automarket 1.1.0, Graphics API Replacer
 1.3.0 and Steam multiplayer 1.2.3. The match used Der grüne Punkt, Wolf and Saladin
-on opposite corners, and one human allied with each AI. No replacement transport
+and one human allied with each AI. No replacement transport
 DLL was deployed. This did not reproduce the earlier Host-button crash.
 
 The host trace opened at tick 197223 during loading, before the AI roster was
@@ -132,4 +132,49 @@ diagnostic lifecycle failure, not evidence that the match itself desynchronized.
 
 Version 0.32.0 gates capture on the native simulation callback and includes a
 regression using that stale tick, loading callbacks, subsequent roster setup and
-the complete requested window. Its paired live comparison must be repeated.
+the complete requested window. The repeated test is described below.
+
+## Paired physical Steam capture (0.32.0, 2026-09-07)
+
+Both licensed PCs launched recorder 0.32.0 with the same Ascension 1.0.11,
+Automarket 1.1.0, UCP2 Legacy 2.15.1 and Steam multiplayer 1.2.3 setup. The
+second match used Der grüne Punkt, both humans allied with Wolf against Saladin.
+No replacement transport DLL was deployed. Both players placed and inspected
+working granaries; the client changed rations. The capture continued after
+both humans died while the AIs kept fighting. Automarket was loaded, but this
+run did not exercise automatic trades.
+
+Both traces opened at tick 1024 with the populated roster and sealed at 131072.
+The interval lasted about eleven minutes. `compare_multiplayer.py --inspect`
+found these observations:
+
+| Evidence | Result |
+| --- | --- |
+| Timed commands | All 10 equal, including player, category, time and payload |
+| Resource checkpoints | All 2,033 equal |
+| Completed native world hashes | All 650 paired ticks equal, including all 14 domains |
+| RNG2 state stream | Equal throughout the captured checkpoints |
+| RNG1 state stream | First observed difference at tick 8064 |
+| Strict replay comparison | Incomplete: immediate categories 12 and 117 remain outside timed coverage |
+
+The host has 715 uncovered events and the client 716. The received advertised
+hash packets are not paired by this observer (each sees the other peer's
+receipts); the 650 matching values above are completed local native world-hash
+samples, not an inference from those packets.
+
+The first differing RNG1 interval, (8000, 8064], contains two additional host
+calls returning to 0x47A34F and 0x47A493. Existing Ghidra evidence places both
+inside native mood-based music selection. Other differing RNG1 caller totals
+are also in the previously audited music functions, including ambient music at
+0x47BE4A. Those presentation calls remain unchanged in multiplayer. This is a
+concrete explanation for the observed RNG1 drift, not proof that RNG1 can be
+ignored in replay verification. RNG2 caller addresses in dynamically allocated
+code differ between processes despite equal counts and state; raw absolute
+addresses there are not comparable identities.
+
+The German pause-menu entry and active/sealed capture status were visually
+checked on both PCs. The native speed panel displayed 90 although the preset
+requested 200; effective speed was not established by reading that panel.
+No desync popup or Host-button crash was observed during this interval.
+Controlled disconnect/rejoin, automatic trading, wider command coverage,
+Extreme multiplayer and offline multiplayer playback remain separate gates.

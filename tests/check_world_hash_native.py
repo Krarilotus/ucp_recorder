@@ -59,6 +59,9 @@ engine={base=base,player=function() return core.readInteger(playerAddress) end,
  tick=function() return 128 end,singlePlayer=function() return false end}
 trace=require('code/multiplayer-trace').new(engine)
 trace.file=true; trace.pendingNativeHashes={}
+-- This fixture starts inside an active match, after the native tick callback.
+-- Loading-time suppression is exercised separately by the lifecycle tests.
+trace.simulationObserved=true
 trace.checkNetwork=function() end -- no transport is emulated by this fixture
 require('code/world-hash-observer').install(trace)
 ''')

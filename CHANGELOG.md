@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.33.0
+
+- Use the original red banner, shields and heading font in replay dialogs on
+  Crusader and Extreme, with room below the banner for controls and messages.
+- Show paused, running, finished and failed playback distinctly, alongside
+  elapsed/total simulation ticks and recorded command progress.
+- Document the physical Steam test: 650 paired native world-state hashes,
+  2,033 resource checkpoints and all ten timed commands matched. Multiplayer
+  captures remain diagnostic-only; uncovered immediate events and differing
+  music RNG calls prevent a complete replay validation claim.
+
 ## 0.32.0
 
 - Start multiplayer diagnostic capture only after the native simulation begins.

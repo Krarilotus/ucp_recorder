@@ -18,6 +18,7 @@ function M.new(sites,onError)
   local o=setmetatable({sites=sites,onError=onError,dialogs={},textBuffer=core.allocate(1024,true)},{__index=M})
   o.textNative=core.exposeCode(sites.text.address,9,1)
   o.widthNative=core.exposeCode(sites.textWidth.address,3,1)
+  o.headerNative=core.exposeCode(sites.header.address,5,1)
   o.borderNative=core.exposeCode(sites.border.address,6,1)
   o.buttonNative=core.exposeCode(sites.basicButton.address,3,1)
   o.menuConstructor=core.exposeCode(sites.menuConstructor.address,2,1)
@@ -34,7 +35,7 @@ function M:callback(callback)
   end)
 end
 
-function M:text(label,x,y,alignment,font,hover,maxWidth,disabled)
+function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend)
   label=require('code/locale').native(label)
   label=tostring(label):gsub('[\r\n%z]',' '):sub(1,150)
   core.writeString(self.textBuffer,label..'\0')
@@ -51,7 +52,14 @@ function M:text(label,x,y,alignment,font,hover,maxWidth,disabled)
   -- Alignment1 is centered on x; a positive width centers inside that width.
   self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,
     disabled and 0x7F7F7F or (hover and 0xCCFAFF or 0xC2F0EB),font or 18,0,
-    disabled and 0 or (hover and 2 or 4))
+    blend or (disabled and 0 or (hover and 2 or 4)))
+end
+
+function M:header(label,x,y,width)
+  -- Original Options dialog banner: tiled interface_icons3, shields and font15.
+  -- The native function accepts four stack arguments and cleans all four.
+  self.headerNative(self.sites.pencil.value,x,y,width,0)
+  self:text(label,x+math.floor(width/2),y+22,1,15,false,width-100,false,0)
 end
 
 function M:button(address,x,y,width,height,label,action,selected,leftAligned,enabled)
@@ -83,13 +91,14 @@ function M:button(address,x,y,width,height,label,action,selected,leftAligned,ena
   core.writeSmallInteger(address+48,0xfff0) -- no user-control lookup
 end
 
-function M:modal(items,count,width,height,render)
+function M:modal(items,count,width,height,render,title)
   assert(count==#items,'Replay dialog item count differs')
+  local contentOffset=title and 32 or 0
   local menu=core.allocate(0x44,true)
   local array=core.allocate((count+1)*self.ITEM_SIZE,true)
   for i,item in ipairs(items) do
     local address=array+(i-1)*self.ITEM_SIZE
-    self:button(address,item.x,item.y,item.width,item.height,item.label,item.action,item.selected,item.leftAligned,item.enabled)
+    self:button(address,item.x,item.y+contentOffset,item.width,item.height,item.label,item.action,item.selected,item.leftAligned,item.enabled)
     core.writeInteger(address+0x4c,menu)
   end
   core.writeInteger(array+count*self.ITEM_SIZE,0x66)
@@ -107,10 +116,12 @@ function M:modal(items,count,width,height,render)
   local id=300; while used[id] do id=id+1; assert(id<1300,'No replay dialog slot') end
   local dialog=core.allocate(40,true)
   local callback=self:callback(function(registers)
-    render(core.readInteger(registers.ESP+4),core.readInteger(registers.ESP+8))
+    local x,y=core.readInteger(registers.ESP+4),core.readInteger(registers.ESP+8)
+    if title then self:header(type(title)=='function' and title() or title,x,y,width) end
+    render(x,y+contentOffset)
   end)
   -- Native red double frame; centered coordinates and the game's own backdrop.
-  self.modalConstructor(dialog,id,-1,-1,width,height,512,0,callback,menu)
+  self.modalConstructor(dialog,id,-1,-1,width,height+contentOffset,512,0,callback,menu)
   self.dialogs[id]=true
   return id
 end

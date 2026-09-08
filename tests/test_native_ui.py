@@ -5,6 +5,37 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_header_uses_original_banner_abi_and_native_title_font(self):
+        self.check('''
+local banner,text
+ui.headerNative=function(...) banner={...} end
+ui.widthNative=function() return 80 end
+ui.textNative=function(...) text={...} end
+ui:header('Replay controls',40,50,600)
+assert(#banner==5 and banner[1]==sites.pencil.value and banner[2]==40 and banner[3]==50)
+assert(banner[4]==600 and banner[5]==0)
+assert(text[3]==340 and text[4]==72 and text[5]==1 and text[7]==15 and text[9]==0)
+''')
+
+    def test_titled_modal_offsets_controls_and_content_below_the_native_banner(self):
+        self.check('''
+local callbacks={}; local nextCallback=1; local callback
+utils.createLuaFunctionWrapper=function(fn)
+ local id=nextCallback; nextCallback=id+1; callbacks[id]=fn; return id
+end
+local buttonY,contentY,headerY
+ui.button=function(_,_,x,y) buttonY=y end
+ui.menuConstructor=function() end
+ui.header=function(_,title,x,y,width) assert(title=='Replays' and width==600); headerY=y end
+ui.modalConstructor=function(_,id,x,y,w,h,style,color,draw,menu)
+ assert(w==600 and h==272); callback=callbacks[draw]
+end
+ui:modal({{x=24,y=72,width=552,height=30}},1,600,240,
+ function(x,y) contentY=y end,function() return 'Replays' end)
+memory[0x9004]=10; memory[0x9008]=20; callback({ESP=0x9000})
+assert(headerY==20 and contentY==52 and buttonY==104)
+''')
+
     def test_unavailable_button_uses_native_disabled_style_and_ignores_click(self):
         self.check('''
 local functions={}; local nextId=10; local allowed=false; local clicks=0; local rendered

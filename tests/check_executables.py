@@ -110,6 +110,8 @@ def check(folder):
         check_rng_observer(reader,lua,native,root,name)
         from check_replay_view_native import check_replay_view
         check_replay_view(reader,lua,native,root,name)
+        from check_header_native import check_header
+        check_header(reader,lua,root,name)
         from check_dispatch_native import check_dispatch
         check_dispatch(reader,name)
         from check_world_hash_native import check_world_hash
