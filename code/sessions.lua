@@ -246,7 +246,7 @@ end
 function M.preflight(manifest,progress)
   validation.manifest(manifest)
   local path=M.path(manifest.id)
-  if manifest.multiplayer then require('code/multiplayer-session').preflight(manifest,path) end
+  if manifest.multiplayer then require('code/multiplayer-session').preflight(manifest,path,progress) end
   require('code/replay-preflight').check(manifest,path,progress)
 end
 

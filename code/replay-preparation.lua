@@ -7,7 +7,8 @@ function M.prepare(id,engine,worlds,progress)
   if progress then progress('Checking replay data...') end
   local manifest=store.load(id,native.profile)
   assert(store.compatible(manifest),'Replay requires its recorded UCP settings')
-  store.preflight(manifest,progress)
+  -- The MP chain owns validation for every segment, including the first one.
+  if not manifest.multiplayer or worlds then store.preflight(manifest,progress) end
   local path=store.path(id)
   local environment=json:decode(store.read(path..'/environment.json'))
   if type(environment)=='table' and environment.assets then
@@ -16,7 +17,7 @@ function M.prepare(id,engine,worlds,progress)
   if progress then progress('Checking starting state...') end
   local snapshotPath,snapshotHash=path..'/start.sav',manifest.snapshotHash
   if manifest.multiplayer then
-    worlds=worlds or require('code/multiplayer-session').prepareChain(manifest,engine)
+    worlds=worlds or require('code/multiplayer-session').prepareChain(manifest,engine,progress)
     local world=assert(worlds[id],'Recovery world was not prepared')
     snapshotPath,snapshotHash=world.path,world.hash
   end

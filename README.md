@@ -13,7 +13,7 @@ determinism and live UI checks remain. See the [remaining work](docs/roadmap.md)
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.47.4.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.47.5.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API

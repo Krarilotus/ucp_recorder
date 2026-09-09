@@ -90,7 +90,7 @@ exit $LASTEXITCODE
         self.assertEqual(result.returncode, 0, result.stderr)
         launch = json.loads((self.root/'launch.json').read_text(encoding='utf-8-sig'))
         self.assertEqual(launch['executable'], str(self.exe))
-        self.assertEqual(launch['arguments'], f'--ucp-config-file="{self.settings}"')
+        self.assertEqual(launch['arguments'], '--ucp-config-file="ucp/replays/test-recording/ucp-config.yml"')
         self.assertEqual(launch['replay'], 'test-recording')
         self.assertEqual(normal.read_text(), 'normal settings')
 
@@ -135,7 +135,7 @@ exit $LASTEXITCODE
         result=self.run_helper()
         self.assertEqual(result.returncode,0,result.stderr)
         launch=json.loads((self.root/'launch.json').read_text(encoding='utf-8-sig'))
-        self.assertEqual(launch['arguments'],f'--ucp-config-file="{pinned}"')
+        self.assertEqual(launch['arguments'],'--ucp-config-file="ucp/replays/test-recording/replay-config.yml"')
         self.assertEqual(self.settings.read_bytes(),original)
 
     def test_changed_pinned_profile_or_environment_never_launches(self):

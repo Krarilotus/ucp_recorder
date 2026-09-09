@@ -102,7 +102,8 @@ function M.seal(capture)
     ok,reason=xpcall(function()
       manifest.ticksHash=require('code/native-hash').file(path..'/ticks.bin',M.MAX_TICKS)
       for name,file in pairs({commands='commands',checkpoints='rng-sync',info='infself'}) do
-        manifest[name..'Hash']=sha.sha256(store.read(path..'/stream-'..file..'.json'))
+        manifest[name..'Hash']=require('code/native-hash').file(path..'/stream-'..file..'.json',
+          require('code/replay-preflight').MAX_STREAM)
       end
       store.preflight(manifest)
       manifest.status='complete'
@@ -114,45 +115,45 @@ function M.seal(capture)
   return manifest
 end
 
-function M.preflight(manifest,path)
+function M.preflight(manifest,path,progress)
   require('code/offline-runtime').roster(manifest.multiplayer)
   if manifest.nextReplay then store.path(manifest.nextReplay) end
   validation.hash(manifest.ticksHash,'tick journal hash')
-  assert(require('code/native-hash').file(path..'/ticks.bin',M.MAX_TICKS)==manifest.ticksHash,
-    'Recorded simulation ticks are damaged')
-  local file=assert(io.open(path..'/ticks.bin','rb'))
-  local ok,reason=pcall(function()
-    local expected=manifest.startTick
-    while true do
-      local raw=file:read(ticks.SIZE)
-      if not raw then break end
-      local frame=ticks.decode(raw)
+  local expected,pending=manifest.startTick,''
+  local hash=require('code/native-hash').file(path..'/ticks.bin',M.MAX_TICKS,function(chunk)
+    local data=pending..chunk
+    local length=#data-#data%ticks.SIZE
+    for offset=1,length,ticks.SIZE do
+      local frame=ticks.decode(data:sub(offset,offset+ticks.SIZE-1))
       assert(frame.time==expected,'Recorded simulation ticks are not continuous')
       expected=expected+1
     end
-    assert(expected>=manifest.lastTick and expected<=manifest.lastTick+1,
-      'Recorded simulation ticks ended early or passed the ending boundary')
+    pending=data:sub(length+1)
+    if progress then progress('Checking replay data...') end
   end)
-  local closed=file:close(); assert(ok and closed,reason or 'Cannot close tick journal')
+  assert(hash==manifest.ticksHash,'Recorded simulation ticks are damaged')
+  assert(#pending==0,'Incomplete recorded simulation tick')
+  assert(expected>=manifest.lastTick and expected<=manifest.lastTick+1,
+    'Recorded simulation ticks ended early or passed the ending boundary')
 end
 
-function M.prepare(manifest,engine)
+function M.prepare(manifest,engine,progress)
   local path=store.path(manifest.id)
-  local result=require('code/world-container').prepare(path,engine)
+  local result=require('code/world-container').prepare(path,engine,progress)
   assert(result.sourceWorldHash==manifest.snapshotHash,'Starting multiplayer world changed')
   return path..'/world-native.sav',result.sha256
 end
 
 -- Prepare the entire recovery chain while still in the single-player browser.
 -- Missing settings/assets or a broken link must fail before the first world load.
-function M.prepareChain(first,engine)
+function M.prepareChain(first,engine,progress)
   local prepared,manifest={},first
   for _=1,32 do
     assert(not prepared[manifest.id],'Replay recovery chain contains a cycle')
     assert(manifest.simulationProfile==M.PROFILE and manifest.environmentHash==first.environmentHash
       and manifest.executable==first.executable,'Recovery segment requires a different environment')
-    store.preflight(manifest)
-    local path,hash=M.prepare(manifest,engine)
+    store.preflight(manifest,progress)
+    local path,hash=M.prepare(manifest,engine,progress)
     prepared[manifest.id]={path=path,hash=hash}
     if not manifest.nextReplay then return prepared end
     local loaded,nextManifest=pcall(store.load,manifest.nextReplay,require('code/native').profile)

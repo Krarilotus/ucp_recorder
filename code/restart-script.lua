@@ -79,7 +79,10 @@ try {
     }
     $env:UCP_RECORDER_REPLAY = $request.id
     # A Windows file path cannot contain a quote. This one ends in .yml, not a backslash.
-    $arguments = '--ucp-config-file="' + $settingsPath + '"'
+    # UCP's config loader accepts only paths relative to the game directory.
+    # The folder ID was validated above; keep hashing the absolute source path.
+    $relativeSettings = 'ucp/replays/' + $request.id + '/' + [IO.Path]::GetFileName($settingsPath)
+    $arguments = '--ucp-config-file="' + $relativeSettings + '"'
     Start-Process -FilePath $executable -WorkingDirectory $gameRoot -ArgumentList $arguments
 } catch {
     $failure = $_ | Out-String

@@ -12,6 +12,27 @@ spec.loader.exec_module(inspector)
 
 
 class MultiplayerCaptureTests(unittest.TestCase):
+    def test_tick_preflight_streams_split_frames_and_rejects_corrupt_tail(self):
+        self.valid_world()
+        self.lua.execute('''
+local ticks=require('code/tick-journal'); local mp=require('code/multiplayer-session')
+local p=temp_root..'/ticks-test'; assert(make_directory(p))
+local data={}; local state=string.char(1,0,2,0,3,0,0,0,4,0,0,0)
+for t=1,5000 do data[t]=ticks.frame(t,state,state) end
+local raw=table.concat(data); store.write(p..'/ticks.bin',raw)
+local digest=require('code/native-hash'); local real=digest.file; local passes=0
+digest.file=function(...) passes=passes+1; return real(...) end
+local manifest={multiplayer=network,startTick=1,lastTick=5001,ticksHash=hash_file(p..'/ticks.bin',mp.MAX_TICKS)}
+local progress=0; mp.preflight(manifest,p,function() progress=progress+1 end)
+assert(passes==1 and progress==3) -- 64 KiB boundaries split 28-byte frames
+for _,bad in ipairs({raw:sub(1,-2),raw:sub(1,-29)..ticks.frame(4999,state,state)}) do
+ store.write(p..'/ticks.bin',bad)
+ manifest.ticksHash=hash_file(p..'/ticks.bin',mp.MAX_TICKS)
+ assert(not pcall(mp.preflight,manifest,p))
+end
+digest.file=real
+''')
+
     def setUp(self):
         test_session_files.SessionFileTests.setUp(self)
         self.lua.execute('''

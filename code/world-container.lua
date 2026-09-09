@@ -55,7 +55,7 @@ end
 ---@param path string Multiplayer capture folder.
 ---@param engine table
 ---@return PreparedNativeWorld
-function M.prepare(path,engine)
+function M.prepare(path,engine,progress)
   assert(engine:singlePlayer() and core.readInteger(engine.sites.gameCore+0xc)==20,
     'Prepare multiplayer worlds from the Skirmish menu')
   local reader=require('code/world-reader').open(path)
@@ -75,7 +75,10 @@ function M.prepare(path,engine)
           compressed=packed and 1 or 0,offset=bytes}
         assert(file:write(payload)); bytes=bytes+#payload
       end
-      reader:eachSection(function(entry,data) section(entry.section,data,entry.compressed~=0) end)
+      reader:eachSection(function(entry,data)
+        section(entry.section,data,entry.compressed~=0)
+        if progress then progress('Checking starting state...') end
+      end)
       if reader.extensions then
         section(1337,reader.extensions,true)
       elseif reader.automarket then

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.47.5
+
+- Hash compiled multiplayer streams with the native streaming SHA-256 provider
+  when saving, avoiding full-file Lua hashing.
+- Validate and hash tick journals in one bounded pass. Multiplayer preparation
+  now yields between chunks and native world sections, and validates the first
+  recovery segment once instead of twice. Validation of damaged tails remains.
+- Pass a game-relative configuration path when restarting with recorded settings,
+  as required by UCP. Keep the original file hashes and settings unchanged.
+- These changes reduce repeated work; end-of-match conversion remains synchronous
+  and live loading/exit timings still require measurement.
+
 ## 0.47.4
 
 - Route replay portrait input through the active build/book tab's native input
