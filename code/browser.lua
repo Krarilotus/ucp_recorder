@@ -114,7 +114,11 @@ function Browser:advancePreparation(beforeStart)
   if task.status=='pending' then return false end
   self.preparation=nil
   if task.status=='cancelled' then self.message='Replay preparation cancelled.'; return false end
-  if task.status=='failed' then self.message=task.error; return false end
+  if task.status=='failed' then
+    self.message=task.error
+    print('[recorder] Replay preparation failed: '..task.error)
+    return false
+  end
   local ready=task.result
   local ok=self.recorder:guard(function()
     if beforeStart then beforeStart() end

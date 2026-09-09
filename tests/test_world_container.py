@@ -75,6 +75,18 @@ container=require('code/world-container')
         self.assertEqual(target.read_bytes(),b'previous')
         self.assertFalse((self.root/'world-native.json').exists())
 
+    def test_history_preparation_yields_and_matches_skirmish_container(self):
+        self.prepare()
+        self.lua.execute('container.prepare(virtual_path,engine)')
+        expected=(self.root/'world-native.sav').read_bytes()
+        self.lua.execute('''
+core.readInteger=function() return 58 end
+local progress=0
+container.prepare(virtual_path,engine,function() progress=progress+1 end)
+assert(progress==122)
+''')
+        self.assertEqual((self.root/'world-native.sav').read_bytes(),expected)
+
     def test_corrupt_section_is_never_published(self):
         self.prepare(); (self.root/'world.bin').write_bytes(b'x'*len(self.expected))
         with self.assertRaisesRegex(Exception,'section is damaged'):
@@ -84,7 +96,7 @@ container=require('code/world-container')
     def test_conversion_does_not_run_during_a_match_or_with_a_traversal_path(self):
         self.prepare()
         self.lua.execute('core.readInteger=function() return 14 end')
-        with self.assertRaisesRegex(Exception,'Skirmish menu'):
+        with self.assertRaisesRegex(Exception,'Skirmish or battle history'):
             self.lua.execute('container.prepare(virtual_path,engine)')
         self.lua.execute('core.readInteger=function() return 20 end')
         with self.assertRaisesRegex(Exception,'capture path'):

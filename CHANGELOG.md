@@ -2,6 +2,9 @@
 
 ## 0.47.5
 
+- Allow multiplayer world preparation from the integrated single-player battle
+  history, fixing rejection by the old Skirmish-only guard. Log the full
+  preparation error instead of leaving its only copy in a short footer.
 - Hash compiled multiplayer streams with the native streaming SHA-256 provider
   when saving, avoiding full-file Lua hashing.
 - Validate and hash tick journals in one bounded pass. Multiplayer preparation

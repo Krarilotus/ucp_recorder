@@ -56,8 +56,11 @@ end
 ---@param engine table
 ---@return PreparedNativeWorld
 function M.prepare(path,engine,progress)
-  assert(engine:singlePlayer() and core.readInteger(engine.sites.gameCore+0xc)==20,
-    'Prepare multiplayer worlds from the Skirmish menu')
+  local view=core.readInteger(engine.sites.gameCore+0xc)
+  -- Conversion uses private codec buffers. Both single-player entry screens
+  -- are safe; the native loader owns its later transition into the match.
+  assert(engine:singlePlayer() and (view==20 or view==58),
+    'Prepare multiplayer worlds from Skirmish or battle history')
   local reader=require('code/world-reader').open(path)
   local capacity=40512
   for _,entry in ipairs(reader.entries) do capacity=math.max(capacity,entry.size) end
