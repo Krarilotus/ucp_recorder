@@ -36,3 +36,28 @@ assert(hud:key(0x101,114)); hud:key(0x100,114); assert(not hud.details)
 hud:key(0x101,114); available=false; assert(not hud:key(0x100,114) and not hud.details)
 assert(next(recorder)==nil)
 ''')
+
+    def test_hud_has_visible_player_choices_and_native_right_aligned_progress(self):
+        self.check('''
+local available=true; local chosen; local controls; local visible; local texts={}
+local recorder={status='finished',manifest={startTick=1,lastTick=101,variant='SHC'},
+ engine={tick=function() return 101 end},playbackInfo={framework='3.0.7',packs={},count=1}}
+local view={available=function() return available end,players=function() return {1,3} end,
+ player=function() return chosen or 1 end,select=function(_,slot) chosen=slot end}
+local hud=require('code/replay-hud').new(recorder,view)
+local ui={activeDialog=function() return -1 end,attachOverlay=function(_,ids,items,predicate)
+ assert(ids[1]==14 and ids[2]==16); controls=items; visible=predicate end,
+ text=function(_,label,x,y,alignment) texts[#texts+1]={label,x,y,alignment} end,
+ avatarNative=function(slot,x,y) assert(slot==3 and x==10 and y==152) end,
+ border=function() end}
+hud:install(ui); assert(visible())
+assert(controls[1].visible() and controls[2].visible() and not controls[3].visible())
+controls[2].action(); assert(chosen==3); controls[2].render(10,152)
+for _,item in ipairs(controls) do assert(not item.frontEnd) end
+controls[9].render(390,12)
+assert(texts[1][1]=='Replay: 100 / 100 ticks')
+for _,text in ipairs(texts) do assert(text[4]==-1 and text[2]==788) end
+assert(not controls[10].visible()); hud:key(0x100,114); assert(controls[10].visible())
+controls[10].render(54,12); assert(texts[4][1]=='SHC 1.41')
+available=false; assert(not visible())
+''')

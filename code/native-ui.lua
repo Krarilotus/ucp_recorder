@@ -55,7 +55,11 @@ end
 function M:renderOverlayItem(item)
   local target=modules.ui:access().game.Rendering.pDrawBufferChoiceValue
   local previous=target[0]
-  target[0]=0 -- UI, including the in-game status/book, draws to SCREEN_MENU.
+  -- Front-end controls belong to SCREEN_MENU. During gameplay only the native
+  -- menu's declared overlap rectangles are copied from that surface to the map
+  -- (TextureRenderCore::moveOverlappingMenuPartsToMapSurface). Screen-space HUD
+  -- controls outside those rectangles must draw directly to MAP_GAME.
+  target[0]=item.frontEnd and 0 or 1
   local state=self.sites.buttonState.value
   local ok,reason=pcall(item.render,core.readInteger(state),core.readInteger(state+4))
   target[0]=previous
@@ -64,7 +68,7 @@ end
 
 function M:updateOverlay(menu)
   local overlay=self.overlays and self.overlays[menu]
-  if not overlay then return end
+  if not overlay or not overlay.visible() then return end
   if not overlay.array then
     local array=core.allocate((#overlay.items+1)*self.ITEM_SIZE,true)
     overlay.menu=core.allocate(0x44,true)
@@ -82,25 +86,31 @@ function M:updateOverlay(menu)
     core.writeInteger(array+#overlay.items*self.ITEM_SIZE,0x66)
     self.menuConstructor(overlay.menu,array)
     overlay.array=array
+    overlay.layout={}
   end
-  local shown=overlay.visible()
   -- The book and build menu have different offsets. Place these controls in
   -- screen space while leaving the native menu's own origin untouched.
   local originX,originY=0,0
   local window=self.sites.buildingAndStatus.bytes
   local resolution=window[3]+window[4]*256+window[5]*65536+window[6]*16777216
   local width=core.readInteger(resolution-0x5c+0x18)
+  local frontX=core.readInteger(resolution-0x5c+0x20)
+  local frontY=core.readInteger(resolution-0x5c+0x24)
   for index,item in ipairs(overlay.items) do
     local address=overlay.array+(index-1)*self.ITEM_SIZE
-    local visible=shown and (not item.visible or item.visible())
-    core.writeInteger(address,visible and 3 or -2147483645)
+    local kind=(not item.visible or item.visible()) and 3 or -2147483645
     local x=item.x<0 and width+item.x or item.x
     local y=item.y
     if item.frontEnd then
-      x=x+core.readInteger(resolution-0x5c+0x20)
-      y=y+core.readInteger(resolution-0x5c+0x24)
+      x=x+frontX
+      y=y+frontY
     end
-    core.writeInteger(address+4,x-originX); core.writeInteger(address+8,y-originY)
+    x=x-originX; y=y-originY
+    local previous=overlay.layout[index] or {}
+    if previous.kind~=kind then core.writeInteger(address,kind); previous.kind=kind end
+    if previous.x~=x then core.writeInteger(address+4,x); previous.x=x end
+    if previous.y~=y then core.writeInteger(address+8,y); previous.y=y end
+    overlay.layout[index]=previous
   end
   return overlay
 end

@@ -56,22 +56,32 @@ function M.new(ui,recorder,browser,rename)
     return recorder.mode=='none' and ui:activeDialog()==-1
   end
   local function hasReplay() return o.model.selected and o.model.selected.manifest~=nil end
-  local function renameAction() if hasReplay() then rename(o.model:title(),function(name) o.model:rename(name); o:publish() end) end end
+  local function ready()
+    return hasReplay() and o.model.selected.manifest.status=='complete' and not browser.preparation
+  end
+  local function renameAction()
+    if hasReplay() and not browser.preparation then
+      rename(o.model:title(),function(name) o.model:rename(name); o:publish() end)
+    end
+  end
   local items={
-    {x=270,y=540,width=180,height=30,frontEnd=true,
-      visible=hasReplay,action=renameAction,
+    -- Native footer: hover/trail description at (175,522), game count at
+    -- (175,550). Keep our button in the clear space to the right of both.
+    {x=450,y=546,width=160,height=30,frontEnd=true,
+      visible=function() return hasReplay() and not browser.preparation end,action=renameAction,
       label=function() return tr('Rename replay...') end},
-    {x=620,y=484,width=170,height=96,frontEnd=true,
-      visible=hasReplay,
+    -- Native Back's visible pixels occupy (53,526)-(150,573). Mirror that
+    -- footprint in the 800px canvas. GM150 picture71 has 46px/67px transparent
+    -- padding: exclude it from input bounds so row8 and the scrollbar stay usable.
+    {x=650,y=526,width=97,height=47,frontEnd=true,
+      visible=ready,
       action=function() o:play() end,
       render=function(x,y)
-        local item=o.model.selected
-        local ready=item and item.manifest and item.manifest.status=='complete' and not browser.preparation
-        ui:sprite(150,71,x,y-67)
-        ui:text(tr(ready and 'Watch replay' or 'Replay unavailable'),x+85,y+68,1,18,false,170,not ready)
+        ui:sprite(150,71,x-46,y-67)
       end},
-    {x=260,y=514,width=430,height=16,frontEnd=true,enabled=false,
-      render=function(x,y) if o.message then ui:text(tr(o.message),x,y,0,18,false,430) end end},
+    -- Reuse the area of the removed native help text, never its trail caption.
+    {x=450,y=522,width=190,height=18,frontEnd=true,enabled=false,
+      render=function(x,y) if o.message then ui:text(tr(o.message),x,y,0,18,false,190) end end},
   }
   for row=0,7 do
     local offset=row

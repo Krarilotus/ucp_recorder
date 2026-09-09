@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.47.1
+
+- Draw replay portraits and F3 information on the gameplay surface. The earlier
+  overlay used a menu surface whose off-panel pixels were never displayed.
+  Correct native right alignment for the always-visible tick/status text.
+- Skip inactive overlays and update native item positions only when layout or
+  visibility changes, avoiding repeated memory writes during ordinary gameplay.
+- Mirror the history Back hand's visible footprint for Replay, without a subtitle.
+  Its transparent padding no longer intercepts the eighth row or the scrollbar.
+  Move Rename into the clear footer space and bound preparation text separately.
+  Hide Replay while preparing or when the selected recording is not complete.
+- Preserve the 0.47.0 maintenance-phase correction. A fresh single-player capture
+  completed 35,815 ticks and seven commands with matching RNG/resource checkpoints,
+  including two recorded pause-maintenance windows. Broader gameplay, multiplayer
+  and live verification of these UI changes remain acceptance gates.
+
 ## 0.47.0
 
 - Record native maintenance that runs while the match clock is stopped, keeping

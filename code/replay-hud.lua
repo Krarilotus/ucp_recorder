@@ -37,9 +37,9 @@ function M:install(ui)
   end
   items[#items+1]={x=-410,y=12,width=398,height=58,enabled=false,
     render=function(x,y)
-      ui:text(self:progress(),x+398,y,2,18,false,398)
-      ui:text(self:status(),x+398,y+18,2,18,false,398)
-      ui:text(tr('F3: replay information'),x+398,y+36,2,18,false,398)
+      ui:text(self:progress(),x+398,y,-1,18,false,398)
+      ui:text(self:status(),x+398,y+18,-1,18,false,398)
+      ui:text(tr('F3: replay information'),x+398,y+36,-1,18,false,398)
     end}
   items[#items+1]={x=54,y=12,width=320,height=180,enabled=false,
     visible=function() return self.details and self.recorder.playbackInfo~=nil end,

@@ -5,9 +5,33 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
-    def test_overlay_uses_screen_target_and_normal_render_pass_then_restores_target(self):
+    def test_overlay_layout_writes_only_changes_and_skips_inactive_sessions(self):
         self.check('''
-local hook; local target={[0]=2}; local fail=false
+local shown=false; local rowVisible=true; local writes=0
+local write=core.writeInteger
+core.writeInteger=function(a,v) writes=writes+1; write(a,v) end
+local instruction=sites.buildingAndStatus.bytes
+local resolution=instruction[3]+instruction[4]*256+instruction[5]*65536+instruction[6]*16777216
+memory[resolution-0x44]=1920; memory[resolution-0x3c]=560; memory[resolution-0x38]=240
+ui.overlays={[7000]={visible=function() return shown end,items={
+ {x=-410,y=12,width=398,height=58,visible=function() return rowVisible end},
+ {x=450,y=546,width=160,height=30,frontEnd=true}}}}
+assert(not ui:updateOverlay(7000) and writes==0)
+shown=true; local overlay=ui:updateOverlay(7000)
+assert(memory[overlay.array+4]==1510 and memory[overlay.array+8]==12)
+assert(memory[overlay.array+84]==1010 and memory[overlay.array+88]==786)
+writes=0; ui:updateOverlay(7000); assert(writes==0)
+rowVisible=false; ui:updateOverlay(7000); assert(writes==1 and memory[overlay.array]==-2147483645)
+writes=0; memory[resolution-0x44]=1280; ui:updateOverlay(7000)
+assert(writes==1 and memory[overlay.array+4]==870)
+shown=false; writes=0; assert(not ui:updateOverlay(7000) and writes==0)
+shown=true; rowVisible=true; ui:updateOverlay(7000)
+assert(writes==1 and memory[overlay.array]==3)
+''')
+
+    def test_overlay_uses_its_owner_surface_and_restores_target_even_on_failure(self):
+        self.check('''
+local hook; local target={[0]=2}; local fail=false; local frontEnd=false
 modules={ui={access=function() return {game={Rendering={pDrawBufferChoiceValue=target}}} end}}
 ui.updateOverlay=function(_,parent) return {menu=0x6000,items={{}}} end
 core.hookCode=function(callback)
@@ -15,8 +39,8 @@ core.hookCode=function(callback)
  return function(parent,action)
   if parent==0x6000 then
    assert(action==1)
-   ui:renderOverlayItem({render=function()
-    assert(target[0]==0)
+   ui:renderOverlayItem({frontEnd=frontEnd,render=function()
+    assert(target[0]==(frontEnd and 0 or 1))
     if fail then error('draw failed') end
    end})
   end
@@ -26,6 +50,7 @@ memory[0x8000+0x4c]=0x7000; memory[0x8000+20]=123
 memory[0x7000]=0x9000; memory[0x9000]=0x66
 ui:trackVisibility({0x8000},function() return true end)
 hook(0x7000,3); assert(target[0]==2)
+frontEnd=true; hook(0x7000,1); assert(target[0]==2)
 fail=true; assert(not pcall(hook,0x7000,1) and target[0]==2)
 ''')
 

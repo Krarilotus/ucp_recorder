@@ -57,6 +57,36 @@ hooked[sites.action.address](11)
 assert(returned and core.readInteger(0x191dd80)==99)
 ''')
 
+    def test_footer_preserves_native_rows_count_scrollbar_and_mirrors_back_hand(self):
+        self.check('''
+local rename,hand,progress=controls[1],controls[2],controls[3]
+local function overlaps(a,b)
+ return a.x<b.x+b.width and b.x<a.x+a.width and a.y<b.y+b.height and b.y<a.y+a.height
+end
+-- Native layout and decoded opaque footprint of GM150 picture69.
+local back={x=53,y=526,width=97,height=47}
+local row8={x=24,y=461,width=730,height=47}
+local scroll={x=755,y=85,width=20,height=494}
+local count={x=175,y=550,width=240,height=22}
+assert(hand.x==800-back.x-back.width and hand.y==back.y)
+assert(hand.width==back.width and hand.height==back.height)
+for _,item in ipairs({rename,hand,progress}) do
+ for _,nativeItem in ipairs({row8,scroll,count}) do assert(not overlaps(item,nativeItem)) end
+end
+assert(not overlaps(rename,hand) and not overlaps(progress,hand) and not overlaps(rename,progress))
+ui.text=function() error('The hand must not draw a subtitle') end
+ui.sprite=function(_,gm,picture,x,y)
+ assert(gm==150 and picture==71 and x+46==hand.x and y+67==hand.y)
+end
+hand.render(hand.x,hand.y)
+history.model.selected={manifest={status='complete'}}
+assert(hand.visible() and rename.visible())
+history.browser.preparation={}; assert(not hand.visible() and not rename.visible())
+ui.onNativeKey(0x100,113); assert(not renamed)
+history.browser.preparation=nil; history.model.selected.manifest.status='recording'
+assert(not hand.visible() and rename.visible())
+''')
+
     def test_sort_icon_updates_heading_and_keeps_native_record_unchanged(self):
         self.check('''
 hooked[sites.prepare.address]()
