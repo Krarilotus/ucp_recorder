@@ -229,7 +229,8 @@ for _,origin in ipairs({{0,0},{181,24},{450,120}}) do
  assert(memory[address+4]==100 and memory[address+8]==76)
 end
 ui.buttonNative=function() error('draw failure') end
-functions[memory[address+28]]({})
+local ok,reason=pcall(functions[memory[address+28]],{})
+assert(not ok and tostring(reason):find('draw failure',1,true))
 assert(memory[state]==100 and memory[state+4]==76)
 ''')
 
