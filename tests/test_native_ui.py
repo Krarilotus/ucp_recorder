@@ -210,6 +210,29 @@ assert(rendered[6]==0x7f7f7f and rendered[9]==0 and memory[sites.buttonState.val
 allowed=true; functions[memory[address+20]]({}); assert(clicks==1)
 ''')
 
+    def test_native_overlay_button_uses_viewport_without_moving_its_hitbox(self):
+        self.check('''
+local functions={}; local id=10; local state=sites.buttonState.value
+utils.createLuaFunctionWrapper=function(fn) id=id+1; functions[id]=fn; return id end
+local address=core.allocate(80); local textX,textY
+ui.text=function(_,_,x,y) textX,textY=x,y end
+ui:button(address,100,76,36,28,'+',function() end)
+for _,origin in ipairs({{0,0},{181,24},{450,120}}) do
+ ui.overlayOriginX,ui.overlayOriginY=origin[1],origin[2]
+ memory[state]=100; memory[state+4]=76
+ ui.buttonNative=function()
+  assert(memory[state]==100+origin[1] and memory[state+4]==76+origin[2])
+ end
+ functions[memory[address+28]]({})
+ assert(textX==118+origin[1] and textY==83+origin[2])
+ assert(memory[state]==100 and memory[state+4]==76)
+ assert(memory[address+4]==100 and memory[address+8]==76)
+end
+ui.buttonNative=function() error('draw failure') end
+functions[memory[address+28]]({})
+assert(memory[state]==100 and memory[state+4]==76)
+''')
+
     def test_native_font_centering_and_width_fit_use_original_text_parameters(self):
         self.check('''
 local text,calls='',{}

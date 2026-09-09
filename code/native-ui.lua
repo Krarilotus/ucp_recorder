@@ -208,15 +208,24 @@ function M:button(address,x,y,width,height,label,action,selected,leftAligned,ena
   core.writeInteger(address+20,self:callback(function() if not enabled or enabled() then action() end end))
   core.writeInteger(address+28,self:callback(function()
     local state=self.sites.buttonState.value
-    local drawX,drawY=core.readInteger(state),core.readInteger(state+4)
+    local originalX,originalY=core.readInteger(state),core.readInteger(state+4)
+    local drawX=originalX+(self.overlayOriginX or 0)
+    local drawY=originalY+(self.overlayOriginY or 0)
     local text=type(label)=='function' and label() or label
     if text=='' then return end
     -- The same tiled interface_icons3 skin used by the native pause-menu buttons.
     local interactive=not enabled or enabled()
     local previousHover=core.readInteger(state+16)
     if not interactive then core.writeInteger(state+16,0) end
-    self.buttonNative(self.sites.buttonSurface.value,0,-1)
+    -- Native button backgrounds read shared coordinates themselves. Translate
+    -- drawing through the same viewport as custom HUD items; keep hitboxes and
+    -- the next native renderer in screen coordinates.
+    local translated=drawX~=originalX or drawY~=originalY
+    if translated then core.writeInteger(state,drawX); core.writeInteger(state+4,drawY) end
+    local ok,reason=pcall(self.buttonNative,self.sites.buttonSurface.value,0,-1)
+    if translated then core.writeInteger(state,originalX); core.writeInteger(state+4,originalY) end
     if not interactive then core.writeInteger(state+16,previousHover) end
+    assert(ok,reason)
     local color=core.readSmallInteger(self.sites.gold.value)%65536
     local hover=core.readInteger(state+16)~=0
     if selected and selected() then
