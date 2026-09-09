@@ -12,6 +12,48 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_named_snapshot_and_sealing_never_read_whole_large_payloads(self):
+        self.lua.execute('''
+local m=recording(); local p=store.path(m.id)
+local snapshot=string.rep('saved world',20000)
+store.write(p..'/start.sav',snapshot); m.snapshotHash=sha.sha256(snapshot)
+store.write(p..'/rng.bin','rng'); m.rngHash=sha.sha256('rng')
+local original=store.read(p..'/stream-commands.json')
+local oldOpen=io.open; local reads=0
+io.open=function(path,mode)
+ local f,err=oldOpen(path,mode); if not f then return f,err end
+ if mode~='rb' or not (path:find('stream-',1,true) or path:find('start.sav',1,true)) then return f end
+ return {read=function(_,n)
+  assert(type(n)=='number' and n<=65536,'Unbounded replay payload read')
+  reads=reads+1; return f:read(n)
+ end,seek=function(_,...) return f:seek(...) end,lines=function() return f:lines() end,
+ close=function() return f:close() end}
+end
+local copy=store.copy(m,'Bounded snapshot',m.finalRngHash)
+store.finish(m)
+io.open=oldOpen
+assert(reads>4 and copy.status=='complete' and m.status=='complete')
+assert(copy.commandCount==1 and m.commandCount==1)
+assert(store.read(store.path(copy.id)..'/start.sav')==snapshot)
+assert(store.read(p..'/start.sav')==snapshot)
+assert(store.read(p..'/stream-commands.json')==original:match('[^\\n]+')..'\\n')
+store.preflight(copy); store.preflight(m)
+''')
+
+    def test_stream_hash_read_failure_never_publishes_complete_manifest(self):
+        self.lua.execute('''
+local m=recording()
+local digest=require('code/native-hash'); local original=digest.file
+digest.file=function(path,...)
+ if path:find('stream-rng-sync.json',1,true) then error('injected read failure') end
+ return original(path,...)
+end
+assert(not pcall(store.finish,m))
+local disk=json:decode(store.read(store.path(m.id)..'/manifest.json'))
+assert(m.status~='complete' and disk.status~='complete')
+digest.file=original; store.finish(m); store.preflight(m)
+''')
+
     def test_preflight_splits_large_streams_and_rejects_damaged_tail_without_read_all(self):
         self.lua.execute('''
 local m=recording(); local p=store.path(m.id)

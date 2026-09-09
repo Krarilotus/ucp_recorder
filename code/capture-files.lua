@@ -37,23 +37,7 @@ function M.begin(path,engine,settings)
   return capture
 end
 
--- Copy exactly the flushed byte prefix. Never stop or edit the source stream.
-local function prefix(source,target,size)
-  local input=assert(io.open(source,'rb'))
-  local output,err=io.open(target,'wb')
-  if not output then input:close(); error(err) end
-  local ok,reason=pcall(function()
-    local remaining=size or assert(input:seek('end'))
-    assert(input:seek('set',0))
-    while remaining>0 do
-      local chunk=assert(input:read(math.min(remaining,65536)),'Capture prefix ended early')
-      assert(#chunk>0 and #chunk<=remaining,'Invalid capture prefix')
-      assert(output:write(chunk)); remaining=remaining-#chunk
-    end
-  end)
-  local a,b=input:close(),output:close()
-  assert(ok and a and b,reason or 'Cannot close capture copy')
-end
+local prefix=require('code/replay-files').copy
 
 function M.copy(source,name,bytes,events,commands,tick)
   name=validation.displayName(name)

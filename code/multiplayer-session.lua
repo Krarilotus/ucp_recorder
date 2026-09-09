@@ -101,10 +101,7 @@ function M.seal(capture)
   if ok then
     ok,reason=xpcall(function()
       manifest.ticksHash=require('code/native-hash').file(path..'/ticks.bin',M.MAX_TICKS)
-      for name,file in pairs({commands='commands',checkpoints='rng-sync',info='infself'}) do
-        manifest[name..'Hash']=require('code/native-hash').file(path..'/stream-'..file..'.json',
-          require('code/replay-preflight').MAX_STREAM)
-      end
+      store.hashStreams(manifest,path)
       store.preflight(manifest)
       manifest.status='complete'
     end,debug.traceback)

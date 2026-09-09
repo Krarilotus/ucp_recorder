@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.48.2
+
+- Copy named single-player replay snapshots in bounded 64 KiB chunks using the
+  same file-copy owner as multiplayer. Large saves and command streams no longer
+  require a complete extra Lua string; copying keeps the active capture running.
+- Use the shared native streaming hash path when sealing either capture mode,
+  including named single-player starting saves. Keep complete stream validation
+  and fail completion on read errors. No simulation or recording format change.
+
 ## 0.48.1
 
 - Reuse only native starting saves converted and verified by this game process.

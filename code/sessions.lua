@@ -151,18 +151,20 @@ function M.copy(source,name,finalRngHash)
   copy.id=id; copy.created=created; copy.displayName=name; copy.sourceId=source.id
   copy.status='copying'; copy.finalRngHash=finalRngHash
   local path,original=M.path(id),M.path(source.id)
+  local copyFile=require('code/replay-files').copy
+  local digest=require('code/native-hash')
   local ok,reason=xpcall(function()
     M.save(copy)
     if source.battle then write(path..'/battle.bin',require('code/battle-statistics').read(source)) end
     for _,file in ipairs({'start.sav','rng.bin','ucp-config.yml','environment.json',
       'stream-commands.json','stream-rng-sync.json','stream-infself.json'}) do
-      write(path..'/'..file,read(original..'/'..file))
+      copyFile(original..'/'..file,path..'/'..file)
     end
     if source.phaseProfile then
       local file=require('code/maintenance-journal').FILE
-      write(path..'/'..file,read(original..'/'..file))
+      copyFile(original..'/'..file,path..'/'..file)
     end
-    assert(sha.sha256(read(path..'/start.sav'))==copy.snapshotHash,'Starting save is damaged')
+    assert(digest.file(path..'/start.sav',1024*1024*1024)==copy.snapshotHash,'Starting save is damaged')
     assert(sha.sha256(read(path..'/rng.bin'))==copy.rngHash,'Starting RNG state is damaged')
     assert(sha.sha256(read(path..'/ucp-config.yml'))==copy.settingsHash,'Recorded settings are damaged')
     assert(sha.sha256(read(path..'/environment.json'))==copy.environmentHash,'Recorded environment is damaged')
@@ -212,6 +214,15 @@ end
 
 local streams={commands='stream-commands.json',checkpoints='stream-rng-sync.json',info='stream-infself.json'}
 
+-- Both capture modes publish the same bounded stream digests. Validation still
+-- runs before completion, so a matching digest alone cannot seal invalid input.
+function M.hashStreams(manifest,path)
+  local digest=require('code/native-hash')
+  for name,file in pairs(streams) do
+    manifest[name..'Hash']=digest.file(path..'/'..file,require('code/replay-preflight').MAX_STREAM)
+  end
+end
+
 -- Seal only commands that fall within the last observed simulation boundary.
 -- Inputs queued for a later tick when the player leaves are not part of this replay.
 function M.finish(manifest)
@@ -236,7 +247,7 @@ function M.finish(manifest)
   platform.replace(commandsPath..'.tmp',commandsPath)
   manifest.commandCount=count
   require('code/maintenance-journal').seal(manifest,path,platform.replace)
-  for name,file in pairs(streams) do manifest[name..'Hash']=sha.sha256(read(path..'/'..file)) end
+  M.hashStreams(manifest,path)
   M.preflight(manifest)
   manifest.status='complete'
   M.save(manifest)
