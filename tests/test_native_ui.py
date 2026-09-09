@@ -33,7 +33,10 @@ assert(writes==1 and memory[overlay.array]==3)
         self.check('''
 local hook; local target={[0]=2}; local fail=false; local frontEnd=false
 modules={ui={access=function() return {game={Rendering={pDrawBufferChoiceValue=target}}} end}}
-ui.updateOverlay=function(_,parent) return {menu=0x6000,items={{}}} end
+ui.updateOverlay=function(_,parent) return {menu=0x6000,items={{frontEnd=frontEnd}}} end
+local text=sites.textManager.value
+memory[text]=31; memory[text+8]=560; memory[text+12]=1360; memory[text+28]=2
+memory[ui:windowAddress()+0x18]=1920
 core.hookCode=function(callback)
  hook=callback
  return function(parent,action)
@@ -41,6 +44,8 @@ core.hookCode=function(callback)
    assert(action==1)
    ui:renderOverlayItem({frontEnd=frontEnd,render=function()
     assert(target[0]==(frontEnd and 0 or 1))
+    assert(memory[text+28]==target[0] and memory[text+8]==0 and memory[text+12]==1920)
+    memory[text]=123 -- native rendering advances its text cursor
     if fail then error('draw failed') end
    end})
   end
@@ -50,8 +55,10 @@ memory[0x8000+0x4c]=0x7000; memory[0x8000+20]=123
 memory[0x7000]=0x9000; memory[0x9000]=0x66
 ui:trackVisibility({0x8000},function() return true end)
 hook(0x7000,3); assert(target[0]==2)
+assert(memory[text]==31 and memory[text+8]==560 and memory[text+12]==1360 and memory[text+28]==2)
 frontEnd=true; hook(0x7000,1); assert(target[0]==2)
 fail=true; assert(not pcall(hook,0x7000,1) and target[0]==2)
+assert(memory[text]==31 and memory[text+8]==560 and memory[text+12]==1360 and memory[text+28]==2)
 ''')
 
     def test_restart_replacement_preserves_initialized_callbacks_and_never_overwrites_recording_row(self):

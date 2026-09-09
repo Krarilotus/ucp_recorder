@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.47.2
+
+- Scope the native font surface and clipping together with the replay overlay.
+  The font renderer independently chooses its destination; changing the sprite
+  surface alone does not ensure visible tick/F3 text. Restore the original text
+  cursor, clip limits and both render targets after the complete overlay pass.
+- Keep 0.47.1's layout corrections and 0.47.0's simulation implementation.
+  Live visual and multiplayer acceptance remain pending.
+
 ## 0.47.1
 
 - Draw replay portraits and F3 information on the gameplay surface. The earlier

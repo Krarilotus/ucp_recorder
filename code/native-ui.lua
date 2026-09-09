@@ -53,15 +53,38 @@ function M:attachOverlay(menuIDs,items,visible)
 end
 
 function M:renderOverlayItem(item)
+  local state=self.sites.buttonState.value
+  item.render(core.readInteger(state),core.readInteger(state+4))
+end
+
+function M:windowAddress()
+  local bytes=self.sites.buildingAndStatus.bytes
+  return bytes[3]+bytes[4]*256+bytes[5]*65536+bytes[6]*16777216-0x5c
+end
+
+-- Scope the complete overlay, not every glyph/portrait. FontSizeClass::renderText
+-- independently selects TextManager.textSurfaceTarget and its horizontal clip.
+-- Native callbacks following us must see their original surface/clip/text cursor.
+function M:renderOverlay(overlay,render)
   local target=modules.ui:access().game.Rendering.pDrawBufferChoiceValue
   local previous=target[0]
   -- Front-end controls belong to SCREEN_MENU. During gameplay only the native
   -- menu's declared overlap rectangles are copied from that surface to the map
   -- (TextureRenderCore::moveOverlappingMenuPartsToMapSurface). Screen-space HUD
   -- controls outside those rectangles must draw directly to MAP_GAME.
-  target[0]=item.frontEnd and 0 or 1
-  local state=self.sites.buttonState.value
-  local ok,reason=pcall(item.render,core.readInteger(state),core.readInteger(state+4))
+  local surface=overlay.items[1].frontEnd and 0 or 1
+  local text=self.sites.textManager.value
+  local cursor=core.readInteger(text)
+  local left,right=core.readInteger(text+8),core.readInteger(text+12)
+  local textSurface=core.readInteger(text+28)
+  target[0]=surface
+  core.writeInteger(text+28,surface)
+  core.writeInteger(text+8,0)
+  core.writeInteger(text+12,core.readInteger(self:windowAddress()+0x18))
+  local ok,reason=pcall(render)
+  core.writeInteger(text,cursor)
+  core.writeInteger(text+8,left); core.writeInteger(text+12,right)
+  core.writeInteger(text+28,textSurface)
   target[0]=previous
   assert(ok,reason)
 end
@@ -90,12 +113,10 @@ function M:updateOverlay(menu)
   end
   -- The book and build menu have different offsets. Place these controls in
   -- screen space while leaving the native menu's own origin untouched.
-  local originX,originY=0,0
-  local window=self.sites.buildingAndStatus.bytes
-  local resolution=window[3]+window[4]*256+window[5]*65536+window[6]*16777216
-  local width=core.readInteger(resolution-0x5c+0x18)
-  local frontX=core.readInteger(resolution-0x5c+0x20)
-  local frontY=core.readInteger(resolution-0x5c+0x24)
+  local window=self:windowAddress()
+  local width=core.readInteger(window+0x18)
+  local frontX=core.readInteger(window+0x20)
+  local frontY=core.readInteger(window+0x24)
   for index,item in ipairs(overlay.items) do
     local address=overlay.array+(index-1)*self.ITEM_SIZE
     local kind=(not item.visible or item.visible()) and 3 or -2147483645
@@ -105,7 +126,6 @@ function M:updateOverlay(menu)
       x=x+frontX
       y=y+frontY
     end
-    x=x-originX; y=y-originY
     local previous=overlay.layout[index] or {}
     if previous.kind~=kind then core.writeInteger(address,kind); previous.kind=kind end
     if previous.x~=x then core.writeInteger(address+4,x); previous.x=x end
@@ -340,7 +360,9 @@ function M:trackVisibility(referenceItems,predicate)
     if overlay and action~=0 then
       -- The game's alternate render pass selects flagged native items. Our
       -- separate menu contains ordinary items and must use its ordinary pass.
-      original(overlay.menu,action==3 and 1 or action)
+      if action==1 or action==3 then
+        self:renderOverlay(overlay,function() original(overlay.menu,1) end)
+      else original(overlay.menu,action) end
     end
     -- Input dispatch has unwound: same game-thread boundary as a native Play
     -- action, outside rendering and outside every simulation tick.

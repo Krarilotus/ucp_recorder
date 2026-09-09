@@ -28,8 +28,12 @@ only the native tab's specified overlap rectangles from SCREEN_MENU into the
 map. It does not composite arbitrary top-corner or left-edge menu pixels.
 
 Consequently front-end overlays draw to SCREEN_MENU (0), and in-game overlays
-draw to MAP_GAME (1). Each callback restores the previous target, including on
-failure. Native text uses -1 for right alignment; 2 is not a right-alignment
+draw to MAP_GAME (1). `FontSizeClass::renderText` (SHC 0x472D60) overrides the
+sprite target with `TextManager.textSurfaceTarget` (+0x1C) and clips to the
+manager's horizontal range (+8/+12). The complete overlay therefore owns a
+temporary screen-wide text clip and matching text/sprite targets. It restores
+the previous targets, clip and text cursor, including on failure, before native
+rendering resumes. Native text uses -1 for right alignment; 2 is not a right-alignment
 constant. These contracts are documented in OpenSHC's RenderTarget and
 TextAlignment definitions and checked against the original SHC executable.
 
