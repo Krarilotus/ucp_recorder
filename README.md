@@ -6,13 +6,14 @@ recorded separately on each PC and played back locally in single-player.
 There is no multiplayer replay session to join or host.
 
 **Experimental test build:** the code supports Crusader and Extreme. The new
-offline multiplayer/recovery path still needs live verification. Earlier RNG2
-divergence is not yet proven fixed. See the [remaining work](docs/roadmap.md).
+offline multiplayer/recovery path still needs live verification. The native
+maintenance correction passed a fresh short single-player replay; broader
+determinism and live UI checks remain. See the [remaining work](docs/roadmap.md).
 
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.47.0.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.47.1.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API

@@ -32,6 +32,8 @@ Use the ordinary Escape menu to resume or leave; mission restart is disabled.
 The recent native-history entry/return and ordinary recording Escape fixes were
 exercised live. The latest selection, hand, HUD/render-pass, date and preparation
 changes pass portable regression checks and original SHC/Extreme hook checks;
-their final appearance still needs an in-game check. Both a named snapshot and
-its full source reproducibly stop at RNG divergence tick 27072. Multiplayer
+their final appearance still needs an in-game check. The historical 0.46.0
+recording omitted native paused maintenance and reproducibly failed at tick27072.
+The 0.47.0 correction passed a fresh 35,815-tick capture including two recorded
+pause windows. Old recordings cannot supply the omitted work. Multiplayer
 host/client offline playback is not yet signed off.
