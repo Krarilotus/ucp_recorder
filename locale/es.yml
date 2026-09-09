@@ -1,6 +1,6 @@
 {
   "auto_header": "Grabar partidas automáticamente",
-  "auto_text": "Grabar escaramuzas individuales y capturar partidas multijugador en este PC. Puedes guardar copias con nombre desde el menú de pausa. Las capturas multijugador aún no se pueden reproducir sin conexión.",
+  "auto_text": "Graba automáticamente las escaramuzas de un jugador y las partidas multijugador en este PC. Guarda copias con nombre desde el menú de pausa y ve las grabaciones en el historial de batallas de un jugador.",
   "seed_on_header": "Usar una semilla inicial fija",
   "seed_on_text": "Usar la semilla indicada abajo para nuevas grabaciones individuales. Es opcional: las repeticiones restauran el estado aleatorio grabado. Las semillas multijugador no cambian.",
   "seed_header": "Semilla inicial",

@@ -35,6 +35,23 @@ function M.decode(data)
   require('code/validation').integer(tick,0,2147483646,'observed tick')
   return {time=tick,before=M.values(data:sub(5,16)),after=M.values(data:sub(17,28))}
 end
+
+-- Preflight consumes complete frames without allocating playback tables and
+-- substring copies for every tick. Packed 16-bit RNG values are valid by
+-- construction; the four table indices and clock still require validation.
+function M.scan(data,expected)
+  assert(type(data)=='string' and #data%M.SIZE==0,'Incomplete recorded simulation tick')
+  for offset=1,#data,M.SIZE do
+    local tick=integer(data,offset)
+    assert(tick<=2147483646,'Invalid replay observed tick')
+    assert(tick==expected,'Recorded simulation ticks are not continuous')
+    assert(integer(data,offset+8)<20000 and integer(data,offset+12)<20000
+      and integer(data,offset+20)<20000 and integer(data,offset+24)<20000,
+      'Invalid replay RNG index')
+    expected=expected+1
+  end
+  return expected
+end
 function M.input(engine,expected)
   require('code/validation').rng(expected)
   local actual=engine:rngState()

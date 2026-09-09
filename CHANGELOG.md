@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.48.0
+
+- Publish separate release and diagnostic builds. Release retains all replay
+  controls, exact settings and integrity checks, while omitting optional RNG
+  investigation hooks and analysis tools. Diagnostic bundles contain an
+  installable module ZIP; install one build at a time.
+- Use the installed CFFI bridge for length-explicit binary copies after a real
+  capability probe. Keep verified fallbacks for older runtimes. Regression tests
+  cover embedded NULs, boundaries, broken bridges and misleading leftover bytes.
+- Validate multiplayer tick journals without allocating per-tick playback tables.
+  Preserve clock continuity, index bounds, complete-file hashes and endpoint checks.
+- Reuse verified native starting saves instead of recompressing them on every
+  playback. Verify captured source sections and cached output; rebuild missing,
+  damaged or outdated derived files. Hash converted files in bounded chunks.
+
 ## 0.47.7
 
 - Hash files directly from UCP's virtual-filesystem descriptors into the native

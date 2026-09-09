@@ -11,7 +11,7 @@ offline-MP completion.
 | Area | Implemented | Still required |
 | --- | --- | --- |
 | Native world restoration | SHC/Extreme header, codec, original reader and post-preparation restoration | Live loaded-save and recovery-world comparison |
-| Offline multiplayer | Human roster/actor translation, timed commands, transport isolation, local SP browser | Host and client replay completion with AIs and Automarket |
+| Offline multiplayer | Human roster/actor translation, timed commands, transport isolation, local SP browser; host and client captures from one physical Steam match both completed offline | More matches, Extreme and recovery coverage |
 | Connection recovery | Stable replacement worlds, linked intervals, independent named copies, prefix retention | Controlled loss/resync/host departure across multiple games |
 | Determinism/settings | Tick/command RNG checks, exact config/restart, asset fingerprints | Prove earlier RNG2 failures resolved; audit remaining module-owned state |
 | Menu integration | Native battle history, snapshot statistics, rename/right hand, portraits and F3 HUD | Packaged-build visual check, report navigation, more in-game languages, current screenshots |

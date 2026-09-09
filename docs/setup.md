@@ -9,6 +9,10 @@ equivalence is still being verified.
 
 ## Download and install
 
+Ordinary testing uses the release ZIP. The separate diagnostic bundle contains
+an inner module ZIP for targeted investigations; see [build profiles](build-profiles.md).
+Install one build at a time and retain its artifact with your recordings.
+
 1. Open the PR you want to test in
    [Corax34/ucp_recorder](https://github.com/Corax34/ucp_recorder/pulls). Find its
    **test release** link in its description or comments. Assets are published in

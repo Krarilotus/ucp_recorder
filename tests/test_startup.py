@@ -169,6 +169,17 @@ assert(not result.reason:find('unexpected recorder mutation',1,true))
 assert(not result.reason:find('settings sentinel',1,true))
 ''')
 
+    def test_release_ignores_stale_diagnostic_flags_without_mutating_the_preset(self):
+        self.prepare_enable()
+        self.check('''
+package.loaded['code/build-profile']={diagnostics=false}
+bytes[0x46a7d0]=0xcc
+local config={autoRecord=false,multiplayerDiagnostics=true,singleplayerRngDiagnostics=true}
+local result=require('init'):enable(config)
+assert(result.status=='disabled' and result.reason:find('settings sentinel',1,true))
+assert(config.multiplayerDiagnostics and config.singleplayerRngDiagnostics)
+''')
+
     def test_supported_save_wrappers_on_both_variants_keep_strict_tail_checks(self):
         self.check('''
 local Engine=require('code/engine')

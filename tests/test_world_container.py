@@ -34,7 +34,14 @@ end
 core.readInteger=function() return 20 end
 engine.sites={gameCore=0x1fe7d10}; engine.singlePlayer=function() return true end
 require('code/platform').replace=replace_virtual
+require('code/native-hash').file=function(path,limit,onChunk)
+ local data=require('code/world-reader').read(path,limit)
+ if onChunk then onChunk(data,#data) end
+ return sha.sha256(data)
+end
+compressions=0
 package.loaded['code/world-codec']={withBuffers=function(capacity,callback)
+ compressions=compressions+1
  return callback({compress=function(_,data)
   if #data==1000 or #data==40512 then return compress_fixture(data) end
  end})
@@ -92,6 +99,22 @@ assert(progress==122)
         with self.assertRaisesRegex(Exception,'section is damaged'):
             self.lua.execute('container.prepare(virtual_path,engine)')
         self.assertFalse((self.root/'world-native.sav').exists())
+
+    def test_cache_avoids_recompression_and_still_checks_source_bytes(self):
+        self.prepare()
+        self.lua.execute('container.prepare(virtual_path,engine); container.prepare(virtual_path,engine); assert(compressions==1)')
+        (self.root/'world.bin').write_bytes(b'x'*len(self.expected))
+        with self.assertRaisesRegex(Exception,'section is damaged'):
+            self.lua.execute('container.prepare(virtual_path,engine)')
+
+    def test_corrupt_cache_or_old_converter_rebuilds_from_original(self):
+        self.prepare()
+        self.lua.execute('container.prepare(virtual_path,engine)')
+        expected=(self.root/'world-native.sav').read_bytes()
+        (self.root/'world-native.sav').write_bytes(b'corrupt')
+        self.lua.execute('container.prepare(virtual_path,engine); assert(compressions==2)')
+        self.assertEqual((self.root/'world-native.sav').read_bytes(),expected)
+        self.lua.execute("require('code/world-cache').REVISION=2; container.prepare(virtual_path,engine); assert(compressions==3)")
 
     def test_conversion_does_not_run_during_a_match_or_with_a_traversal_path(self):
         self.prepare()

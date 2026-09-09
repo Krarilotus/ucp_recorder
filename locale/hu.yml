@@ -1,6 +1,6 @@
 {
   "auto_header": "Mérkőzések automatikus rögzítése",
-  "auto_text": "Egyjátékos csaták és többjátékos mérkőzések rögzítése ezen a gépen. A szünetmenüben elnevezett másolatok menthetők. A többjátékos felvételek még nem játszhatók vissza kapcsolat nélkül.",
+  "auto_text": "Az egyjátékos és többjátékos csatákat automatikusan rögzíti ezen a gépen. A szünetmenüben névvel ellátott másolat menthető, a felvételek az egyjátékos csataelőzményekből nézhetők vissza.",
   "seed_on_header": "Rögzített kezdőérték használata",
   "seed_on_text": "Az alábbi kezdőérték használata új egyjátékos felvételekhez. Nem kötelező: a visszajátszás a rögzített véletlenállapotot állítja helyre. A többjátékos kezdőértékek nem változnak.",
   "seed_header": "Kezdőérték",

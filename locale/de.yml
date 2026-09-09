@@ -1,6 +1,6 @@
 {
   "auto_header": "Partien automatisch aufnehmen",
-  "auto_text": "Einzelspieler-Gefechte aufnehmen und Mehrspieler-Partien auf diesem PC erfassen. Benannte Kopien lassen sich im Pausenmenü speichern. Mehrspieler-Aufnahmen sind noch nicht offline abspielbar.",
+  "auto_text": "Einzelspieler-Gefechte und Mehrspieler-Partien automatisch auf diesem PC aufnehmen. Benannte Kopien im Pausenmenü speichern und Aufnahmen über die Gefechtshistorie im Einzelspieler ansehen.",
   "seed_on_header": "Festen Startwert verwenden",
   "seed_on_text": "Den folgenden Startwert für neue Einzelspieler-Aufnahmen verwenden. Dies ist optional: Replays stellen den aufgezeichneten Zufallszustand wieder her. Mehrspieler-Startwerte bleiben unverändert.",
   "seed_header": "Startwert",

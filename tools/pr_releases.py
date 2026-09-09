@@ -8,9 +8,9 @@ import subprocess
 import sys
 import zipfile
 if __package__:
-    from .module_package import build_module
+    from .module_package import build_module, build_diagnostic_bundle
 else:
-    from module_package import build_module
+    from module_package import build_module, build_diagnostic_bundle
 
 
 def gh(*args):
@@ -56,10 +56,17 @@ def package():
     build = json.loads(os.environ['PR_BUILD'])
     source = Path('source').resolve()
     destination = Path('out')
-    package = build_module(source, destination)
+    profiles = (source / 'code' / 'build-profile.lua').is_file()
+    package = build_module(source, destination, profile='release' if profiles else None)
     asset, version, checksum = package.path, package.version, package.sha256
     asset.with_suffix('.zip.sha256').write_text(f'{checksum}  {asset.name}\n', encoding='utf-8')
-    (destination / 'build.json').write_text(json.dumps(dict(build, version=version, sha256=checksum)), encoding='utf-8')
+    metadata = dict(build, version=version, sha256=checksum)
+    if profiles:
+        diagnostic = build_diagnostic_bundle(source, destination)
+        diagnostic.path.with_suffix('.zip.sha256').write_text(
+            f'{diagnostic.sha256}  {diagnostic.path.name}\n', encoding='utf-8')
+        metadata['diagnosticsSha256'] = diagnostic.sha256
+    (destination / 'build.json').write_text(json.dumps(metadata), encoding='utf-8')
 
 
 def publish():
@@ -77,13 +84,24 @@ def publish():
         assert re.search(rf'^version: {re.escape(version)}\s*$', definition, re.M)
         changelog = archive.read('CHANGELOG.md').decode('utf-8')
     asset.with_suffix('.zip.sha256').write_text(f'{digest}  {asset.name}\n', encoding='utf-8')
+    attachments = [str(asset), str(asset.with_suffix('.zip.sha256'))]
+    diagnostic_note = ''
+    if 'diagnosticsSha256' in metadata:
+        diagnostic = Path('out') / f'recorder-{version}-diagnostics-bundle.zip'
+        checksum = hashlib.sha256(diagnostic.read_bytes()).hexdigest()
+        assert checksum == metadata['diagnosticsSha256'], 'Diagnostic artifact checksum differs'
+        with zipfile.ZipFile(diagnostic) as archive:
+            assert archive.testzip() is None and asset.name in archive.namelist()
+        diagnostic.with_suffix('.zip.sha256').write_text(f'{checksum}  {diagnostic.name}\n', encoding='utf-8')
+        attachments.extend([str(diagnostic), str(diagnostic.with_suffix('.zip.sha256'))])
+        diagnostic_note = f'\n\n**Diagnostics:** `{diagnostic.name}` is for investigations. Extract it first and install its inner `{asset.name}` instead of the release ZIP. Both builds record/play replays; optional attribution hooks are available only in diagnostics. Exact package fingerprints differ, so retain the build used for recording.'
     section = re.search(rf'^## {re.escape(version)}\s*\n(.*?)(?=^## |\Z)', changelog, re.M | re.S)
     source = os.environ['SOURCE_REPO']
     notes = f'''Experimental test build for [{source} PR #{build['pr']}](https://github.com/{source}/pull/{build['pr']}).
 
 **Exact commit:** `{build['sha']}`. **Module version:** `{version}`.
 
-Download **{asset.name}** below. GitHub's source archives are not installable modules. This PR includes preceding stacked changes; test the PR stages in order. Later updates produce a separate release for the new commit.
+Download **{asset.name}** below. GitHub's source archives are not installable modules. This PR includes preceding stacked changes; test the PR stages in order. Later updates produce a separate release for the new commit.{diagnostic_note}
 
 Use a separate UCP3 developer-mode installation. Preserve Graphics API Replacer and its dependencies if required. Consult the packaged README for the features and installation instructions of this exact stage. Later stages require recorder after protocol in extension order.
 
@@ -95,7 +113,7 @@ Automated tests passed on Windows and Linux. No live game is launched by this wo
 '''
     body = Path('out/release-notes.md')
     body.write_text(notes, encoding='utf-8')
-    print(gh('release', 'create', build['tag'], str(asset), str(asset.with_suffix('.zip.sha256')),
+    print(gh('release', 'create', build['tag'], *attachments,
              '--repo', os.environ['GITHUB_REPOSITORY'], '--target', build['sha'], '--prerelease',
              '--title', f'PR #{build["pr"]} - Recorder {version} - {build["sha"][:12]}', '--notes-file', str(body)))
 

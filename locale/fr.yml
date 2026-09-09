@@ -1,6 +1,6 @@
 {
   "auto_header": "Enregistrer les parties automatiquement",
-  "auto_text": "Enregistrer les escarmouches solo et capturer les parties multijoueurs sur ce PC. Des copies nommées sont disponibles dans le menu de pause. La lecture hors ligne des captures multijoueurs est encore indisponible.",
+  "auto_text": "Enregistrer automatiquement les escarmouches solo et les parties multijoueurs sur ce PC. Enregistrer des copies nommées depuis le menu de pause et regarder les enregistrements dans l’historique des batailles en solo.",
   "seed_on_header": "Utiliser une graine initiale fixe",
   "seed_on_text": "Utiliser la graine ci-dessous pour les nouveaux enregistrements solo. Ce réglage est facultatif : les replays restaurent l’état aléatoire enregistré. Les graines multijoueurs restent inchangées.",
   "seed_header": "Graine initiale",

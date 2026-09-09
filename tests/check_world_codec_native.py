@@ -202,6 +202,11 @@ json={encode=function(_,v) return encode_json(v) end,decode=function(_,v) return
 sha={sha256=hash_data}; core.readByte=readByte
 require('code/native').profile.sha256=executable_hash
 require('code/native-hash').sha256=hash_data
+require('code/native-hash').file=function(path,limit,onChunk)
+ local data=require('code/world-reader').read(path,limit)
+ if onChunk then onChunk(data,#data) end
+ return hash_data(data)
+end
 package.loaded['code/platform']={replace=replace_file}
 engine={sites={gameCore=game_core},singlePlayer=function() return true end,
  tick=function() return 1 end,networkState=function() return {mode=1} end,

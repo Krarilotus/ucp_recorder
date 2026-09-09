@@ -4,9 +4,34 @@ from tempfile import TemporaryDirectory
 import unittest
 import zipfile
 
-from tools.module_package import build_module
+from tools.module_package import build_module, build_diagnostic_bundle, DIAGNOSTIC_MODULES
 
 class ModulePackageTests(unittest.TestCase):
+    def test_actual_release_and_diagnostic_payloads_keep_distinct_capabilities(self):
+        import io
+        source=Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            release=build_module(source,root,profile='release')
+            bundle=build_diagnostic_bundle(source,root)
+            with zipfile.ZipFile(release.path) as production, zipfile.ZipFile(bundle.path) as outer:
+                with zipfile.ZipFile(io.BytesIO(outer.read(release.path.name))) as diagnostic:
+                    self.assertIn(b'diagnostics=false',production.read('code/build-profile.lua'))
+                    self.assertIn(b'diagnostics=true',diagnostic.read('code/build-profile.lua'))
+                    for name in DIAGNOSTIC_MODULES:
+                        self.assertNotIn('code/'+name,production.namelist())
+                        self.assertIn('code/'+name,diagnostic.namelist())
+                    for name in ('multiplayer-capture','network-observer','world-hash-observer',
+                                 'tick-journal','replay-preparation','playback-controls','history-native'):
+                        member='code/'+name+'.lua'
+                        self.assertEqual(production.read(member),diagnostic.read(member))
+                    self.assertFalse(any(name.startswith('tools/') for name in production.namelist()))
+                    self.assertIn('tools/inspect_replay.py',diagnostic.namelist())
+                    self.assertEqual(production.read('definition.yml'),diagnostic.read('definition.yml'))
+                    self.assertNotIn(b'RngDiagnostics',production.read('options.yml'))
+                    self.assertNotIn(b'multiplayerDiagnostics',production.read('options.yml'))
+                    self.assertIn(b'recorder.autoRecord',production.read('options.yml'))
+                    self.assertIn(b'recorder.singleplayerRngDiagnostics',diagnostic.read('options.yml'))
     def test_release_contains_translations_and_tools_without_running_source(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

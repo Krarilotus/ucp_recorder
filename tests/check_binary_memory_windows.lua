@@ -2,6 +2,11 @@
 -- lua.exe check_binary_memory_windows.lua <recorder source> <ucp/code>
 -- Uses private allocations only; no game process or game executable is needed.
 local source,framework=assert(arg[1]),assert(arg[2])
+-- Optional installed CFFI DLL: exercise the actual bridge, not an FFI stand-in.
+if arg[3] then
+  local ffi=assert(package.loadlib(arg[3],'luaopen_cffi'))()
+  modules={cffi={cffi=function() return ffi end}}
+end
 package.path=source..'/?.lua;'..package.path
 local rps=require('RPS')
 ucp={internal=rps}
@@ -15,6 +20,9 @@ platform.stdcall=function(library,name,count)
   return platform.stdcallAddress(rps.getLibraryProcAddressA(library,name),count)
 end
 local binary=require('code/binary-memory')
+local byteWrites=0
+local writeBytes=core.writeBytes
+core.writeBytes=function(...) byteWrites=byteWrites+1; return writeBytes(...) end
 local values={}; for i=0,255 do values[#values+1]=string.char(i) end
 local all=table.concat(values)
 local address=core.allocate(65538,true)
@@ -32,4 +40,5 @@ local hash=require('code/native-hash')
 hash.prepare()
 assert(hash.sha256('')=='e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
 assert(hash.sha256(all)=='40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880')
+if arg[3] then assert(byteWrites==0,'Installed CFFI did not provide a binary copy') end
 print('PASS: binary transfer boundaries and native hash startup through installed RPS')

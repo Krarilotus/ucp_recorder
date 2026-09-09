@@ -122,6 +122,15 @@ local function enable(self,config,stage,install)
 end
 
 function module:enable(config)
+  if not require('code/build-profile').diagnostics then
+    -- Preserve the caller's configuration, but never install attribution hooks
+    -- from a stale developer preset when the release artifact lacks them.
+    local production={}
+    for key,value in pairs(config) do production[key]=value end
+    production.multiplayerDiagnostics=false
+    production.singleplayerRngDiagnostics=false
+    config=production
+  end
   self.startup=require('code/startup').run(function(stage,install) enable(self,config,stage,install) end)
   return self.startup
 end

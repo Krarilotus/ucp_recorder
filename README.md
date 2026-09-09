@@ -6,14 +6,15 @@ recorded separately on each PC and played back locally in single-player.
 There is no multiplayer replay session to join or host.
 
 **Experimental test build:** the code supports Crusader and Extreme. The new
-offline multiplayer path completed one physical Steam host recording (288,568
-ticks, 3,951 commands) with RNG and resource checkpoints matching. Independent
-client completion, recovery and broader testing remain. See the [remaining work](docs/roadmap.md).
+offline multiplayer path completed both the host (288,568 ticks) and independent
+client (288,592 ticks) captures from one physical Steam match, each with 3,951
+commands and matching RNG/resource checkpoints. Recovery, Extreme live acceptance
+and broader testing remain. See the [remaining work](docs/roadmap.md).
 
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.47.7.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.48.0.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API

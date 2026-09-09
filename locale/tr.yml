@@ -1,6 +1,6 @@
 {
   "auto_header": "Maçları otomatik kaydet",
-  "auto_text": "Bu bilgisayarda tek oyunculu çatışmaları ve çok oyunculu maçları kaydet. Duraklatma menüsünden adlandırılmış kopyalar kaydedilebilir. Çok oyunculu kayıtlar henüz çevrimdışı oynatılamaz.",
+  "auto_text": "Tek oyunculu çarpışmaları ve çok oyunculu maçları bu bilgisayarda otomatik olarak kaydedin. Duraklatma menüsünden adlandırılmış kopyalar kaydedin ve kayıtları tek oyunculu savaş geçmişinden izleyin.",
   "seed_on_header": "Sabit başlangıç tohumu kullan",
   "seed_on_text": "Yeni tek oyunculu kayıtlar için aşağıdaki tohumu kullan. İsteğe bağlıdır: tekrarlar kaydedilmiş rastgelelik durumunu geri yükler. Çok oyunculu tohumlar değişmez.",
   "seed_header": "Başlangıç tohumu",

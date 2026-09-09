@@ -123,11 +123,7 @@ function M.preflight(manifest,path,progress)
   local hash=require('code/native-hash').file(path..'/ticks.bin',M.MAX_TICKS,function(chunk)
     local data=pending..chunk
     local length=#data-#data%ticks.SIZE
-    for offset=1,length,ticks.SIZE do
-      local frame=ticks.decode(data:sub(offset,offset+ticks.SIZE-1))
-      assert(frame.time==expected,'Recorded simulation ticks are not continuous')
-      expected=expected+1
-    end
+    expected=ticks.scan(data:sub(1,length),expected)
     pending=data:sub(length+1)
     if progress then progress('Checking replay data...') end
   end)

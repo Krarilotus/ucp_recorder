@@ -62,6 +62,14 @@ function M.prepare(path,engine,progress)
   assert(engine:singlePlayer() and (view==20 or view==58),
     'Prepare multiplayer worlds from Skirmish or battle history')
   local reader=require('code/world-reader').open(path)
+  local cache=require('code/world-cache')
+  local cached=cache.load(path,reader,native.profile,M.MAX_PAYLOAD+110000)
+  if cached then
+    reader:eachSection(function()
+      if progress then progress('Checking starting state...') end
+    end)
+    return cached
+  end
   local capacity=40512
   for _,entry in ipairs(reader.entries) do capacity=math.max(capacity,entry.size) end
   local result=require('code/world-codec').withBuffers(capacity,function(codec)
@@ -92,10 +100,12 @@ function M.prepare(path,engine,progress)
     end,debug.traceback)
     local closed=file:close()
     assert(ok and closed,reason or 'Cannot close prepared world')
-    local data=require('code/world-reader').read(path..'/world-native.sav.tmp',M.MAX_PAYLOAD+110000)
-    assert(#data==#prefix+3036+bytes,'Prepared native world length differs')
+    local size=0
+    local digest=require('code/native-hash').file(path..'/world-native.sav.tmp',M.MAX_PAYLOAD+110000,
+      function(_,count) size=count end)
+    assert(size==#prefix+3036+bytes,'Prepared native world length differs')
     return {format=1,sourceWorldHash=reader.capture.world.hash,variant=native.profile.name,
-      executable=native.profile.sha256,sha256=require('code/native-hash').sha256(data),bytes=#data,
+      executable=native.profile.sha256,converterRevision=cache.REVISION,sha256=digest,bytes=size,
       payloadBytes=bytes,sections=#rows,preview='neutral-placeholder',playable=false}
   end)
   require('code/platform').replace(path..'/world-native.sav.tmp',path..'/world-native.sav')

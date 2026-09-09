@@ -1,6 +1,6 @@
 {
   "auto_header": "Record matches automatically",
-  "auto_text": "Record single-player Skirmishes and capture multiplayer matches on this PC. Named copies are available in the pause menu. Multiplayer captures cannot yet be played offline.",
+  "auto_text": "Record single-player Skirmishes and multiplayer matches automatically on this PC. Save named copies from the pause menu and watch recordings through single-player battle history.",
   "seed_on_header": "Use a fixed starting seed",
   "seed_on_text": "Use the seed below for new single-player recordings. This is optional: replays restore the recorded random state. Multiplayer seeds are unchanged.",
   "seed_header": "Starting seed",
