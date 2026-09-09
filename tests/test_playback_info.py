@@ -8,6 +8,22 @@ class PlaybackInfoTests(unittest.TestCase):
     def setUp(self):
         fixture.RecorderTests.setUp(self)
 
+    def test_native_portraits_do_not_overlap_or_enter_the_bottom_controls(self):
+        self.check('''
+local hud=require('code/replay-hud')
+for _,height in ipairs({600,720,768,1080,1440}) do
+ local bounds={}
+ for i=1,8 do
+  local x,y=hud.portraitPosition(i,height)
+  assert(x>=10 and x+72<=800 and y>=160 and y+72<=height-180)
+  for _,other in ipairs(bounds) do
+   assert(x>=other[1]+80 or other[1]>=x+80 or y>=other[2]+80 or other[2]>=y+80)
+  end
+  bounds[#bounds+1]={x,y}
+ end
+end
+''')
+
     def test_summary_retains_actual_versions_and_omits_transitive_leaf_modules(self):
         self.check('''
 local function extension(name,version,kind,deps)
@@ -48,12 +64,13 @@ local recorder={status='finished',manifest={startTick=1,lastTick=101,variant='SH
 local view={available=function() return available end,players=function() return {1,3} end,
  player=function() return chosen or 1 end,select=function(_,slot) chosen=slot end}
 local hud=require('code/replay-hud').new(recorder,view)
-local ui={activeDialog=function() return -1 end,attachOverlay=function(_,ids,items,predicate)
- assert(ids[1]==14 and ids[2]==16); controls=items; visible=predicate end,
+local ui={activeDialog=function() return -1 end,attachOverlay=function(_,ids,items,predicate,screenInput)
+ assert(ids[1]==14 and ids[2]==16 and screenInput); controls=items; visible=predicate end,
  hudText=function(_,label,x,y,alignment) texts[#texts+1]={label,x,y,alignment} end,
  avatarNative=function(slot,x,y) assert(slot==3 and x==10 and y==152) end,
  border=function() end}
 hud:install(ui); assert(visible())
+assert(controls[1].width==72 and controls[1].height==72)
 assert(controls[1].visible() and controls[2].visible() and not controls[3].visible())
 controls[2].action(); assert(chosen==3); controls[2].render(10,152)
 for _,item in ipairs(controls) do assert(not item.frontEnd) end

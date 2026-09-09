@@ -41,7 +41,7 @@ end
 
 -- Register now, attach only after the game's constructors have populated the
 -- menu. Use the UI module's registry so this also respects other extensions.
-function M:attachOverlay(menuIDs,items,visible)
+function M:attachOverlay(menuIDs,items,visible,screenInput)
   local ffi=modules.cffi:cffi()
   local manager=modules.ui:access().manager
   self.overlays=self.overlays or {}
@@ -49,6 +49,10 @@ function M:attachOverlay(menuIDs,items,visible)
     local pointer=manager.lookupMenu(id)
     local menu=assert(ffi.tonumber(ffi.cast('unsigned long',pointer)))
     self.overlays[menu]={items=items,visible=visible}
+    if screenInput then
+      self.inputOverlays=self.inputOverlays or {}
+      self.inputOverlays[id]=menu
+    end
   end
 end
 
@@ -101,7 +105,13 @@ function M:renderOverlay(overlay,render)
   assert(ok,reason)
 end
 
-function M:updateOverlay(menu)
+function M:updateOverlay(menu,action)
+  -- Gameplay renders the root view, but sends input to its selected build/book
+  -- tab. Resolve screen-wide controls from that root before native tab input;
+  -- attaching them only to the root renderer never receives gameplay clicks.
+  if action==0 and self.inputOverlays then
+    menu=self.inputOverlays[core.readInteger(native.addr(0x1fe7d1c))] or menu
+  end
   local overlay=self.overlays and self.overlays[menu]
   if not overlay or not overlay.visible() then return end
   if not overlay.array then
@@ -127,13 +137,15 @@ function M:updateOverlay(menu)
   -- screen space while leaving the native menu's own origin untouched.
   local window=self:windowAddress()
   local width=core.readInteger(window+0x18)
+  local height=core.readInteger(window+0x1c)
   local frontX=core.readInteger(window+0x20)
   local frontY=core.readInteger(window+0x24)
   for index,item in ipairs(overlay.items) do
     local address=overlay.array+(index-1)*self.ITEM_SIZE
     local kind=(not item.visible or item.visible()) and 3 or -2147483645
-    local x=item.x<0 and width+item.x or item.x
-    local y=item.y
+    local x,y=item.x,item.y
+    if item.position then x,y=item.position(width,height) end
+    if x<0 then x=width+x end
     if item.frontEnd then
       x=x+frontX
       y=y+frontY
@@ -343,7 +355,7 @@ function M:trackVisibility(referenceItems,predicate)
   self.visibilityInstalled=true
   local original
   original=core.hookCode(function(this,action)
-    local overlay=self:updateOverlay(this)
+    local overlay=self:updateOverlay(this,action)
     for _,group in ipairs(self.visibilityGroups) do
       if this==core.readInteger(group.items[1]+0x4c) then
         local ok,reason=pcall(function()

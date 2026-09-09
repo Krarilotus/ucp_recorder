@@ -5,6 +5,32 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_gameplay_overlay_input_uses_root_view_when_native_dispatches_a_subtab(self):
+        self.check('''
+local visible=true
+ui.overlays={[7000]={visible=function() return visible end,items={{x=10,y=160,width=72,height=72}}}}
+ui.inputOverlays={[14]=7000,[16]=7000}
+memory[0x1fe7d1c]=14; memory[ui:windowAddress()+0x18]=1920
+assert(not ui:updateOverlay(7100,1)) -- unrelated subtab rendering stays native
+local overlay=ui:updateOverlay(7100,0)
+assert(overlay==ui.overlays[7000] and memory[overlay.array+12]==72)
+memory[0x1fe7d1c]=16; assert(ui:updateOverlay(7200,0)==overlay)
+visible=false; assert(not ui:updateOverlay(7200,0)) -- modal/ordinary play excluded
+visible=true; memory[0x1fe7d1c]=58; assert(not ui:updateOverlay(7200,0))
+''')
+
+    def test_responsive_overlay_positions_share_draw_and_native_input_bounds(self):
+        self.check('''
+ui.overlays={[7000]={visible=function() return true end,items={{x=10,y=160,width=72,height=72,
+ position=function(width,height) return width-90,height-252 end}}}}
+memory[ui:windowAddress()+0x18]=1920; memory[ui:windowAddress()+0x1c]=1080
+local overlay=ui:updateOverlay(7000,1)
+assert(memory[overlay.array+4]==1830 and memory[overlay.array+8]==828)
+memory[ui:windowAddress()+0x18]=800; memory[ui:windowAddress()+0x1c]=600
+ui:updateOverlay(7000,0)
+assert(memory[overlay.array+4]==710 and memory[overlay.array+8]==348)
+''')
+
     def test_overlay_layout_writes_only_changes_and_skips_inactive_sessions(self):
         self.check('''
 local shown=false; local rowVisible=true; local writes=0

@@ -21,18 +21,26 @@ function M:progress()
   return tr('Replay: %d / %d ticks',math.max(0,math.min(r.engine:tick(),last)-first),last-first)
 end
 
+-- Native RenderPlayerAvatars uses 72x72 images. Reserve the native bottom
+-- controls and metadata above; wrap the strip into columns on shorter windows.
+function M.portraitPosition(index,height)
+  local rows=math.max(1,math.floor((height-160-180+8)/80))
+  return 10+math.floor((index-1)/rows)*80,160+((index-1)%rows)*80
+end
+
 function M:install(ui)
   local items={}
   for index=1,8 do
     local row=index
-    items[#items+1]={x=10,y=110+(row-1)*42,width=36,height=36,
+    items[#items+1]={x=10,y=160,width=72,height=72,
+      position=function(_,height) return M.portraitPosition(row,height) end,
       visible=function() return self.view:players()[row]~=nil end,
       action=function() local slot=self.view:players()[row]; if slot then self.view:select(slot) end end,
       render=function(x,y)
         local slot=self.view:players()[row]
         if not slot then return end
         ui.avatarNative(slot,x,y)
-        if slot==self.view:player() then ui:border(x-2,y-2,38,38) end
+        if slot==self.view:player() then ui:border(x-2,y-2,76,76) end
       end}
   end
   items[#items+1]={x=-410,y=12,width=398,height=58,enabled=false,
@@ -50,7 +58,7 @@ function M:install(ui)
       end
       for index,line in ipairs(self.lines) do ui:hudText(line,x,y+(index-1)*18,0,320) end
     end}
-  ui:attachOverlay({14,16},items,function() return self.view:available() and ui:activeDialog()==-1 end)
+  ui:attachOverlay({14,16},items,function() return self.view:available() and ui:activeDialog()==-1 end,true)
 end
 
 function M:key(message,key)

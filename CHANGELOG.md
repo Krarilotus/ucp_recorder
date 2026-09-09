@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.47.4
+
+- Route replay portrait input through the active build/book tab's native input
+  pass. Gameplay renders the root view but dispatches clicks to its selected tab;
+  the previous root-only attachment displayed controls without receiving clicks.
+- Match portrait hitboxes and selection borders to the native 72x72 images.
+  Space portraits apart and wrap into columns when the available height requires
+  it, keeping the native bottom controls and the metadata area clear.
+- Keep the shared viewport translation and persistent opaque tick/status display.
+
 ## 0.47.3
 
 - Translate replay overlays through the native map viewport when drawing.

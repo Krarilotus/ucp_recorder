@@ -19,6 +19,19 @@ summary, then restore the recorded actor. Tick status is always drawn during
 playback. F3 toggles recorded configuration details. Neither operation changes
 the command stream, pause state or simulation speed.
 
+Gameplay's input owner is the selected build/book tab, not its root view. The
+original loop calls `Menu::updateMenuButtons` through the active tab pointer
+(SHC 0x57C466); the drawing pass also visits the root view. Screen-wide replay
+controls resolve their input overlay from the root ID at that existing input
+boundary, then use the original menu-item dispatcher before the native tab.
+Ordinary play and modal dialogs exclude the replay overlay. A consumed portrait
+click cannot also activate the native tab underneath it. No new mouse polling or
+WindowProc click emulation is needed.
+
+`RenderPlayerAvatars` uses native 72x72 images. The strip's hit rectangles and
+spacing use that size; its layout reserves the metadata area and bottom panel,
+wrapping into columns from the available height rather than resolution presets.
+
 ## Surfaces and render passes
 
 The original WinMain loop renders the map, then menu items, then modal dialogs.
