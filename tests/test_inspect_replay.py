@@ -10,6 +10,22 @@ spec.loader.exec_module(module)
 
 
 class InspectionTests(unittest.TestCase):
+    def test_fire_inputs_can_differ_before_rng_counts_and_old_traces_remain_readable(self):
+        a, b = self.sample(), self.sample()
+        for rows in (a, b):
+            rows[0]['fireContext'] = True
+            rows[1]['fires'] = [dict(kind='ignite', time=63, caller=0x405b27, player=4,
+                                    microX=300, microY=400, height=8, spreadParameter=3, intensity=100)]
+        b[1]['fires'][0]['microX'] += 8
+        report = module.compare(self.write('a', a), self.write('b', b))
+        self.assertEqual(report['status'], 'attribution differs')
+        self.assertEqual(report['callerDifferences'], [])
+        self.assertEqual(report['secondFires'][0]['microX'], 308)
+        del b[0]['fireContext']
+        report = module.compare(self.write('a', a), self.write('b', b))
+        self.assertFalse(report['fireContextCompared'])
+        self.assertEqual(report['status'], 'matching observed prefix')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

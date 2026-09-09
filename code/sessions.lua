@@ -236,35 +236,11 @@ function M.finish(manifest)
 end
 
 -- Check every stream before loading the native save, including data near EOF.
-function M.preflight(manifest)
+function M.preflight(manifest,progress)
   validation.manifest(manifest)
   local path=M.path(manifest.id)
   if manifest.multiplayer then require('code/multiplayer-session').preflight(manifest,path) end
-  local data={}
-  for name,file in pairs(streams) do
-    data[name]=read(path..'/'..file)
-    assert(sha.sha256(data[name])==manifest[name..'Hash'],'Replay '..name..' stream is damaged')
-  end
-  local count,previous,batchSize=0,manifest.startTick,0
-  for line in data.commands:gmatch('[^\r\n]+') do
-    local c=validation.sessionCommand(json:decode(line),manifest)
-    assert(c.time>=previous and c.time<=manifest.lastTick,'Replay command tick is outside its ordered timeline')
-    batchSize=c.time==previous and batchSize+1 or 1
-    assert(batchSize<=100,'Replay exceeds the native 100-command dispatch batch')
-    count=count+1; previous=c.time
-  end
-  assert(count==manifest.commandCount,'Replay command count differs')
-  local tick=math.ceil(manifest.startTick/64)*64
-  for line in data.checkpoints:gmatch('[^\r\n]+') do
-    local checkpoint=json:decode(line)
-    assert(type(checkpoint)=='table' and checkpoint.time==tick and tick<=manifest.lastTick,'Invalid replay checkpoint timeline')
-    validation.rng(checkpoint.rng)
-    validation.resources(checkpoint.resources)
-    validation.hash(checkpoint.rngHash,'checkpoint RNG hash')
-    tick=tick+64
-  end
-  assert(tick>manifest.lastTick,'Replay verification data ended early')
-  validation.info(json:decode(data.info))
+  require('code/replay-preflight').check(manifest,path,progress)
 end
 
 function M.compatible(manifest)

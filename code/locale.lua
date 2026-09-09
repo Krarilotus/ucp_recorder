@@ -1,6 +1,10 @@
 -- GUI language is passed at launch. Older launchers fall back to the game language.
 local M={}
 local de={
+ ['Checking replay data...']='Aufnahme wird geprüft...',
+ ['Checking recorded settings...']='Aufgezeichnete Einstellungen werden geprüft...',
+ ['Checking starting state...']='Startzustand wird geprüft...',
+ ['Replay preparation cancelled.']='Vorbereitung abgebrochen.',
  ['Automatic recording: on']='Automatische Aufnahme: ein',
  ['Automatic recording: off']='Automatische Aufnahme: aus',
  ['Pause replay']='Wiedergabe pausieren', ['Resume replay']='Wiedergabe fortsetzen',

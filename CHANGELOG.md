@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.44.0
+
+- Fix player viewing in the ordinary book, whose native rendering runs outside the menu-item dispatcher. Keep the chosen player's statistics selected as playback advances. Selecting a player returns to replay controls with pause preserved until Resume.
+- Prepare replay streams and starting saves with bounded reads and native hashing. The library advances verification in cooperative steps, shows progress and allows cancellation before loading. Playback continues to stream commands; damaged tails are still rejected before the native load. Startup asset capture and native world loading can still block.
+- Hide the Skirmish Replays button while a dialog is open.
+- Extend optional RNG attribution with bounded fire-call arguments to investigate the repeatable tick-76544 failure. Two playback attempts, including one without viewer interaction, failed identically. This diagnostic does not fix that unresolved determinism failure or change native fire behavior.
+- Preserve binary-transfer, UCP asset-alias and viewer-pause corrections. Portable regression tests and original Crusader/Extreme code checks pass; live book navigation, responsiveness and complete multiplayer replay equivalence still require verification.
+
 ## 0.43.3
 
 - Fix recorded-settings startup with configured UCP path aliases, including Ascension map and AI directories. Resolve aliases through UCP before comparing a directory with its returned entries, and store the resolved asset identity.

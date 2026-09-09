@@ -83,3 +83,57 @@ nativeView=viewModule.new(viewRecorder)
             assert all(stack-256<=address<stack or address==sites.textManager.value for address,size in writes)
             cases += 1
     print(f'PASS: {variant} {cases} original player-summary cases; selected stats, restored identity, unchanged player/RNG state; pixel drawing is stubbed')
+
+
+def check_book_resources(path, reader, lua, native, root, variant):
+    """Native per-frame dispatch and resource book; only drawing callees stubbed."""
+    from native_image import load_image
+    machine=Uc(UC_ARCH_X86,UC_MODE_32); load_image(machine,path)
+    sites=lua.execute((root/'code/ui-sites.lua').read_text())[variant]
+    engine=lua.execute((root/'code/engine-sites.lua').read_text())[variant]
+    entry=sites.buildingAndStatus.address
+    # Both original variants use the same tab dispatcher offsets/layout.
+    assert reader(entry+0x13d,3)==b'\xff\x24\x85'
+    table=struct.unpack('<I',reader(entry+0x140,4))[0]
+    branch=struct.unpack('<I',reader(table+(77-1)*4,4))[0]  # native resources tab
+    assert reader(branch,1)==b'\xe8'
+    report=branch+5+struct.unpack('<i',reader(branch+1,4))[0]
+    instructions=list(Cs(CS_ARCH_X86,CS_MODE_32).disasm(reader(report,0xda),report))
+    assert instructions[-1].mnemonic=='ret'
+    text_lookup,text_draw,gm_draw,number_draw=[int(i.op_str,16) for i in instructions if i.mnemonic=='call']
+    machine.mem_write(text_lookup,b'\xb8\x00\xf0\x10\x04\xc2\x08\x00')
+    for address,cleanup in ((text_draw,32),(gm_draw,16),(number_draw,32)):
+        machine.mem_write(address,b'\xc2'+struct.pack('<H',cleanup))
+    get=lambda a: struct.unpack('<i',machine.mem_read(a,4))[0]
+    def put(a,v): machine.mem_write(a,struct.pack('<i',v))
+    lua.globals().core.readInteger=get; lua.globals().core.writeInteger=put
+    view=lua.globals().nativeView
+    slot=native.addr(0x1a275dc); actor=native.addr(0x191d768)+engine.actorOffset
+    tab=native.addr(0x1fe7d1c)+4
+    resolution=struct.unpack('<I',reader(entry+2,4))[0]
+    resources=engine.playerResources
+    # Identify resource order from the original indexed-read operand instead of
+    # relying on the data-section shift between variants.
+    lookup=next(i for i in instructions if i.mnemonic=='add' and i.op_str.startswith('eax, dword ptr [ebx +'))
+    order=struct.unpack('<8I',reader(struct.unpack('<I',lookup.bytes[-4:])[0],32))
+    drawn=[]
+    machine.hook_add(UC_HOOK_CODE,lambda uc,ip,size,user:
+        drawn.append(get(uc.reg_read(UC_X86_REG_ESP)+4)) if ip==number_draw else None)
+    stack,stop=0x4108000,0x410f100
+    for player in range(1,9):
+        for resource in range(25): put(resources+player*0x39f4+resource*4,player*1000+resource)
+    for selected in range(1,9):
+        put(slot,1);put(actor,7);put(tab,77);put(resolution,20)
+        before=bytes(machine.mem_read(resources,9*0x39f4))
+        rng=native.addr(0x1a279c0); before_rng=bytes(machine.mem_read(rng,0x9c50))
+        view.select(view,selected); drawn.clear()
+        def render():
+            put(stack,stop); machine.reg_write(UC_X86_REG_ESP,stack)
+            machine.emu_start(entry,stop,count=10000)
+            assert machine.reg_read(UC_X86_REG_ESP)==stack+4
+        view.render(view,render)
+        assert drawn==[selected*1000+i for i in order], (variant,selected,drawn,order)
+        assert get(slot)==1 and get(actor)==7
+        assert bytes(machine.mem_read(resources,9*0x39f4))==before
+        assert bytes(machine.mem_read(rng,0x9c50))==before_rng
+    print(f'PASS: {variant} original frame-to-book dispatch displays all 8 selected players resources; player/RNG state unchanged, drawing stubbed')

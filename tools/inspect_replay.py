@@ -254,16 +254,22 @@ def trace(path):
         keys = [(c["stream"], c["returnAddress"]) for c in entry["calls"]]
         if len(set(keys)) != len(keys) or sum(c["count"] for c in entry["calls"]) != entry["count"]:
             raise ValueError(f"{path}: inconsistent attribution counts")
-        if entries[0].get("spawnContext"):
-            spawns = entry.get("spawns")
-            if not isinstance(spawns, list) or len(spawns) > 512:
-                raise ValueError(f"{path}: missing or oversized spawn context")
-            for spawn in spawns:
-                if not isinstance(spawn, dict) or any(type(spawn.get(key)) is not int for key in
-                        ("time", "caller", "player", "color", "microX", "microY", "height", "unitType")):
-                    raise ValueError(f"{path}: malformed spawn context")
-                if not entry["fromTick"] <= spawn["time"] <= entry["time"]:
-                    raise ValueError(f"{path}: spawn outside its checkpoint interval")
+        for flag, field, limit, fields in (
+                ('spawnContext', 'spawns', 512, ('color', 'unitType')),
+                ('fireContext', 'fires', 2048, ('spreadParameter', 'intensity'))):
+            if not entries[0].get(flag):
+                continue
+            events = entry.get(field)
+            if not isinstance(events, list) or len(events) > limit:
+                raise ValueError(f"{path}: missing or oversized {field} context")
+            for event in events:
+                keys = ('time', 'caller', 'player', 'microX', 'microY', 'height') + fields
+                if not isinstance(event, dict) or any(type(event.get(key)) is not int for key in keys):
+                    raise ValueError(f"{path}: malformed {field} context")
+                if flag == 'fireContext' and event.get('kind') not in ('ignite', 'spread'):
+                    raise ValueError(f"{path}: malformed fire kind")
+                if not entry["fromTick"] <= event["time"] <= entry["time"]:
+                    raise ValueError(f"{path}: {field} outside its checkpoint interval")
         previous = entry["time"]
     return entries[0], checkpoints, entries[-1].get("kind") == "end"
 
@@ -279,6 +285,8 @@ def compare(first, second):
               "caution": "Caller counts and the ordering checksum do not prove equal world state."}
     with_spawns = bool(a_header.get("spawnContext") and b_header.get("spawnContext"))
     result["spawnContextCompared"] = with_spawns
+    with_fires = bool(a_header.get('fireContext') and b_header.get('fireContext'))
+    result['fireContextCompared'] = with_fires
     def phase_difference(a, b, time):
         if a.get("phase") is None or b.get("phase") is None:
             return
@@ -297,7 +305,8 @@ def compare(first, second):
         result["checkpointsCompared"] += 1
         phase_difference(a, b, a["time"])
         if (any(a[key] != b[key] for key in ("count", "order", "rng", "calls"))
-                or (with_spawns and a["spawns"] != b["spawns"])):
+                or (with_spawns and a["spawns"] != b["spawns"])
+                or (with_fires and a['fires'] != b['fires'])):
             def callers(row):
                 return {(c["stream"], c["returnAddress"]): c for c in row["calls"]}
             left, right = callers(a), callers(b)
@@ -311,6 +320,8 @@ def compare(first, second):
                           firstOrder=a["order"], secondOrder=b["order"])
             if with_spawns:
                 result.update(firstSpawns=a["spawns"], secondSpawns=b["spawns"])
+            if with_fires:
+                result.update(firstFires=a['fires'], secondFires=b['fires'])
             return result
     result["unpairedCheckpoints"] = abs(len(a_rows) - len(b_rows))
     return result

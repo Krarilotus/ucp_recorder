@@ -5,6 +5,23 @@ import test_recorder as fixture
 class AttributionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_fire_caller_inputs_use_existing_observer_without_per_call_writes(self):
+        self.check('''
+trace:finish('restart')
+for _,site in ipairs(require('code/rng-fire-context').SHC) do core.writeBytes(site.address,site.bytes) end
+trace:begin(manifest,'record'); assert(encoded[#encoded].fireContext)
+local start=writes
+memory[100]=0x4052f4
+for i,value in ipairs({0x405b27,4,120,160,8,3,100}) do memory[112+i*4]=value end
+now=17; trace:rngCall(2,100)
+assert(writes==start and #trace.fires==1 and trace.fires[1].caller==0x405b27)
+assert(trace.fires[1].player==4 and trace.fires[1].spreadParameter==3 and trace.fires[1].intensity==100)
+trace:checkpoint(); assert(#encoded[#encoded].fires==1 and #trace.fires==0)
+Attribution.MAX_FIRES=1; trace:observe('rngCall',2,100); trace:observe('rngCall',2,100)
+assert(not trace.file and trace.failed:find('fire limit',1,true))
+assert(memory[100]==0x4052f4 and memory[140]==100)
+''')
+
     def setUp(self):
         fixture.RecorderTests.setUp(self)
         self.check('''

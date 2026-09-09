@@ -21,6 +21,13 @@ Unavailable actions use the original game's gray disabled text. Canceling a
 rename preserves the name. Display names are still ASCII and remain metadata;
 they never become paths. Duplicate names do not overwrite another recording.
 
+Play verifies commands, checkpoints, recorded assets and the starting save
+before loading. Verification reads bounded chunks and yields to menu updates;
+Cancel stops preparation and closes its file/hash resources without loading a
+world. Playback already reads commands incrementally. Initial startup asset
+capture, multiplayer recovery-world preparation and the game's native world load
+are still synchronous; this change does not eliminate every loading delay.
+
 Removal moves the entire folder, including snapshots, settings and diagnostic
 files, into `ucp/replays/removed/REPLAY_ID`. It does not permanently delete them.
 An active recording/copy cannot be removed. Existing removed copies cannot be
@@ -38,8 +45,11 @@ multiplayer match speed.
 ## Viewing players
 
 During playback, open **Pause > Replay controls > View player**, select an
-occupied player slot, then return to the replay. The native gold, popularity, population and
-report rendering use that player's view. The recorded player is selected when
+occupied player slot, then choose Resume in the replay controls. Selection returns
+to those controls and preserves the pause until you resume. Open the ordinary
+book to inspect the selected player's statistics as playback advances: popularity,
+fear, population, food, army, resources, weapons and religion. The selection stays
+active across book pages and subsequent frames. The recorded player is selected when
 a new replay starts. The selector is unavailable during normal recording,
 loading, or a live multiplayer match. It is available while watching a multiplayer recording locally.
 
@@ -85,12 +95,19 @@ Native references checked against SHC and Extreme include
 `0x004718B0`) and the player summary (`0x00433780` / `0x004339C0`). The native
 menu dispatcher uses action 0 for input, 1/3 for rendering and 2 for reset; only
 rendering is scoped to the viewed player. The gold/popularity strip is outside
-that dispatcher and has its own rendering wrapper.
+that dispatcher and has its own rendering wrapper. The book has a separate
+per-frame owner (`0x004494E0` / `0x00449710`) which dispatches all nine status
+tabs, including overview. That owner also needs the selected viewer; wrapping
+menu items alone left the book showing the recorded player's statistics.
 
 Original-binary tests run the full player-summary function for all eight slots,
 with zero/negative and large statistics. Only the pixel/number drawing callees
 are stand-ins. They verify selected values, stack/callee-saved registers,
-unchanged player/RNG data and restored identity. Portable tests cover keyboard
+unchanged player/RNG data and restored identity. Another original-code test runs
+the frame dispatcher through the resource book for all eight selected players;
+only drawing calls are stubbed. Other book pages share this dispatcher and read
+the current viewer, but their live navigation and visual output still need checking.
+Portable tests cover keyboard
 flow, localization, disabled actions, geometry, nested/error restoration and
 recoverable removal. These checks do not replace live visual and full replay
 tests.

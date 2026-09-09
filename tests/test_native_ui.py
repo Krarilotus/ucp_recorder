@@ -5,6 +5,23 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_summary_and_book_renderers_share_scoped_view_and_preserve_return_value(self):
+        self.check('''
+local hooks={}; local scoped=false; local calls={}
+core.hookCode=function(callback,address,count,convention,size)
+ assert(count==0 and convention==0)
+ hooks[address]=callback
+ return function() assert(scoped); calls[#calls+1]=address; return address end
+end
+ui.renderScope=function(run) scoped=true; local result=run(); scoped=false; return result end
+ui:installViewRender()
+for _,name in ipairs({'playerSummary','buildingAndStatus'}) do
+ local address=sites[name].address
+ assert(hooks[address]()==address and not scoped)
+end
+assert(#calls==2 and not hooks[sites.handleMenu.address])
+''')
+
     def test_header_uses_original_banner_abi_and_native_title_font(self):
         self.check('''
 local banner,text

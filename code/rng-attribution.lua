@@ -3,14 +3,15 @@ local store=require('code/sessions')
 local platform=require('code/platform')
 local native=require('code/native')
 local spawnContext=require('code/rng-spawn-context')
-local M={MAX_BYTES=64*1024*1024,MAX_CALLERS=512,MAX_SPAWNS=512}
+local fireContext=require('code/rng-fire-context')
+local M={MAX_BYTES=64*1024*1024,MAX_CALLERS=512,MAX_SPAWNS=512,MAX_FIRES=2048}
 
 function M.new(engine)
   return setmetatable({engine=engine},{__index=M})
 end
 
 function M:clear()
-  self.calls={}; self.callers=0; self.count=0; self.order=0; self.spawns={}
+  self.calls={}; self.callers=0; self.count=0; self.order=0; self.spawns={}; self.fires={}
   self.tickReturns=0; self.unclockedReturns=0; self.clockJumps=0
 end
 
@@ -55,8 +56,12 @@ function M:begin(manifest,mode)
   local contextOk,context=pcall(spawnContext.verify,native.profile.name)
   self.spawnProfile=contextOk and context or nil
   if not contextOk then print('RNG spawn context disabled: '..tostring(context)) end
+  local fireOk,fire=pcall(fireContext.verify,native.profile.name)
+  self.fireProfile=fireOk and fire or nil
+  if not fireOk then print('RNG fire context disabled: '..tostring(fire)) end
   self:write({kind='header',format=2,mode=mode,replay=manifest.id,
     spawnContext=contextOk,
+    fireContext=fireOk,
     variant=native.profile.name,executable=native.profile.sha256,
     firstTick=self.previousTick,rng=self.engine:rngState(),phase=self:phaseState()})
 end
@@ -86,6 +91,13 @@ function M:rngCall(stream,stack)
       self.spawns[#self.spawns+1]=context
     end
   end
+  if stream==2 and self.fireProfile then
+    local context=fireContext.read(self.fireProfile,address,stack,tick)
+    if context then
+      assert(#self.fires<M.MAX_FIRES,'RNG attribution fire limit reached')
+      self.fires[#self.fires+1]=context
+    end
+  end
 end
 
 function M:checkpoint()
@@ -98,7 +110,8 @@ function M:checkpoint()
   end)
   self:write({kind='checkpoint',fromTick=self.previousTick,time=now,
     rng=self.engine:rngState(),count=self.count,order=self.order%4294967296,calls=entries,
-    spawns=self.spawnProfile and self.spawns or nil,phase=self:phaseState()})
+    spawns=self.spawnProfile and self.spawns or nil,
+    fires=self.fireProfile and self.fires or nil,phase=self:phaseState()})
   self.previousTick=now; self:clear()
 end
 

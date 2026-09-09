@@ -58,6 +58,10 @@ function M.createButtons(recorder,sites)
       local action=editor:input(message,key)
       if action=='save' then saveName() elseif action=='cancel' then cancelName() end
     elseif ui:activeDialog()==dialog then
+      if browser.preparation then
+        if message==0x102 and key==27 then browser:cancelPreparation() end
+        return
+      end
       if message==0x100 then
         if key==38 then browser:select(browser.index-1)
         elseif key==40 then browser:select(browser.index+1)
@@ -163,7 +167,10 @@ function M.createButtons(recorder,sites)
     players[#players+1]={x=24+((row-1)%2)*280,y=74+math.floor((row-1)/2)*38,width=272,height=30,
       label=function() local slot=view:players()[row]; return slot and tr('Player %d',slot) or '' end,
       selected=function() return view:players()[row]==view:player() end,
-      action=function() local slot=view:players()[row]; if slot then view:select(slot); ui:close() end end}
+      action=function()
+        local slot=view:players()[row]
+        if slot then view:select(slot); ui:show(M.statusDialog) end
+      end}
   end
   players[#players+1]={x=24,y=280,width=180,height=30,label=function() return tr('Back') end,
     action=function() ui:show(M.statusDialog) end}
@@ -187,12 +194,15 @@ function M.createButtons(recorder,sites)
   removeSelected=function() if browser.items[browser.index] then ui:show(removeDialog) end end
   playSelected=function()
     if not browser.selected then return end
-    if browser:play() then ui:close()
+    if browser:play(true) then ui:close()
     elseif recorder.error then browser.message=short(recorder.error) end
   end
   local items={}
-  local function button(x,y,width,label,action,selected,leftAligned,enabled)
-    items[#items+1]={x=x,y=y,width=width,height=30,label=label,action=action,selected=selected,leftAligned=leftAligned,enabled=enabled}
+  local function button(x,y,width,label,action,selected,leftAligned,enabled,duringPreparation)
+    items[#items+1]={x=x,y=y,width=width,height=30,label=label,action=action,selected=selected,leftAligned=leftAligned,
+      enabled=function()
+        return (duringPreparation or not browser.preparation) and (not enabled or enabled())
+      end}
   end
   for row=0,Browser.PAGE_SIZE-1 do
     local offset=row
@@ -213,7 +223,9 @@ function M.createButtons(recorder,sites)
     function() if browser:firstRow()>1 then browser:page(-1) end end)
   button(616,352,40,function() return browser:firstRow()+Browser.PAGE_SIZE<=#browser.items and '>' or '' end,
     function() if browser:firstRow()+Browser.PAGE_SIZE<=#browser.items then browser:page(1) end end)
-  button(24,434,140,function() return tr('Back') end,function() ui:close() end)
+  button(24,434,140,function() return tr(browser.preparation and 'Cancel' or 'Back') end,function()
+    if browser.preparation then browser:cancelPreparation() else ui:close() end
+  end,nil,nil,nil,true)
   button(188,434,140,function() return tr('Remove') end,removeSelected,nil,nil,
     function() return browser.items[browser.index]~=nil and recorder.mode=='none' end)
   button(352,434,140,function() return tr('Rename replay...') end,renameSelected,nil,nil,
@@ -229,6 +241,10 @@ function M.createButtons(recorder,sites)
     end
     ui:text(tr('Enter: play   F2: rename   Delete: remove'),x+340,y+398,1,18)
   end,function() return tr('Recorded Skirmishes') end)
+  ui.onMenuUpdated=function()
+    if browser.preparation and ui:activeDialog()~=dialog then browser:cancelPreparation() end
+    if browser:advancePreparation() then ui:close() end
+  end
 
   -- Extend only the original Skirmish menu's item array, retaining its sentinel.
   local originalSize,itemSize=0x1d10,NativeUI.ITEM_SIZE
@@ -245,7 +261,9 @@ function M.createButtons(recorder,sites)
   core.writeCode(native.addr(0x59ab30),{
     core.AssemblyLambda('push array',{array=array})
   })
-  ui:trackVisibility({browse},function() return recorder.engine:localSession() end)
+  ui:trackVisibility({browse},function()
+    return recorder.engine:localSession() and ui:activeDialog()==-1
+  end)
 end
 
 function M.resetButtons() end -- Labels derive from session state at render time.

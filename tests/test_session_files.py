@@ -12,6 +12,35 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_preflight_splits_large_streams_and_rejects_damaged_tail_without_read_all(self):
+        self.lua.execute('''
+local m=recording(); local p=store.path(m.id)
+m.lastTick=6400
+local commands={}; for i=1,5000 do commands[i]=json:encode({commandCategory=34,player=1,time=i,size=1,data='01'}) end
+store.write(p..'/stream-commands.json',table.concat(commands,'\\r\\n'))
+local checkpoints={}; for tick=0,6400,64 do
+ checkpoints[#checkpoints+1]=json:encode({time=tick,rng={1,2,3,4},resources=resourceState(),rngHash=m.rngHash})
+end
+store.write(p..'/stream-rng-sync.json',table.concat(checkpoints,'\\r\\n'))
+m.commandCount=5000
+for name,file in pairs({commands='stream-commands.json',checkpoints='stream-rng-sync.json',info='stream-infself.json'}) do
+ m[name..'Hash']=sha.sha256(store.read(p..'/'..file))
+end
+local oldOpen=io.open; local closed=0
+io.open=function(path,mode)
+ local f=assert(oldOpen(path,mode))
+ return {read=function(_,n) assert(type(n)=='number' and n<=65536); return f:read(n) end,
+ close=function() closed=closed+1; return f:close() end}
+end
+local progress=0; store.preflight(m,function() progress=progress+1 end)
+assert(progress>5000 and closed==3)
+io.open=oldOpen
+store.write(p..'/stream-commands.json',table.concat(commands,'\\n')..'\\n'..commands[1])
+m.commandsHash=sha.sha256(store.read(p..'/stream-commands.json'))
+local ok,reason=pcall(store.preflight,m)
+assert(not ok and tostring(reason):find('ordered timeline',1,true))
+''')
+
     def test_removal_preserves_files_and_prevents_reusing_archived_identity(self):
         def archive(root, identity):
             base=Path(root)
@@ -125,6 +154,11 @@ assert(not pcall(store.finish,m))
         g.encode_json = lambda value: json.dumps(from_lua(value), separators=(',', ':'))
         g.decode_json = lambda value: lua.table_from(json.loads(value), recursive=True)
         g.hash_string = lambda value: hashlib.sha256(value.encode()).hexdigest()
+        def hash_file(path, limit):
+            self.assertLessEqual(Path(path).stat().st_size, limit)
+            with open(path, 'rb') as stream:
+                return hashlib.file_digest(stream, 'sha256').hexdigest()
+        g.hash_file = hash_file
         g.make_directory = mkdir
         g.replace_file = os.replace
         g.directories = lambda path: lua.table_from([str(p) for p in Path(path).iterdir() if p.is_dir()])
@@ -132,6 +166,17 @@ assert(not pcall(store.finish,m))
 package.path=source_root..'/?.lua;'..package.path
 json={encode=function(_,v) return encode_json(v) end,decode=function(_,v) return decode_json(v) end}
 sha={sha256=hash_string}
+-- Keep real Lua streaming/decoding; replace only the Windows hashing boundary.
+package.loaded['code/native-hash']={file=function(path,limit,onChunk)
+ if onChunk then
+  local f=assert(io.open(path,'rb'))
+  local ok,reason=pcall(function()
+   while true do local chunk=f:read(65536); if not chunk then break end; onChunk(chunk) end
+  end)
+  assert(f:close()); assert(ok,reason)
+ end
+ return hash_file(path,limit)
+end}
 package.loaded['code/platform']={mkdir=make_directory,replace=replace_file}
 ucp={internal={io={directories=directories}}}
 store=require('code/sessions'); store.ROOT=temp_root..'/replays'

@@ -66,14 +66,17 @@ function M.sha256(data)
     return chunk
   end)
 end
-function M.file(path,limit)
+function M.file(path,limit,onChunk)
   local file=assert(io.open(path,'rb'),'Missing file: '..path)
   local ok,result=pcall(function()
     local count=0
     local digest=hashChunks(function()
       local chunk,reason=file:read(M.CHUNK)
       assert(not reason,reason)
-      if chunk then count=count+#chunk; assert(count<=limit,'File exceeds replay size limit: '..path) end
+      if chunk then
+        count=count+#chunk; assert(count<=limit,'File exceeds replay size limit: '..path)
+        if onChunk then onChunk(chunk,count) end
+      end
       return chunk
     end)
     return digest

@@ -15,9 +15,11 @@ class RuntimeTests(unittest.TestCase):
             with self.subTest(runtime=runtime):
                 lua=runtime(unpack_returned_tuples=True)
                 lua.globals().spawnSource=(Path(__file__).resolve().parents[1]/'code/rng-spawn-context.lua').read_text()
+                lua.globals().fireSource=(Path(__file__).resolve().parents[1]/'code/rng-fire-context.lua').read_text()
                 lua.execute('''
 require=function(name)
  if name=='code/rng-spawn-context' then return assert((loadstring or load)(spawnSource))() end
+ if name=='code/rng-fire-context' then return assert((loadstring or load)(fireSource))() end
  assert(name=='code/sessions' or name=='code/platform' or name=='code/native',
   'Unavailable extension dependency: '..name)
  return {}

@@ -62,7 +62,6 @@ end
         self.lua.globals().hash_file = hash_file
         self.lua.execute('''
 store.ROOT=Capture.ROOT
-package.loaded['code/native-hash']={file=hash_file}
 core.readByte=function() return 34 end
 engine.rngData=function()
  return string.char(1,0,2,0,123,0,0,0)..string.rep('a',40000)..string.char(3,0,0,0,4,0,0,0)

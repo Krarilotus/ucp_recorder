@@ -131,7 +131,13 @@ function Session:prepareRecording()
   if self.mode=='record' and self.status=='armed' then self.capturePending=true end
 end
 
-function Session:startPlayback(id,prepared)
+function Session:preparePlayback(id,prepared,progress)
+  assert(self.mode=='none','A replay session is already active')
+  assert(self.engine:singlePlayer(),'Replay playback is single-player only')
+  return require('code/replay-preparation').prepare(id,self.engine,prepared,progress)
+end
+
+function Session:startPlayback(id,prepared,ready)
   assert(self.mode=='none','A replay session is already active')
   assert(self.engine:singlePlayer(),'Replay playback is single-player only')
   if not id then
@@ -140,28 +146,18 @@ function Session:startPlayback(id,prepared)
     end
   end
   assert(id,'No completed recording is available')
-  local manifest=store.load(id,native.profile)
+  ready=ready or self:preparePlayback(id,prepared)
+  local manifest=ready.manifest
+  assert(manifest.id==id,'Prepared replay identity differs')
   assert(store.compatible(manifest),'Replay requires its recorded UCP settings')
-  store.preflight(manifest)
   local path=store.path(id)
-  local environment=json:decode(store.read(path..'/environment.json'))
-  if type(environment)=='table' and environment.assets then require('code/replay-assets').verify(environment.assets) end
-  local snapshotPath,snapshotHash=path..'/start.sav',manifest.snapshotHash
-  if manifest.multiplayer then
-    prepared=prepared or require('code/multiplayer-session').prepareChain(manifest,self.engine)
-    local world=assert(prepared[id],'Recovery world was not prepared')
-    snapshotPath,snapshotHash=world.path,world.hash
-  end
-  local snapshot=store.read(snapshotPath)
-  local rng=store.read(path..'/rng.bin')
-  assert(sha.sha256(snapshot)==snapshotHash,'Starting save is damaged')
-  assert(#rng==0x9c50 and sha.sha256(rng)==manifest.rngHash,'Starting RNG state is damaged')
+  local snapshotPath,rng=ready.snapshotPath,ready.rng
   self:setName(path..'/stream')
   self:openFiles('r')
   if manifest.multiplayer then self.tickFile=assert(io.open(path..'/ticks.bin','rb')) end
   self.manifest=manifest
   self.firstDesync=nil
-  self.preparedWorlds=prepared
+  self.preparedWorlds=ready.worlds
   self.mode='play'; self.status='loading'; self.active=false
   core.writeInteger(self.playbackActive,0)
   -- The native victory/defeat banner leaves the simulation after eight real

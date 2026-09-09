@@ -24,6 +24,7 @@ function Browser:refresh(preferred)
 end
 
 function Browser:select(index)
+  if self.preparation then return end
   self.lastClick=nil
   self.selected=nil
   if #self.items==0 then self.index=1; self.message='New Skirmishes are recorded automatically when enabled.'; return end
@@ -85,11 +86,39 @@ function Browser:remove()
   self.message='Replay removed.'
 end
 
-function Browser:play()
+function Browser:play(deferred)
+  if self.preparation then return false end
   assert(self.selected,'Choose a completed recording')
   assert(self.recorder.mode=='none','Finish or cancel the active recording first')
   if not store.compatible(self.selected) then self:restart(); return false end
+  if deferred then
+    local id=self.selected.id
+    self.preparation=require('code/preparation-task').new(function(progress)
+      return self.recorder:preparePlayback(id,nil,progress)
+    end,require('code/platform').milliseconds)
+    self.message='Checking replay data...'
+    return false
+  end
   return self.recorder:guard(function() self.recorder:startPlayback(self.selected.id) end)
+end
+
+function Browser:cancelPreparation()
+  if self.preparation then self.preparation:cancel() end
+end
+
+function Browser:advancePreparation()
+  local task=self.preparation
+  if not task then return false end
+  task:step()
+  self.message=task.message or self.message
+  if task.status=='pending' then return false end
+  self.preparation=nil
+  if task.status=='cancelled' then self.message='Replay preparation cancelled.'; return false end
+  if task.status=='failed' then self.message=task.error; return false end
+  local ready=task.result
+  local ok=self.recorder:guard(function() self.recorder:startPlayback(ready.manifest.id,nil,ready) end)
+  if not ok then self.message=self.recorder.error end
+  return ok
 end
 
 function Browser:rename(name)

@@ -6,6 +6,35 @@ import test_browser
 class UIFlowTests(unittest.TestCase):
     check = test_browser.BrowserTests.check
 
+    def test_loading_is_cancellable_and_does_not_change_selection_or_start_a_world(self):
+        self.check('''
+entries={entry('one'),entry('two')}; browse(); local library=shown
+local now=0; require('code/platform').milliseconds=function() now=now+20; return now end
+local cleaned=false
+recorder.preparePlayback=function(_,id,worlds,progress)
+ local ok,reason=pcall(function() progress('Checking recorded settings...') end)
+ cleaned=true; assert(ok,reason); return {manifest={id=id}}
+end
+click('Play'); ui.onMenuUpdated()
+assert(menu.browser.preparation and not cleaned and not played and shown==library)
+input(0x100,40); input(0x100,113); input(0x102,13)
+assert(menu.browser.index==1 and shown==library and not played)
+click('Cancel'); ui.onMenuUpdated()
+assert(cleaned and not menu.browser.preparation and not played and shown==library and recorder.mode=='none')
+assert(menu.browser.message=='Replay preparation cancelled.')
+''')
+
+    def test_corrupt_preparation_remains_in_library_without_native_load(self):
+        self.check('''
+entries={entry('one')}; browse(); local library=shown
+recorder.preparePlayback=function(_,id,worlds,progress)
+ progress('Checking'); error('damaged checkpoint at EOF')
+end
+click('Play'); while menu.browser.preparation do ui.onMenuUpdated() end
+assert(not played and shown==library and recorder.mode=='none')
+assert(menu.browser.message:find('damaged checkpoint at EOF',1,true))
+''')
+
     def test_multiplayer_named_capture_uses_local_copy_and_returns_to_status(self):
         self.check('''
 recorder.engine.singlePlayer=function() return false end
@@ -50,7 +79,9 @@ input(0x100,113); assert(shown~=library)
 input(0x102,27); assert(shown==library)
 input(0x100,46); assert(shown~=library)
 click('Cancel'); assert(shown==library and menu.browser.index==1 and #menu.browser.items==9)
-input(0x102,13); assert(played=='replay1' and shown==-1)
+input(0x102,13); assert(not played and menu.browser.preparation)
+while menu.browser.preparation do ui.onMenuUpdated() end
+assert(played=='replay1' and shown==-1)
 ''')
 
     def test_view_selector_only_changes_presentation_choice(self):
@@ -58,8 +89,12 @@ input(0x102,13); assert(played=='replay1' and shown==-1)
 local roster={}; for i=1,8 do roster[i]={kind=i==4 and 'ai' or 'empty'} end
 recorder.engine.networkState=function() return {roster=roster} end
 recorder.mode='play'; recorder.active=true; recorder.status='playing'; recorder.manifest={player=1}
-pauseAction(); click('View player 1...'); click('Player 4')
-assert(shown==-1 and menu.view:player()==4 and recorder.manifest.player==1)
+local paused=true
+recorder.engine.isLogicallyPaused=function() return paused end
+recorder.engine.setPaused=function(_,value) paused=value end
+pauseAction(); local status=shown; click('View player 1...'); click('Player 4')
+assert(shown==status and paused and menu.view:player()==4 and recorder.manifest.player==1)
+click('Resume replay'); assert(shown==-1 and not paused)
 recorder.mode='record'; assert(not menu.view:available())
 ''')
 
@@ -100,6 +135,11 @@ recorder.engine={singlePlayer=function() return true end,isPaused=function() ret
  presentationSpeed=function() return 90 end,
  isLogicallyPaused=function(self) return self:isPaused() end}
 recorder.status='idle'; recorder.autoRecord=true
+require('code/platform').milliseconds=function() return 0 end
+recorder.preparePlayback=function(_,id,worlds,progress)
+ progress('Checking replay data...')
+ return {manifest={id=id}}
+end
 menu=require('code/ui'); menu.createButtons(recorder,{})
 function click(label)
  for _,item in ipairs(assert(dialogs[shown])) do
@@ -150,6 +190,7 @@ for c in ('Named match'):gmatch('.') do input(0x102,c:byte()) end
 click('Save name'); assert(shown==library and menu.browser.selected.displayName=='Named match')
 click('Play'); assert(restarted=='one' and not played and shown==library)
 entries[1].different=false; menu.browser:refresh(); click('Play')
+while menu.browser.preparation do ui.onMenuUpdated() end
 assert(played=='one' and shown==-1)
 ''')
 

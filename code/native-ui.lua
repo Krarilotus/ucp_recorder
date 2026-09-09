@@ -135,11 +135,16 @@ function M:activeDialog()
 end
 
 function M:installViewRender()
-  local original
-  -- The gold/popularity/population strip is drawn outside the menu-item loop.
-  original=core.hookCode(function()
-    return self.renderScope(function() return original() end)
-  end,self.sites.playerSummary.address,0,0,#self.sites.playerSummary.bytes)
+  -- Both the summary strip and the book/building details have their own
+  -- rendering owners outside handleMenuItems. Scope only these render calls;
+  -- input callbacks and command execution retain the recorded actor.
+  for _,name in ipairs({'playerSummary','buildingAndStatus'}) do
+    local site=self.sites[name]
+    local original
+    original=core.hookCode(function()
+      return self.renderScope(function() return original() end)
+    end,site.address,0,0,#site.bytes)
+  end
 end
 
 function M:installInput(singlePlayer,handler)
@@ -210,7 +215,11 @@ function M:trackVisibility(referenceItems,predicate)
     if self.renderScope and (action==1 or action==3) then
       return self.renderScope(function() return original(this,action) end)
     end
-    return original(this,action)
+    local result=original(this,action)
+    -- Input dispatch has unwound: same game-thread boundary as a native Play
+    -- action, outside rendering and outside every simulation tick.
+    if action==0 and self.onMenuUpdated then self.onMenuUpdated() end
+    return result
   end,self.sites.handleMenu.address,2,1,#self.sites.handleMenu.bytes)
 end
 return M

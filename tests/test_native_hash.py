@@ -177,6 +177,28 @@ end
         self.assertEqual(lua.globals().closed,3)
         self.assertFalse(backend.hashes or backend.providers)
 
+    def test_yielding_preparation_cancel_releases_native_hash_and_file(self):
+        backend=Backend(real=os.name=='nt'); lua=backend.runtime()
+        lua.execute('''
+local Task=require('code/preparation-task'); local now=0
+closed=0
+io.open=function()
+ local remaining=200000
+ return {read=function(_,n)
+  if remaining==0 then return end
+  local count=math.min(n,remaining); remaining=remaining-count; return string.rep('x',count)
+ end,close=function() closed=closed+1; return true end}
+end
+task=Task.new(function(progress)
+ return hash.file('virtual',200000,function() progress('Hashing') end)
+end,function() now=now+20; return now end)
+task:step(); assert(task.status=='pending' and closed==0)
+''')
+        self.assertTrue(backend.providers and backend.hashes)
+        lua.execute("task:cancel(); task:step(); assert(task.status=='cancelled' and closed==1)")
+        self.assertFalse(backend.providers or backend.hashes)
+        self.assertEqual(lua.globals().hash.sha256('abc'),hashlib.sha256(b'abc').hexdigest())
+
     @unittest.skipUnless(os.name=='nt','Requires Windows CryptoAPI')
     def test_actual_windows_cryptoapi_private_buffers(self):
         self.check_vectors(True)

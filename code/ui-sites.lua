@@ -4,6 +4,7 @@ return {
   SHC = {
     header = {address=0x00468FE0, bytes={131,68,36,8,8,83,139,92,36,8,85,139,108,36,20,131,195,8,131,237,16,86,51,192,87}},
     playerSummary = {address=0x00433780, bytes={131,236,16,139,13,220,117,162,1}},
+    buildingAndStatus = {address=0x004494E0, bytes={131,61,148,131,249,0,20}},
     textWidth = {address=0x00471690, bytes={86,139,116,36,8,133,246,117,6,51,192,94,194,8,0}},
     basicButton = {address=0x00463A90, bytes={139,68,36,4,131,236,8,86,139,53,168,49,237,0,51,201}},
     buttonSurface = {address=0x004918CC, bytes={185,188,199,242,0}, value=0x00F2C7BC},
@@ -26,6 +27,7 @@ return {
   Extreme = {
     header = {address=0x00469210, bytes={131,68,36,8,8,83,139,92,36,8,85,139,108,36,20,131,195,8,131,237,16,86,51,192,87}},
     playerSummary = {address=0x004339C0, bytes={131,236,16,139,13,220,170,75,2}},
+    buildingAndStatus = {address=0x00449710, bytes={131,61,20,136,249,0,20}},
     textWidth = {address=0x004718B0, bytes={86,139,116,36,8,133,246,117,6,51,192,94,194,8,0}},
     basicButton = {address=0x00463CA0, bytes={139,68,36,4,131,236,8,86,139,53,40,54,237,0,51,201}},
     buttonSurface = {address=0x00491A2C, bytes={185,60,204,242,0}, value=0x00F2CC3C},

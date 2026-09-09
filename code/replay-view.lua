@@ -1,5 +1,6 @@
 -- A view is a presentation choice. The native actor, queue and replay manifest
--- never change. The original local slot is restored before menu rendering returns.
+-- never change. Each native renderer reads the selected player's live statistics;
+-- the original local slot is restored before that rendering scope returns.
 local native=require('code/native')
 local M={}
 function M.new(recorder)

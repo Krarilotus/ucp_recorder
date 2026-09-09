@@ -80,7 +80,7 @@ function M.capture(extensions,config)
   return {profile=M.PROFILE,files=files,layouts=layouts,roots=roots}
 end
 
-function M.verify(snapshot)
+function M.verify(snapshot,progress)
   assert(type(snapshot)=='table' and snapshot.profile==M.PROFILE and type(snapshot.files)=='table'
     and type(snapshot.roots)=='table',
     'Unsupported replay asset inventory')
@@ -101,7 +101,9 @@ function M.verify(snapshot)
     count=count+1; assert(count<=M.MAX_FILES,'Too many replay assets')
     assert(normalized(path)==path,'Invalid replay asset path')
     require('code/validation').hash(expected,'asset hash')
-    local ok,hash=pcall(digest.file,path,M.MAX_FILE)
+    local ok,hash=pcall(digest.file,path,M.MAX_FILE,progress and function()
+      progress('Checking recorded settings...')
+    end)
     assert(ok and hash==expected,'Recorded asset changed or is unavailable: '..path)
   end
 end

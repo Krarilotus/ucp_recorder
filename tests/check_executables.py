@@ -121,8 +121,9 @@ def check(folder):
         check_immediate(reader,name)
         from check_rng_observer_native import check_rng_observer
         check_rng_observer(reader,lua,native,root,name)
-        from check_spawn_context_native import check_spawn_context, check_menu_pause
+        from check_spawn_context_native import check_spawn_context, check_menu_pause, check_fire_context
         check_spawn_context(reader,lua,root,name)
+        check_fire_context(reader,lua,root,name)
         check_menu_pause(reader,lua,root,name)
         from check_results_native import check_results
         from check_tick_boundary_native import check_tick_boundary
@@ -130,8 +131,9 @@ def check(folder):
         check_results(reader,lua,root,name)
         from check_load_native import check_load
         check_load(reader,lua,root,name)
-        from check_replay_view_native import check_replay_view
+        from check_replay_view_native import check_replay_view, check_book_resources
         check_replay_view(reader,lua,native,root,name)
+        check_book_resources(folder/file,reader,lua,native,root,name)
         from check_header_native import check_header
         check_header(reader,lua,root,name)
         from check_dispatch_native import check_dispatch

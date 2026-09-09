@@ -140,3 +140,32 @@ next checkpoint, expected RNG is `[2494,22591,1875,18179]`, playback is
 not just a modulo-index difference. The missing unit and the earlier world
 state that caused it remain unknown; the new spawn context targets that gap.
 Do not suppress these RNG calls: they participate in real unit creation.
+
+### Repeatable later failure (0.43.3)
+
+Recording `20260908-232532-0001` completed at tick 245,289 with 1,902
+commands. Both playback attempts failed at 76,544 after 342 commands. The
+second attempt had no viewer pause or player switching. Their checkpoint RNG
+states, caller evidence and captured unit-spawn arguments agree with each other
+through the failure. Viewer interaction is therefore not a necessary trigger.
+
+Recording and playback agree through checkpoint 76,480. The next interval has
+no recorded commands, and its two captured unit spawns have matching arguments.
+RNG2 is 81 calls behind the source at failure, while RNG1 matches. Fire spreading,
+ignition, projectile and chicken-update caller counts differ. This does not yet
+establish which simulation decision diverged first; fire activity had already
+started before the last matching checkpoint. The older missing-spawn failure
+remains a separate unresolved reproduction.
+
+Version 0.44.0 optionally captures the caller and six native arguments at the
+existing RNG2 observation point inside `IgniteFireAtMiniTile` (SHC `0x004052E0`,
+Extreme `0x004052F0`) and `AFireSpreadFunction` (`0x004054E0` / `0x004054F0`).
+Arguments are player, micro X/Y, height, spread parameter and intensity. Checked
+original prologues establish the stack layout; both executable variants have
+original-code tests. No additional native hook or fire behavior change is added.
+
+Each checkpoint holds at most 2,048 fire events under the existing diagnostic
+file limit. The header reports `fireContext`; the comparator only compares this
+context when both traces contain it. Older recordings cannot supply missing
+source arguments retroactively. A fresh paired capture is required to trace the
+first differing fire decision input; these arguments alone are not a root cause.

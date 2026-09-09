@@ -226,6 +226,7 @@ assert(savedManifest.finalRngHash==expected and not r.finalRngData)
         self.check('''
 json.encode=function(_,value) lastEncoded=value; return 'json' end
 sha={sha256=function(value) return string.rep('a',64) end}
+package.loaded['code/native-hash']={file=function() return string.rep('a',64) end}
 savedManifest=nil
 package.loaded['code/sessions']={
   new=function() return {id='test',variant='SHC',commandCount=0,lastTick=0} end,
