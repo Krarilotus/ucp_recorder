@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.46.1
+
+- Select a history row with one click and open its statistics with a second.
+  Use a native rename button and right-pointing hand only on the history screen;
+  leave statistics navigation alone and remove its obsolete click/delete hint.
+- Sort recordings by the saved snapshot or match-end time. Keep verification
+  progress in history until playback starts; leaving cancels pending preparation.
+- Draw replay portraits, status and F3 details in the visible UI render pass,
+  preserving the game's render target. Include the saved date in F3 details.
+- Label the recording action "Save replay" ("Replay speichern") and use a smaller
+  name dialog without keyboard help text. Keep save errors visible in the dialog.
+## 0.46.0
+
+- Integrate recordings and named snapshots into the game's battle history, with
+  native rows, scrolling, portraits and statistics for each saved boundary.
+  Default to newest date first, using the game's existing sorting heading.
+  Only recordings offer Rename and Watch replay; existing game records are untouched.
+- Replace the replay options submenu with player portraits and a status display
+  during playback. Keep the normal Escape menu; disable mission restart in replays.
+- Add F3 playback information with the recorded game/framework version and a
+  compact pack summary. Full extension versions and assets remain verified.
+- Include UCP2-Legacy's saved feature state in multiplayer starting worlds too.
+  Require its read-only state export before enabling capture.
+- This development baseline requires fresh recordings. Earlier diagnostic
+  recordings have no snapshot statistics and are not migrated.
+
+## 0.45.0
+
+- Require saved UCP2 simulation state when UCP2-Legacy is active. Update to
+  UCP2-Legacy 2.15.2 and its map-extensions dependency before recording. UCP2's
+  private attack target cycle previously survived outside the starting save,
+  changing AI decisions despite matching RNG. In a controlled failing replay,
+  restoring only that captured counter changed a tick-60288 failure into a
+  completed tick-83350 playback with all RNG and resource checkpoints matching.
+- Use UCP2's native custom save section for attack selection, wall-defense counts
+  and ladder destinations. Recorder does not duplicate the AI logic or add a
+  per-tick state correction. Older recordings lack this state and cannot be
+  repaired by changing their settings metadata.
+- Report unsupported UCP2 state persistence before installing recorder hooks,
+  with direct update instructions. Preserve the native book, streaming loader
+  and viewer-pause corrections. Broader multiplayer equivalence remains under
+  verification; the controlled result establishes this cause, not every cause.
+
 ## 0.44.0
 
 - Fix player viewing in the ordinary book, whose native rendering runs outside the menu-item dispatcher. Keep the chosen player's statistics selected as playback advances. Selecting a player returns to replay controls with pause preserved until Resume.

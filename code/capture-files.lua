@@ -71,6 +71,7 @@ function M.copy(source,name,bytes,events,commands,tick)
   copy.bytes=bytes; copy.events=events; copy.commands=commands; copy.lastObservedTick=tick
   M.save(copy)
   local ok,err=pcall(function()
+    if source.battle then prefix(source.path..'/battle.bin',path..'/battle.bin') end
     for _,file in ipairs({'ucp-config.yml','environment.json','initial-rng.bin'}) do
       prefix(source.path..'/'..file,path..'/'..file)
     end
@@ -81,6 +82,7 @@ function M.copy(source,name,bytes,events,commands,tick)
       prefix(source.path..'/world.bin',path..'/world.bin')
       if source.world.header then prefix(source.path..'/world-header.bin',path..'/world-header.bin') end
       if source.world.automarket then prefix(source.path..'/automarket.bin',path..'/automarket.bin') end
+      if source.world.extensions then prefix(source.path..'/extensions.zip',path..'/extensions.zip') end
     end
     prefix(source.path..'/commands.jsonl',path..'/commands.jsonl',bytes)
     if source.tickProfile then prefix(source.path..'/ticks.bin',path..'/ticks.bin',source.tickBytes) end

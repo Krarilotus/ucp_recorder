@@ -1,7 +1,7 @@
 # UCP Recorder
 
 Record Skirmishes automatically, save named copies while playing, and watch
-recordings from **Single Player > Skirmish > Replays**. Multiplayer matches are
+recordings from **Single Player > Skirmish > Battle history**. Multiplayer matches are
 recorded separately on each PC and played back locally in single-player.
 There is no multiplayer replay session to join or host.
 
@@ -12,22 +12,24 @@ divergence is not yet proven fixed. See the [remaining work](docs/roadmap.md).
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.43.1.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.46.1.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
    Replacer enabled if needed. The setup guide covers Ascension, Automarket,
    dependencies and extension order.
 3. Recording is **on by default** for new Skirmishes, loaded single-player
-   Skirmish saves, and multiplayer matches. Its toggle is inside **Replays**.
-4. **Pause > Save replay as...** saves a named prefix without stopping the full
+   Skirmish saves, and multiplayer matches. The launch option controls automatic recording.
+4. **Pause > Save replay** saves a named prefix without stopping the full
    recording. During multiplayer use **Replay status > Save capture as...**.
    Leaving the mission normally saves the automatic recording.
-5. Open **Skirmish > Replays**, select a recording, and click **Play**. Double-click
-   or Enter also plays. F2 renames; Delete removes with confirmation. Removed
-   recordings and their recovery segments remain in `ucp/replays/removed`.
-6. During playback use **Pause > Replay controls** for pause/resume, speed and
-   player inspection. Viewing a player does not change recorded commands.
+5. Open **Skirmish > Battle history**. Click a row to select it, then use the
+   right-pointing **Watch replay** hand. Click the selected row again for native
+   statistics. **Rename** and F2 apply only to recordings; old game results remain.
+6. During playback, click a portrait on the left to inspect that player's reports.
+   Tick/status stays visible at the top right; F3 toggles date, game/framework
+   versions and active packs. Use the normal Escape menu to resume or leave.
+   Mission restart is disabled during playback.
 
 All new recordings are stored under `ucp/replays`. Earlier multiplayer diagnostic
 captures remain under their original directories; they lack the new tick data

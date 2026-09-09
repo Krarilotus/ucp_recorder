@@ -3,7 +3,9 @@
 Use a separate copy of your installed game and a working UCP3 installation.
 Keep your usual game and replays. This build targets original Crusader HD 1.41
 and Crusader Extreme 1.41, not Definitive Edition. Both variants have code ports;
-latest-build live verification is outstanding. Multiplayer playback is unavailable.
+latest-build live verification is ongoing. Multiplayer recordings are intended
+for offline playback through the single-player replay browser; multiplayer
+equivalence is still being verified.
 
 ## Download and install
 
@@ -55,9 +57,16 @@ Recorder does not bundle or install them. The combination under investigation is
 | Ascension-Multiplayer | 1.0.11 |
 | automarket | 1.1.0; the adapter checks this exact wire format |
 | protocol | 1.0.0 for the Automarket adapter |
-| map-extensions | 1.0.0 for the Automarket custom save section |
-| ucp2-legacy | 2.15.1 with its dependencies |
+| map-extensions | 1.0.0 for Automarket and UCP2 custom save sections |
+| ucp2-legacy | 2.15.2 with saved simulation state and its dependencies |
 | ui | 1.0.1 in the prepared Ascension test setup |
+
+**Update UCP2-Legacy before recording with 0.45.0.** Version 2.15.1 leaves the AI
+attack target cycle outside saved worlds. This can desync playback even with
+identical RNG and no player commands. UCP2-Legacy 2.15.2 saves that state through
+map-extensions; install both, reload the launcher, and choose 2.15.2 in the active
+configuration. Record a new match. Older recordings do not contain the missing
+state; changing their version or settings metadata does not recover it.
 | steam-multiplayer | 1.2.3 in the prepared test setup |
 
 This is a test configuration, not complete compatibility certification. A
@@ -80,7 +89,7 @@ See [adapter details](automarket-replay.md).
    Do this before multiplayer diagnostics.
 2. Place a building and issue a troop order. With Automarket enabled, set a buy
    or sell threshold and commit it, then let several weeks pass.
-3. Open **Pause > Save replay as...**, enter a name, and continue playing so you
+3. Open **Pause > Save replay**, enter a name, and continue playing so you
    can distinguish this shorter copy from the full recording.
 4. Use **Quit Mission** to finalize the recording automatically. Killing the
    process does not finalize it. The recorder's named-copy action is separate

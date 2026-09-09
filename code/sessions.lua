@@ -41,9 +41,10 @@ function M.captureSettings()
     extensions[i]={name=extension.name,version=extension.version}
   end
   local raw=read(CONFIG_FILE)
+  local framework=read('ucp/ucp-version.yml')
   local environment=canonical({extensions=extensions,config=resolved,
     assets=require('code/replay-assets').capture(allActiveExtensions,resolved),
-    framework=read('ucp/ucp-version.yml')})
+    framework=framework,display=require('code/playback-info').capture(allActiveExtensions,framework)})
   activeSettings={raw=raw,hash=sha.sha256(raw),environment=environment,environmentHash=sha.sha256(environment),
     settingsCapture='resolved-v1',restartSettings=restartSettings,restartSettingsHash=sha.sha256(restartSettings)}
 end
@@ -152,6 +153,7 @@ function M.copy(source,name,finalRngHash)
   local path,original=M.path(id),M.path(source.id)
   local ok,reason=xpcall(function()
     M.save(copy)
+    if source.battle then write(path..'/battle.bin',require('code/battle-statistics').read(source)) end
     for _,file in ipairs({'start.sav','rng.bin','ucp-config.yml','environment.json',
       'stream-commands.json','stream-rng-sync.json','stream-infself.json'}) do
       write(path..'/'..file,read(original..'/'..file))

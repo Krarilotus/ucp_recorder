@@ -76,7 +76,9 @@ function M.prepare(path,engine)
         assert(file:write(payload)); bytes=bytes+#payload
       end
       reader:eachSection(function(entry,data) section(entry.section,data,entry.compressed~=0) end)
-      if reader.automarket then
+      if reader.extensions then
+        section(1337,reader.extensions,true)
+      elseif reader.automarket then
         section(1337,require('code/automarket-container').encode(reader.automarket,reader.manifest.automarket),true)
       end
       assert(file:seek('set',#prefix)); assert(file:write(directory(rows,bytes)))

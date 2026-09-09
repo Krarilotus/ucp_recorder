@@ -39,6 +39,7 @@ function Session:saveCopy(name)
     and self.active and self.observedTick,'No active recording to save yet')
   for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do assert(self[key]:flush()) end
   assert(self.finalRngData,'Missing ending RNG state')
+  if self.engine.battle then self.engine.battle:write(self.manifest) end
   return store.copy(self.manifest,name,sha.sha256(self.finalRngData))
 end
 
@@ -66,6 +67,7 @@ function Session:guard(callback)
     if self.manifest then
       pcall(store.write,store.path(self.manifest.id)..'/last-error.txt',self.error)
       if self.mode=='record' then
+        if self.engine.battle and self.observedTick then pcall(self.engine.battle.write,self.engine.battle,self.manifest) end
         self.manifest.status='failed'; pcall(store.save,self.manifest)
       elseif self.mode=='play' then
         pcall(self.playbackResult,self,'failed',{error=self.error})
@@ -121,6 +123,7 @@ function Session:activateRecording()
   self:saveInfo(0,seed,seed,r[1],r[2],r[4],r[3])
   self.manifest.status='recording'; store.save(self.manifest)
   self.active=true; self.status='recording'
+  if self.engine.battle then self.engine.battle:begin() end
   if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'record') end
   print('Recording '..self.manifest.id)
 end
@@ -148,6 +151,7 @@ function Session:startPlayback(id,prepared,ready)
   assert(id,'No completed recording is available')
   ready=ready or self:preparePlayback(id,prepared)
   local manifest=ready.manifest
+  self.playbackInfo=ready.info
   assert(manifest.id==id,'Prepared replay identity differs')
   assert(store.compatible(manifest),'Replay requires its recorded UCP settings')
   local path=store.path(id)
@@ -231,6 +235,7 @@ function Session:onTick()
   -- Flush before replay checks can halt at the first mismatch.
   if self.rngTrace and now%64==0 then self.rngTrace:observe('checkpoint') end
   if self.status=='recording' then
+    if self.engine.battle then self.engine.battle:observe() end
     self.manifest.lastTick=now
     self.manifest.finalRng=self.engine:rngState()
     self.manifest.finalResources=self.engine:resourceState()
@@ -358,7 +363,8 @@ function Session:reset()
     if complete and closed then
       local ok,finishError=pcall(function()
         assert(self.finalRngData,'Missing ending RNG state')
-        manifest.finalRngHash=sha.sha256(self.finalRngData)
+          manifest.finalRngHash=sha.sha256(self.finalRngData)
+          if self.engine.battle then self.engine.battle:write(manifest) end
         store.finish(manifest)
         self.lastCompletedReplay=manifest.id
       end)

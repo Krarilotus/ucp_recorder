@@ -2,6 +2,7 @@
 -- Signatures and ABI: UCP ui module ui/game.lua and ui/headers/latest/ui.h.
 return {
   SHC = {
+    avatar = {address=0x004D8AE0, bytes={83,139,92,36,8,85,86,51,237}},
     header = {address=0x00468FE0, bytes={131,68,36,8,8,83,139,92,36,8,85,139,108,36,20,131,195,8,131,237,16,86,51,192,87}},
     playerSummary = {address=0x00433780, bytes={131,236,16,139,13,220,117,162,1}},
     buildingAndStatus = {address=0x004494E0, bytes={131,61,148,131,249,0,20}},
@@ -25,6 +26,7 @@ return {
     modalStack = {address=0x004A9E40, bytes={139,21,164,66,223,0,137,80,36}, value=0x00DF42A4},
   },
   Extreme = {
+    avatar = {address=0x004D8E70, bytes={83,139,92,36,8,85,86,51,237}},
     header = {address=0x00469210, bytes={131,68,36,8,8,83,139,92,36,8,85,139,108,36,20,131,195,8,131,237,16,86,51,192,87}},
     playerSummary = {address=0x004339C0, bytes={131,236,16,139,13,220,170,75,2}},
     buildingAndStatus = {address=0x00449710, bytes={131,61,20,136,249,0,20}},

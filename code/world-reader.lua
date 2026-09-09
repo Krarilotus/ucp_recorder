@@ -62,6 +62,13 @@ function M.open(path)
   require('code/world-header').validate(header,manifest.header)
   assert((manifest.automarket~=nil)==(summary.automarket==true),'Automarket world presence differs')
   local market
+  local extensions
+  assert((manifest.extensions~=nil)==(summary.extensions==true),'Extension world presence differs')
+  if manifest.extensions then
+    extensions=read(path..'/extensions.zip',require('code/extension-container').MAX_BYTES)
+    assert(#extensions==manifest.extensions.bytes and sha.sha256(extensions)==manifest.extensions.sha256,
+      'Extension starting state is damaged')
+  end
   if manifest.automarket then
     market=read(path..'/automarket.bin',2416)
     local info=manifest.automarket
@@ -70,7 +77,7 @@ function M.open(path)
       and sha.sha256(market)==info.sha256,'Automarket starting state is damaged')
   end
   return setmetatable({path=path,capture=capture,manifest=manifest,header=header,
-    entries=entries,bytes=profile.total,automarket=market},{__index=Reader})
+    entries=entries,bytes=profile.total,automarket=market,extensions=extensions},{__index=Reader})
 end
 
 ---@param callback fun(entry: NativeWorldSection, data: string)

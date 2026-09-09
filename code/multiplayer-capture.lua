@@ -31,6 +31,7 @@ function M:open()
   self.recoveryPending=nil; self.boundaryEvents=nil
   Trace.open(self)
   self.capture=files.begin(self.path,self.engine,store.settings())
+  if self.engine.battle then self.engine.battle:begin() end
   self.tickFile=assert(io.open(self.path..'/ticks.bin','wb'))
   self.capture.tickProfile='native-tick-rng-v1'
   self.capture.traceHeaderBytes=self.bytes
@@ -70,6 +71,7 @@ function M:onTick()
   self.pendingTick={time=self.observedTick,before=require('code/tick-journal').state(self.engine)}
   self.capture.finalRng=self.engine:rngState()
   self.capture.finalResources=self.engine:resourceState()
+  if self.engine.battle then self.engine.battle:observe() end
   self.finalRngData=self.engine:rngData()
   self.boundaryEvents=self.events
 end
@@ -124,12 +126,17 @@ function M:sealBoundary()
   self.capture.tickBytes=self.tickBytes
   if self.recoveryPending then self.capture.replayEvents=self.boundaryEvents or 0 end
   if self.finalRngData then self.capture.finalRngHash=sha.sha256(self.finalRngData) end
+  if self.engine.battle and self.observedTick then
+    self.capture.lastObservedTick=self.observedTick
+    self.engine.battle:write(self.capture)
+  end
 end
 
 function M:captureFailure(reason)
   if not self.capture then return end
   self.capture.status='interrupted'; self.capture.reason=reason
   self.capture.bytes=self.bytes; self.capture.lastObservedTick=self.observedTick
+  if self.engine.battle and self.observedTick then pcall(self.engine.battle.write,self.engine.battle,self.capture) end
   if self.tickFile then pcall(self.tickFile.close,self.tickFile); self.tickFile=nil end
   files.save(self.capture)
 end

@@ -5,6 +5,54 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_overlay_uses_screen_target_and_normal_render_pass_then_restores_target(self):
+        self.check('''
+local hook; local target={[0]=2}; local fail=false
+modules={ui={access=function() return {game={Rendering={pDrawBufferChoiceValue=target}}} end}}
+ui.updateOverlay=function(_,parent) return {menu=0x6000,items={{}}} end
+core.hookCode=function(callback)
+ hook=callback
+ return function(parent,action)
+  if parent==0x6000 then
+   assert(action==1)
+   ui:renderOverlayItem({render=function()
+    assert(target[0]==0)
+    if fail then error('draw failed') end
+   end})
+  end
+ end
+end
+memory[0x8000+0x4c]=0x7000; memory[0x8000+20]=123
+memory[0x7000]=0x9000; memory[0x9000]=0x66
+ui:trackVisibility({0x8000},function() return true end)
+hook(0x7000,3); assert(target[0]==2)
+fail=true; assert(not pcall(hook,0x7000,1) and target[0]==2)
+''')
+
+    def test_restart_replacement_preserves_initialized_callbacks_and_never_overwrites_recording_row(self):
+        self.check('''
+local hooks,arrays={},{}; local playing=false; local nextFunction=700
+utils.createLuaFunctionWrapper=function() nextFunction=nextFunction+1; return nextFunction end
+core.hookCode=function(f,address) hooks[address]=f; return function() return 42 end end
+core.copyMemory=function(to,from,size)
+ for i=0,size-4,4 do memory[to+i]=memory[from+i] or 0 end
+end
+core.writeCode=function(_,code) arrays[#arrays+1]=code[1].variables.array end
+ui:extendPause('Save',function() end,function() return not playing end,function() return playing end)
+local row=arrays[1]+5*80
+-- Native construction happens AFTER extendPause. It resolves the callbacks
+-- inherited from the interaction group, which are zero in the source template.
+memory[row+20]=1001; memory[row+28]=1002; memory[row+76]=0x9000
+memory[arrays[1]+9*80+76]=0x9000
+local activate=hooks[sites.activateModal.address]
+activate(0,5,1); assert(memory[row+20]==1001 and memory[row+28]==1002)
+playing=true; activate(0,5,1)
+assert(memory[row+20]~=0 and memory[row+28]~=0 and memory[row+28]~=1002)
+activate(0,5,1) -- reopening must not replace the saved original with our row
+playing=false; activate(0,5,1)
+assert(memory[row+20]==1001 and memory[row+28]==1002 and memory[row+76]==0x9000)
+''')
+
     def test_summary_and_book_renderers_share_scoped_view_and_preserve_return_value(self):
         self.check('''
 local hooks={}; local scoped=false; local calls={}
@@ -107,7 +155,7 @@ core.readBytes=function(address,size)
 end
 assert(NativeUI.verify()==sites)
 modules=nil
-assert(NativeUI.verify()==sites)
+assert(not pcall(NativeUI.verify))
 ''')
 
     def test_keyboard_is_consumed_only_in_our_singleplayer_dialogs(self):

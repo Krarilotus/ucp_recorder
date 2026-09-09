@@ -17,8 +17,8 @@ end
 function M.seal(capture)
   local path=capture.path
   local manifest={format=store.FORMAT,id=capture.id,variant=capture.variant,executable=capture.executable,
-    simulationProfile=M.PROFILE,multiplayer=capture.initialNetwork,created=capture.created,
-    displayName=capture.displayName,sourceId=capture.sourceId,status='failed',
+    simulationProfile=M.PROFILE,multiplayer=capture.initialNetwork,created=capture.created,savedAt=capture.savedAt,
+    displayName=capture.displayName,sourceId=capture.sourceId,status='failed',battle=capture.battle,
     nextReplay=capture.nextReplay,previousReplay=capture.previousReplay,
     settingsHash=capture.settingsHash,environmentHash=capture.environmentHash,
     settingsCapture=capture.settingsCapture,restartSettingsHash=capture.restartSettingsHash,

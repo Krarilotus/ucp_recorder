@@ -6,7 +6,8 @@ function M.verify()
   -- ui lazily resolves its main-state callable entries on first access (often
   -- Automarket's GUI-loaded callback). Resolve them before we wrap activation;
   -- the cached entry still points to the wrapper and retains both modules' UI.
-  if modules and modules.ui then modules.ui:access() end
+  assert(modules and modules.ui,'Recorder menus require UI 1.0.1 and its dependencies')
+  modules.ui:access()
   local sites=assert(profiles[native.profile.name])
   for name,site in pairs(sites) do
     require('code/hook-check').verify(site,'Recorder UI conflicts at '..name)
@@ -24,7 +25,84 @@ function M.new(sites,onError)
   o.menuConstructor=core.exposeCode(sites.menuConstructor.address,2,1)
   o.modalConstructor=core.exposeCode(sites.modalConstructor.address,10,1)
   o.activateNative=core.exposeCode(sites.activateModal.address,3,1)
+  o.avatarNative=core.exposeCode(sites.avatar.address,3,0)
   return o
+end
+
+function M:sprite(gm,picture,x,y)
+  local game=modules.ui:access().game
+  game.Rendering.renderGM(game.Rendering.textureRenderCore,gm,picture,x,y)
+end
+
+function M:border(x,y,width,height)
+  local gold=core.readSmallInteger(self.sites.gold.value)%65536
+  self.borderNative(self.sites.pencil.value,x,y,x+width,y+height,gold)
+end
+
+-- Register now, attach only after the game's constructors have populated the
+-- menu. Use the UI module's registry so this also respects other extensions.
+function M:attachOverlay(menuIDs,items,visible)
+  local ffi=modules.cffi:cffi()
+  local manager=modules.ui:access().manager
+  self.overlays=self.overlays or {}
+  for _,id in ipairs(menuIDs) do
+    local pointer=manager.lookupMenu(id)
+    local menu=assert(ffi.tonumber(ffi.cast('unsigned long',pointer)))
+    self.overlays[menu]={items=items,visible=visible}
+  end
+end
+
+function M:renderOverlayItem(item)
+  local target=modules.ui:access().game.Rendering.pDrawBufferChoiceValue
+  local previous=target[0]
+  target[0]=0 -- UI, including the in-game status/book, draws to SCREEN_MENU.
+  local state=self.sites.buttonState.value
+  local ok,reason=pcall(item.render,core.readInteger(state),core.readInteger(state+4))
+  target[0]=previous
+  assert(ok,reason)
+end
+
+function M:updateOverlay(menu)
+  local overlay=self.overlays and self.overlays[menu]
+  if not overlay then return end
+  if not overlay.array then
+    local array=core.allocate((#overlay.items+1)*self.ITEM_SIZE,true)
+    overlay.menu=core.allocate(0x44,true)
+    for index,item in ipairs(overlay.items) do
+      local address=array+(index-1)*self.ITEM_SIZE
+      self:button(address,item.x,item.y,item.width,item.height,item.label or '',function()
+        overlay.consumed=true
+        if item.action then item.action() end
+      end,nil,nil,item.enabled==false and function() return false end or item.enabled)
+      core.writeInteger(address+0x4c,overlay.menu)
+      if item.render then core.writeInteger(address+28,self:callback(function()
+        self:renderOverlayItem(item)
+      end)) end
+    end
+    core.writeInteger(array+#overlay.items*self.ITEM_SIZE,0x66)
+    self.menuConstructor(overlay.menu,array)
+    overlay.array=array
+  end
+  local shown=overlay.visible()
+  -- The book and build menu have different offsets. Place these controls in
+  -- screen space while leaving the native menu's own origin untouched.
+  local originX,originY=0,0
+  local window=self.sites.buildingAndStatus.bytes
+  local resolution=window[3]+window[4]*256+window[5]*65536+window[6]*16777216
+  local width=core.readInteger(resolution-0x5c+0x18)
+  for index,item in ipairs(overlay.items) do
+    local address=overlay.array+(index-1)*self.ITEM_SIZE
+    local visible=shown and (not item.visible or item.visible())
+    core.writeInteger(address,visible and 3 or -2147483645)
+    local x=item.x<0 and width+item.x or item.x
+    local y=item.y
+    if item.frontEnd then
+      x=x+core.readInteger(resolution-0x5c+0x20)
+      y=y+core.readInteger(resolution-0x5c+0x24)
+    end
+    core.writeInteger(address+4,x-originX); core.writeInteger(address+8,y-originY)
+  end
+  return overlay
 end
 
 function M:callback(callback)
@@ -159,14 +237,26 @@ function M:installInput(singlePlayer,handler)
       if not ok then self.onError(reason) end
       return 0
     end
+    if self.onNativeKey then
+      local ok,handled=pcall(self.onNativeKey,message,key)
+      if not ok then self.onError(handled) elseif handled then return 0 end
+    end
     return original(unused,window,message,key,data)
   end,self.sites.windowProc.address,5,1,#self.sites.windowProc.bytes)
 end
 
-function M:extendPause(label,action,predicate)
+function M:extendPause(label,action,predicate,isPlayback)
   local size=10*self.ITEM_SIZE -- original nine entries plus sentinel
   local array=core.allocate(size+self.ITEM_SIZE,true)
   core.copyMemory(array,self.sites.pauseArray.value,size)
+  local restart,originalRestart,disabledRestart,restartDisabled
+  if isPlayback then
+    restart=array+5*self.ITEM_SIZE
+    originalRestart=core.allocate(self.ITEM_SIZE,true)
+    disabledRestart=core.allocate(self.ITEM_SIZE,true)
+    self:button(disabledRestart,100,206,300,27,function() return require('code/locale').text('Restart mission') end,
+      function() end,nil,nil,function() return false end)
+  end
   local item=array+size-self.ITEM_SIZE
   core.copyMemory(item+self.ITEM_SIZE,item,self.ITEM_SIZE)
   self:button(item,100,342,300,27,label,action)
@@ -177,6 +267,19 @@ function M:extendPause(label,action,predicate)
   local original
   original=core.hookCode(function(this,id,retain)
     if id==5 then
+      if restart then
+        if isPlayback() and not restartDisabled then
+          -- The constructor fills inherited action/render callbacks. Preserve
+          -- that initialized row, never the earlier static template (null callbacks).
+          core.copyMemory(originalRestart,restart,self.ITEM_SIZE)
+          core.copyMemory(restart,disabledRestart,self.ITEM_SIZE)
+          core.writeInteger(restart+0x4c,core.readInteger(item+0x4c))
+          restartDisabled=true
+        elseif not isPlayback() and restartDisabled then
+          core.copyMemory(restart,originalRestart,self.ITEM_SIZE)
+          restartDisabled=false
+        end
+      end
       core.writeInteger(self.sites.pauseModal.value+0x10,predicate() and 405 or 357)
     end
     return original(this,id,retain)
@@ -192,6 +295,7 @@ function M:trackVisibility(referenceItems,predicate)
   self.visibilityInstalled=true
   local original
   original=core.hookCode(function(this,action)
+    local overlay=self:updateOverlay(this)
     for _,group in ipairs(self.visibilityGroups) do
       if this==core.readInteger(group.items[1]+0x4c) then
         local ok,reason=pcall(function()
@@ -212,10 +316,22 @@ function M:trackVisibility(referenceItems,predicate)
         if not ok then self.onError(reason) end
       end
     end
-    if self.renderScope and (action==1 or action==3) then
-      return self.renderScope(function() return original(this,action) end)
+    local result
+    if overlay and action==0 then
+      overlay.consumed=false
+      original(overlay.menu,action)
     end
-    local result=original(this,action)
+    if overlay and action==0 and overlay.consumed then
+      -- A portrait/history action owns this click; never also activate the
+      -- native control underneath it (particularly the results Next arrow).
+    elseif self.renderScope and (action==1 or action==3) then
+      result=self.renderScope(function() return original(this,action) end)
+    else result=original(this,action) end
+    if overlay and action~=0 then
+      -- The game's alternate render pass selects flagged native items. Our
+      -- separate menu contains ordinary items and must use its ordinary pass.
+      original(overlay.menu,action==3 and 1 or action)
+    end
     -- Input dispatch has unwound: same game-thread boundary as a native Play
     -- action, outside rendering and outside every simulation tick.
     if action==0 and self.onMenuUpdated then self.onMenuUpdated() end

@@ -71,6 +71,7 @@ class WorldCaptureTests(unittest.TestCase):
 package.path=source_root..'/?.lua;'..package.path
 json={encode=function(_,v) return encode_json(v) end,decode=function(_,v) return decode_json(v) end}
 sha={sha256=hash_string}; core={readString=read_memory}
+package.loaded['code/extension-container']={encode=function(entries) capturedExtensions=entries; return 'zip bytes' end}
 package.loaded['code/native-hash']={prepare=function() end,sha256=hash_string}
 package.loaded['code/platform']={replace=replace_file,mkdir=make_directory}
 require('code/native').profile={name='SHC',sha256=string.rep('a',64)}
@@ -97,6 +98,26 @@ settings={raw='settings',environment='environment',hash=sha.sha256('settings'),
     def capture(self):
         self.lua.execute('capture=files.begin(test_path,engine,settings)')
         return json.loads((self.root/'capture.json').read_text())
+
+    def test_ucp2_mutable_state_is_exported_into_the_custom_save_section(self):
+        self.lua.execute(r'''
+modules={['ucp2-legacy']={serializeSimulationState=function(_,handle)
+ handle:put('format','1'); handle:put('attack-target-cycle.bin','\1\0\0\0')
+ handle:put('wall-defense-counts.bin',string.rep('\2\0\0\0',9))
+ handle:put('ladder-destinations.bin',string.rep('\3\0\0\0',30000))
+end}}
+''')
+        capture = self.capture()
+        self.assertEqual(capture['world']['status'], 'complete')
+        self.assertTrue(capture['world']['extensions'])
+        self.lua.execute(r'''
+assert(capturedExtensions['ucp2-legacy/format']=='1')
+assert(capturedExtensions['ucp2-legacy/attack-target-cycle.bin']=='\1\0\0\0')
+assert(#capturedExtensions['ucp2-legacy/ladder-destinations.bin']==120000)
+''')
+        descriptor = json.loads((self.root/'world.json').read_text())['extensions']
+        self.assertTrue(descriptor['ucp2'])
+        self.assertEqual(descriptor['sha256'], hashlib.sha256((self.root/'extensions.zip').read_bytes()).hexdigest())
 
     def test_exact_binary_sections_and_copy_never_call_native_writes(self):
         capture = self.capture()
@@ -143,6 +164,7 @@ modules={automarket={pAutomarketData=0x5000000},
 ''')
         capture = self.capture()
         self.assertTrue(capture['world']['automarket'])
+        self.assertEqual(self.lua.eval("capturedExtensions['automarket/automarketplayerdata.bin']").encode('latin-1'), market)
         self.assertEqual((self.root/'automarket.bin').read_bytes(),market)
         self.assertEqual(inspector.world_capture(self.root)['automarket']['bytes'],2416)
         (self.root/'automarket.bin').write_bytes(market[:-1])

@@ -4,11 +4,11 @@ For new 0.25.0 recordings, the helper uses `replay-config.yml`, a profile with
 exact loaded versions and resolved options. See [recorded launch settings](recorded-settings.md).
 The raw `ucp-config.yml` path below describes legacy recordings.
 
-The browser is a native modal dialog opened from the single-player Skirmish lobby. It uses MenuItem, Menu and MenuModal layouts documented by the UCP UI module and OpenSHC, and the original game's red frame, font, colours and button input. No new graphics library, CFFI module or external bitmap is required.
-
-`ui-sites.lua` records the exact entry bytes and pointer operands used for Crusader and Extreme. Verification runs before this module installs any hooks. The dialog finds an unused modal ID rather than taking a known menu's ID. Arrays allocate an extra sentinel entry; each button points to its owning Menu.
-
-`browser.lua` handles selection, paging and compatibility independently of rendering. The list includes failed/cancelled sessions so the user can distinguish them from completed captures; these cannot be played. Refresh preserves selection, and an empty list clears stale selection. Native rendering and input still require a live visual test at multiple resolutions in both games.
+The separate recorder browser has been replaced by the native battle history.
+See [menu controls](replay-menus.md) for current selection, statistics, naming and
+playback behavior. `battle-history.lua` owns the merged catalogue;
+`history-native.lua` adapts native navigation and data pointers. The preparation
+controller verifies recorded settings and streams before native loading.
 
 ## Restart handoff
 
@@ -22,7 +22,7 @@ Tests execute the actual helper with `Get-Process` and `Start-Process` replaced 
 
 ## Live test checklist
 
-1. Verify the always-visible native button skins/outlines, the pause-menu Save replay as action, keyboard naming/cancel/confirmation, and labels, modal placement, row text, selection, empty/error lists and all buttons at minimum and normal display resolutions in both variants.
+1. Verify the always-visible native button skins/outlines, the pause-menu Save replay action, keyboard naming/cancel/confirmation, and labels, modal placement, row text, selection, empty/error lists and all buttons at minimum and normal display resolutions in both variants.
 2. Start a short match with default recording enabled, save a named copy while continuing, change speed, pause/resume, issue several commands, quit the mission and replay it through completion.
 3. Replay a second time and choose an older recording; verify that no command/RNG cache survives.
 4. Change UCP settings, queue a restart, exit normally and verify the matching recording loads with the stored settings. Check that the default configuration bytes are unchanged.

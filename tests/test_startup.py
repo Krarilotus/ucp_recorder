@@ -111,6 +111,8 @@ for _,site in ipairs({{address=0x46a800,bytes={139,129,76,156,0,0}},
 end
 realNative.verify=function() return realNative.profile end
 require('code/native-ui').verify=function() return {} end
+require('code/history-native').verify=function() return {} end
+require('code/battle-statistics').verify=function() return {} end
 require('code/fixes').verify=function() return {} end
 require('code/sessions').captureSettings=function() error('settings sentinel') end
 modules={['map-extensions']={}}

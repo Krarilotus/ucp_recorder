@@ -104,11 +104,17 @@ end
 for _,site in pairs(require('code/ui-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 for _,site in ipairs(require('code/scoped-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 for _,site in pairs(require('code/network-sites').SHC) do core.writeBytes(site.address,site.bytes) end
+local history=require('code/history-sites').SHC
+for _,name in ipairs({'prepareList','prepare','action','frame','helpText'}) do local s=history[name]; core.writeBytes(s.address,s.bytes) end
+for _,s in ipairs(history.operands) do core.writeBytes(s.address,s.bytes) end
+core.writeBytes(0x4d1700,{139,68,36,4,163,88,86,223,0}); core.writeBytes(0x4d172a,{232})
 local world=require('code/world-hash-sites').SHC; core.writeBytes(world.address,world.bytes)
 core.hookCode=function() return function() return 0 end end
 core.writeString=function() end
 core.callTo=function() return {} end
 package.loaded['code/sessions']={captureSettings=function() end}
+modules={ui={access=function() return {manager={lookupMenu=function(id) return 0x90000+id*100 end}} end},
+ cffi={cffi=function() return {tonumber=tonumber,cast=function(_,v) return v end} end}}
 local module=dofile(source_root..'/init.lua')
 module:enable({rngLogMethod='trace',useFixedSeed=true,fixedSeed=123})
 assert(core.readInteger(module.recorder.engine.scope)==0)

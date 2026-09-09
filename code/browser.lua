@@ -106,7 +106,7 @@ function Browser:cancelPreparation()
   if self.preparation then self.preparation:cancel() end
 end
 
-function Browser:advancePreparation()
+function Browser:advancePreparation(beforeStart)
   local task=self.preparation
   if not task then return false end
   task:step()
@@ -116,7 +116,10 @@ function Browser:advancePreparation()
   if task.status=='cancelled' then self.message='Replay preparation cancelled.'; return false end
   if task.status=='failed' then self.message=task.error; return false end
   local ready=task.result
-  local ok=self.recorder:guard(function() self.recorder:startPlayback(ready.manifest.id,nil,ready) end)
+  local ok=self.recorder:guard(function()
+    if beforeStart then beforeStart() end
+    self.recorder:startPlayback(ready.manifest.id,nil,ready)
+  end)
   if not ok then self.message=self.recorder.error end
   return ok
 end

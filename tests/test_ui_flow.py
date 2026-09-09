@@ -6,35 +6,6 @@ import test_browser
 class UIFlowTests(unittest.TestCase):
     check = test_browser.BrowserTests.check
 
-    def test_loading_is_cancellable_and_does_not_change_selection_or_start_a_world(self):
-        self.check('''
-entries={entry('one'),entry('two')}; browse(); local library=shown
-local now=0; require('code/platform').milliseconds=function() now=now+20; return now end
-local cleaned=false
-recorder.preparePlayback=function(_,id,worlds,progress)
- local ok,reason=pcall(function() progress('Checking recorded settings...') end)
- cleaned=true; assert(ok,reason); return {manifest={id=id}}
-end
-click('Play'); ui.onMenuUpdated()
-assert(menu.browser.preparation and not cleaned and not played and shown==library)
-input(0x100,40); input(0x100,113); input(0x102,13)
-assert(menu.browser.index==1 and shown==library and not played)
-click('Cancel'); ui.onMenuUpdated()
-assert(cleaned and not menu.browser.preparation and not played and shown==library and recorder.mode=='none')
-assert(menu.browser.message=='Replay preparation cancelled.')
-''')
-
-    def test_corrupt_preparation_remains_in_library_without_native_load(self):
-        self.check('''
-entries={entry('one')}; browse(); local library=shown
-recorder.preparePlayback=function(_,id,worlds,progress)
- progress('Checking'); error('damaged checkpoint at EOF')
-end
-click('Play'); while menu.browser.preparation do ui.onMenuUpdated() end
-assert(not played and shown==library and recorder.mode=='none')
-assert(menu.browser.message:find('damaged checkpoint at EOF',1,true))
-''')
-
     def test_multiplayer_named_capture_uses_local_copy_and_returns_to_status(self):
         self.check('''
 recorder.engine.singlePlayer=function() return false end
@@ -50,52 +21,15 @@ assert(saved=='X' and shown==status and recorder.engine.trace.file and source.id
 click('Save capture as...'); input(0x102,27); assert(shown==status and saved=='X')
 ''')
 
-    def test_paused_finished_and_failed_replay_show_distinct_status_and_progress(self):
-        self.check('''
-recorder.mode='play'; recorder.status='playing'; recorder.playedCommands=3
-recorder.manifest={startTick=100,lastTick=900,commandCount=5}
-recorder.engine.tick=function() return 300 end
-local paused=true; recorder.engine.isPaused=function() return paused end
-pauseAction(); renders[shown](0,0)
-assert(texts[2]=='Playback paused.' and texts[3]=='200 / 800 ticks; 3 / 5 commands')
-paused=false; texts={}; renders[shown](0,0); assert(texts[2]=='Playback running.')
-recorder.status='finished'; paused=true; texts={}; renders[shown](0,0)
-assert(texts[2]=='Playback finished.')
-recorder.status='error'; recorder.error='RNG divergence at tick 300'; texts={}
-pauseAction(); renders[shown](0,0)
-assert(texts[2]==recorder.error and texts[3]=='Playback failed. Leave the mission to return to the library.')
-assert(texts[4]=='200 / 800 ticks; 3 / 5 commands')
-assert(recorder.manifest.player==nil and recorder.status=='error' and paused)
-''')
-
-    def test_keyboard_navigation_rename_and_remove_cancel_preserve_selection(self):
-        self.check('''
-entries={}; for i=1,9 do entries[i]=entry('replay'..i) end
-browse(); local library=shown
-input(0x100,40); assert(menu.browser.index==2)
-input(0x100,34); assert(menu.browser.index==8 and menu.browser:firstRow()==7)
-input(0x100,36); assert(menu.browser.index==1)
-input(0x100,113); assert(shown~=library)
-input(0x102,27); assert(shown==library)
-input(0x100,46); assert(shown~=library)
-click('Cancel'); assert(shown==library and menu.browser.index==1 and #menu.browser.items==9)
-input(0x102,13); assert(not played and menu.browser.preparation)
-while menu.browser.preparation do ui.onMenuUpdated() end
-assert(played=='replay1' and shown==-1)
-''')
-
-    def test_view_selector_only_changes_presentation_choice(self):
-        self.check('''
-local roster={}; for i=1,8 do roster[i]={kind=i==4 and 'ai' or 'empty'} end
+    def test_portraits_select_view_without_changing_pause_or_native_actor(self):
+        self.check('''local roster={}; for i=1,8 do roster[i]={kind=i==4 and 'ai' or 'empty'} end
 recorder.engine.networkState=function() return {roster=roster} end
 recorder.mode='play'; recorder.active=true; recorder.status='playing'; recorder.manifest={player=1}
-local paused=true
-recorder.engine.isLogicallyPaused=function() return paused end
-recorder.engine.setPaused=function(_,value) paused=value end
-pauseAction(); local status=shown; click('View player 1...'); click('Player 4')
-assert(shown==status and paused and menu.view:player()==4 and recorder.manifest.player==1)
-click('Resume replay'); assert(shown==-1 and not paused)
-recorder.mode='record'; assert(not menu.view:available())
+local paused=true; recorder.engine.isPaused=function() return paused end
+assert(not pauseVisible() and restartDisabled())
+assert(overlayVisible()); overlayItems[2].action()
+assert(menu.view:player()==4 and recorder.manifest.player==1 and paused and shown==-1)
+recorder.mode='record'; assert(not overlayVisible() and not restartDisabled())
 ''')
 
     def setUp(self):
@@ -105,6 +39,7 @@ local nextId=300
 controls={}; dialogs={}; renders={}; texts={}; shown=-1
 ui={
  installViewRender=function() end,
+ attachOverlay=function(_,ids,items,visible) overlayItems=items; overlayVisible=visible end,
  modal=function(_,items,count,width,height,render,title)
   assert(count==#items)
   for i,a in ipairs(items) do
@@ -122,7 +57,7 @@ ui={
  end,
  text=function(_,value) texts[#texts+1]=value end,
  installInput=function(_,predicate,handler) input=handler; inputAllowed=predicate end,
- extendPause=function(_,label,action,predicate) pauseLabel=label; pauseAction=action; pauseVisible=predicate end,
+ extendPause=function(_,label,action,predicate,disabled) pauseLabel=label; pauseAction=action; pauseVisible=predicate; restartDisabled=disabled end,
  activeDialog=function() return shown end,
  show=function(_,id) shown=id end,
  close=function() shown=-1 end,
@@ -130,6 +65,10 @@ ui={
  trackVisibility=function() end,
 }
 package.loaded['code/native-ui']={ITEM_SIZE=80,new=function() return ui end}
+package.loaded['code/history-native']={new=function(_,_,browser,rename)
+ historyRename=rename
+ return {advance=function() browser:advancePreparation() end}
+end}
 recorder.engine={singlePlayer=function() return true end,isPaused=function() return false end,
  localSession=function(self) return self:singlePlayer() end,
  presentationSpeed=function() return 90 end,
@@ -148,13 +87,6 @@ function click(label)
  end
  error('Button missing: '..label)
 end
-function browse()
- for _,item in pairs(controls) do
-  local text=type(item.label)=='function' and item.label() or item.label
-  if text=='Replays' then return item.action() end
- end
- error('Replay entry missing')
-end
 ''')
 
     def test_failure_details_distinguish_stopped_capture_from_failed_playback(self):
@@ -164,8 +96,7 @@ assert(pauseLabel()=='Replay failed - details')
 pauseAction(); renders[shown](0,0)
 assert(texts[3]=='Recording stopped. This match is no longer being recorded.')
 assert(texts[4]=='Resume the game to continue playing normally.')
-recorder.mode='play'; texts={}; pauseAction(); renders[shown](0,0)
-assert(texts[3]=='Playback failed. Leave the mission to return to the library.')
+recorder.mode='play'; assert(not pauseVisible())
 ''')
 
     def test_pause_save_copy_cancel_and_confirmation_keep_capture_active(self):
@@ -182,18 +113,6 @@ assert(copies==1 and shown~=editor and menu.browser.message=='Saved: Stream')
 click('Back'); assert(shown==5 and recorder.active and recorder.status=='recording')
 ''')
 
-    def test_library_rename_and_play_choose_the_recorded_settings(self):
-        self.check('''
-entries={entry('one'),entry('two')}; entries[1].different=true
-browse(); local library=shown; click('Rename replay...')
-for c in ('Named match'):gmatch('.') do input(0x102,c:byte()) end
-click('Save name'); assert(shown==library and menu.browser.selected.displayName=='Named match')
-click('Play'); assert(restarted=='one' and not played and shown==library)
-entries[1].different=false; menu.browser:refresh(); click('Play')
-while menu.browser.preparation do ui.onMenuUpdated() end
-assert(played=='one' and shown==-1)
-''')
-
     def test_multiplayer_pause_explains_capture_without_opening_save_or_library(self):
         self.check('''
 recorder.engine.singlePlayer=function() return false end
@@ -207,6 +126,5 @@ recorder.engine.trace={statusLines=function() return {'Test capture saved.','Fur
 texts={}; renders[shown](0,0)
 assert(texts[2]=='Test capture saved.' and texts[3]=='Further actions are not being saved.')
 input(0x102,27); assert(shown==5 and not inputAllowed())
-browse(); assert(shown==5)
 pauseAction(); click('Back'); assert(shown==5)
 ''')

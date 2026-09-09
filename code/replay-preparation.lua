@@ -26,6 +26,6 @@ function M.prepare(id,engine,worlds,progress)
   assert(hash==snapshotHash,'Starting save is damaged')
   local rng=store.read(path..'/rng.bin')
   assert(#rng==0x9c50 and sha.sha256(rng)==manifest.rngHash,'Starting RNG state is damaged')
-  return {manifest=manifest,snapshotPath=snapshotPath,rng=rng,worlds=worlds}
+  return {manifest=manifest,snapshotPath=snapshotPath,rng=rng,worlds=worlds,info=environment.display}
 end
 return M

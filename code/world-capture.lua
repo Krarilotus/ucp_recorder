@@ -46,6 +46,7 @@ function M.capture(path,engine)
   -- which would update custom native section memory and write cache files.
   local adapter=require('code/automarket-replay')
   local descriptor=adapter.current()
+  local custom={}
   if descriptor then
     local pointer=modules.automarket.pAutomarketData
     require('code/validation').integer(pointer,0x10000,0x7fffffff-2416,'Automarket data pointer')
@@ -54,6 +55,20 @@ function M.capture(path,engine)
     store.write(path..'/automarket.bin',data)
     manifest.automarket={version=descriptor.version,protocol=descriptor.protocol,
       format=2,bytes=#data,sha256=sha.sha256(data)}
+    custom['automarket/automarketplayerdata.bin']=data
+  end
+  local legacy=modules and modules['ucp2-legacy']
+  if legacy then
+    assert(type(legacy.serializeSimulationState)=='function','UCP2 requires read-only simulation state export')
+    legacy:serializeSimulationState({put=function(_,name,data)
+      local path='ucp2-legacy/'..name
+      assert(custom[path]==nil,'Duplicate UCP2 state entry'); custom[path]=data
+    end})
+  end
+  if next(custom) then
+    local raw=require('code/extension-container').encode(custom)
+    store.write(path..'/extensions.zip',raw)
+    manifest.extensions={bytes=#raw,sha256=sha.sha256(raw),ucp2=legacy~=nil}
   end
   assert(engine:tick()==manifest.tick,'Simulation advanced during world capture')
   manifest.status='complete'
@@ -61,6 +76,6 @@ function M.capture(path,engine)
   store.write(path..'/world.json.tmp',encoded)
   require('code/platform').replace(path..'/world.json.tmp',path..'/world.json')
   return {status='complete',hash=sha.sha256(encoded),bytes=profile.total,
-    automarket=manifest.automarket~=nil,header=true}
+    automarket=manifest.automarket~=nil,extensions=manifest.extensions~=nil,header=true}
 end
 return M
