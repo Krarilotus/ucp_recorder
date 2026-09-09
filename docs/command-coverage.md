@@ -6,6 +6,41 @@ command during playback. It does not reimplement building, troop or economy
 actions. The validation list must describe all supported timed gameplay commands;
 an incomplete list stops an otherwise valid recording.
 
+## Ally gifts, requests and refusals (native SHC audit)
+
+Command 113 (`SendPlayerToPlayerRequestOrResponse`, SHC `0x486140`, Extreme
+`0x486370`) is an 18-byte timed payload: subtype (int16), recipient, resource/
+target, amount, and sender (four int32 values). Native execution dispatches
+subtypes 0-5 to attack/defence requests, goods requests, goods transfers,
+goods denial, attack/defence acceptance and attack/defence denial respectively.
+Unused payload fields are preserved as received, not reconstructed from UI state.
+
+The SHC send/request input owner `0x4B14C0` checks affordability before queuing.
+An unaffordable gift returns without a transfer command. Receiver capacity may
+reduce the amount before subtype 2 is queued. Cancelling an uncommitted form
+changes its UI fields; denying an existing goods request queues subtype 3.
+The allies action owner `0x4B12D0` queues subtypes 4/5 for accept/deny. The direct
+native callers found for the corresponding gameplay action functions are the
+command-113 dispatcher, not additional unrecorded UI execution paths.
+
+Recorder observes the payload before native dispatch and appends it after the
+handler returns. It does not filter on resource changes or successful delivery.
+A portable regression covers all six subtypes returning without a resource
+change. This tests recorder ownership, not a reimplementation of native trades.
+
+The 2026-09-09 failing source `20260909-093318-0001` contains 13 subtype-2 gifts
+and seven subtype-3 denials before its tick-27072 failure. The last command is
+at 22892. The named snapshot and full source fail at the same checkpoint;
+there is no evidence that these 20 dispatched ally commands were omitted.
+
+Rejected requests can still set a timed storage-warning field or enqueue an
+AI refusal video outside command 113. Direct indexed references to the warning
+fields (`0x115BE24` / `0x115BE28`, player stride `0x39F4`) belong to UI warning
+rendering/input in the analyzed image. This is not a blanket proof that every
+presentation callback is simulation-independent. Preserve native paused
+maintenance and trace any causal state difference before adding new recording
+or correction hooks. Full multiplayer/Extreme behavior remains a live-test gate.
+
 ## Production-switch failure and repair
 
 A live 0.28.0 capture stopped with `Unsupported replay command category 33`
@@ -44,8 +79,8 @@ validated Automarket/protocol extension, documented in [Automarket replay](autom
 
 | ID | Native label | SHC handler / bytes | Extreme handler / bytes | Recorder policy |
 | --- | --- | --- | --- | --- |
-| 0 | DoNothing | `0x469f10` / — | `0x402ae0` / — | no-op |
-| 1 | DoNothing | `0x469f10` / — | `0x402ae0` / — | no-op |
+| 0 | DoNothing | `0x469f10` / â€” | `0x402ae0` / â€” | no-op |
+| 1 | DoNothing | `0x469f10` / â€” | `0x402ae0` / â€” | no-op |
 | 2 | InitialAnnounceToHost | `0x4893c0` / 0 | `0x4894d0` / 0 | immediate |
 | 3 | InitialAnnounceReply | `0x480640` / 0 | `0x480810` / 0 | immediate |
 | 4 | AskForPlayerSlotAssignment | `0x48f870` / 1 | `0x48f980` / 1 | immediate |
@@ -152,10 +187,10 @@ validated Automarket/protocol extension, documented in [Automarket replay](autom
 | 105 | StartReceivingMapFile | `0x485cc0` / 1004 | `0x485ef0` / 1004 | immediate |
 | 106 | ShareMapPart | `0x48b8f0` / 1029 | `0x48ba00` / 1029 | immediate |
 | 107 | MapSendingRelated | `0x485e80` / 1 | `0x4860b0` / 1 | immediate |
-| 108 | DoNothing | `0x469f10` / — | `0x402ae0` / — | no-op |
-| 109 | DoNothing | `0x469f10` / — | `0x402ae0` / — | no-op |
+| 108 | DoNothing | `0x469f10` / â€” | `0x402ae0` / â€” | no-op |
+| 109 | DoNothing | `0x469f10` / â€” | `0x402ae0` / â€” | no-op |
 | 110 | HostAnnounceRoundTable | `0x485f20` / 19 | `0x486150` / 19 | immediate |
-| 111 | DoNothing | `0x469f10` / — | `0x402ae0` / — | no-op |
+| 111 | DoNothing | `0x469f10` / â€” | `0x402ae0` / â€” | no-op |
 | 112 | AddAIPlayer | `0x486040` / 12 | `0x486270` / 12 | immediate |
 | 113 | SendPlayerToPlayerRequestOrResponse | `0x486140` / 18 | `0x486370` / 18 | timed, both |
 | 114 | ResyncVillage | `0x48bbe0` / 28060 | `0x48bcf0` / 28060 | immediate |

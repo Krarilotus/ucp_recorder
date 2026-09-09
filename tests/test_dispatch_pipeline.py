@@ -6,6 +6,33 @@ import test_engine
 class DispatchPipelineTests(unittest.TestCase):
     check = test_engine.EngineTests.check
 
+    def test_ally_commands_are_recorded_after_dispatch_even_without_resource_changes(self):
+        self.check('''
+recorder.mode='record'; recorder.status='recording'
+local recorded={}
+recorder.onExecutedCommand=function(_,c) recorded[#recorded+1]=c end
+local address=engine.base+0x3c67c
+memory[engine.base+0x2d824]=0
+memory[engine.base+engine.sites.actorOffset]=1
+memory[address]=10; memory[address+4]=1; bytes[address+8]=113
+local before=engine:resourceState()
+for subtype=0,5 do
+ local data=string.format('%02X',subtype)..'00020000000A0000006400000001000000'
+ local payload=require('code/utils').hexToTable(data)
+ assert(#payload==18); core.writeBytes(address+10,payload)
+ engine:captureCommand(18)
+ engine:beforeCommand(recorder)
+ -- A native handler may return without transferring goods. Recording follows
+ -- dispatch, not an inferred resource delta or a success return value.
+ engine:afterCommand(recorder)
+ assert(recorded[subtype+1].data:upper()==data)
+ assert(recorded[subtype+1].commandCategory==113 and recorded[subtype+1].time==10)
+ assert(engine.received[0]==nil)
+end
+local after=engine:resourceState(); for i=1,#before do assert(before[i]==after[i]) end
+assert(#recorded==6)
+''')
+
     def setUp(self):
         test_engine.EngineTests.setUp(self)
         self.check('''
