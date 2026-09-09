@@ -16,6 +16,8 @@ local function enable(self,config,stage,install)
   stage('Automarket compatibility',require('code/automarket-replay').current)
   stage('extension simulation state',require('code/simulation-compatibility').verify)
   local sites=stage('session hook checks',Engine.verify)
+  local maintenance=require('code/maintenance-native')
+  local maintenanceSites=stage('maintenance phase checks',maintenance.verify)
   local uiSites=stage('menu hook checks',require('code/native-ui').verify)
   stage('battle history checks',require('code/history-native').verify)
   local battleLayout=stage('battle statistics checks',require('code/battle-statistics').verify)
@@ -43,6 +45,9 @@ local function enable(self,config,stage,install)
     fixes.install(controls,engine.scope,engine.base+0x618,nil,engine.offlineFlag)
     if engine.trace then engine.trace.rngReturnAddresses=rngReturnAddresses end
     local recorder=Session:new(engine,config)
+    recorder.phaseNative=maintenance.new(engine,maintenanceSites,function()
+      recorder:guard(function() recorder:onUnclockedWorld() end)
+    end)
     if multiplayerCapture then engine.trace.enabled=function() return recorder.autoRecord end end
     fixes.install({sites.resultsTimer},recorder.resultsHold,engine.base+0x618,nil,engine.offlineFlag)
     if recorder.rngTrace then recorder.rngTrace.returnAddresses=rngReturnAddresses end
@@ -101,7 +106,7 @@ local function enable(self,config,stage,install)
     -- A stopped replay must also reject paused/loading callers that never reach
     -- the clock hook. The callback can stop the current call at its epilogue;
     -- subsequent calls return at entry, before map/path maintenance.
-    fixes.install({fixes.tickEntry(sites,recorder.halt,recorder.playbackActive)},
+    fixes.install({fixes.tickEntry(sites,recorder.halt,recorder.playbackActive,recorder.phaseNative.internalWork)},
       engine.scope,engine.base+0x618,nil,engine.offlineFlag)
     fixes.installTick(sites.tick,engine.scope,engine.base+0x618,recorder.halt,tickCallback,multiplayerTick,
       engine.offlineFlag,sites.tickExit.address)

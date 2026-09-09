@@ -19,6 +19,7 @@ def check_tick_boundary(path, lua, root, variant):
     lua.globals().source_root = root.as_posix()
     lua.execute("package.path=source_root..'/?.lua;'..package.path")
     fixes = lua.eval("require('code/fixes')")
+    maintenance = lua.eval("require('code/maintenance-native')")
     entry, clock, ending = (sites[key] for key in ('tickEntry', 'tick', 'tickExit'))
     extreme = variant == 'Extreme'
     sync = 0x23547d8 if extreme else 0x191d768
@@ -31,7 +32,7 @@ def check_tick_boundary(path, lua, root, variant):
 
     def run(patched, stopped, mode, local, paused, save=0, sync_status=0, stop_now=False,
             refresh=False, viewing=False, modal=False, navigation=None, enabled=True, legacy=False,
-            reset_period=200):
+            reset_period=200, extra_work=None):
         machine = Uc(UC_ARCH_X86, UC_MODE_32)
         load_image(machine, path)
         put = lambda address, value: machine.mem_write(address, struct.pack('<I', value & 0xffffffff))
@@ -58,7 +59,7 @@ def check_tick_boundary(path, lua, root, variant):
         if patched:
             tick = lua.table_from(dict(address=clock['address'], bytes=clock['bytes'], kind='raw',
                 patch='tick', callback=callback, halt=halt, skipTick=ending['address']))
-            entry_site = entry if legacy else fixes.tickEntry(sites, halt, playback)
+            entry_site = entry if legacy else fixes.tickEntry(sites, halt, playback, 0x3e00134)
             for site, flag, target in ((entry_site, halt if legacy else scope, entry_gate), (tick, scope, clock_gate)):
                 code = bytes(emitter.build(site, flag, sync + 0x618, None, target, None, offline).values())
                 machine.mem_write(target, code)
@@ -111,10 +112,23 @@ def check_tick_boundary(path, lua, root, variant):
         machine.reg_write(reg.UC_X86_REG_ESP, stack)
         machine.reg_write(reg.UC_X86_REG_ESI, 0x12345678)
         machine.reg_write(reg.UC_X86_REG_ECX, 0x112b538 if extreme else 0x112b0b8)
-        machine.emu_start(entry['address'], done, count=10000)
+        start = entry['address']
+        if extra_work:
+            passes, logical_pause = extra_work
+            start = 0x3e08000
+            code = maintenance.runner(sites, maintenance.profiles[variant], 0x3e00120, start)
+            machine.mem_write(start, bytes(code.values()))
+            put(stack + 4, passes); put(stack + 8, logical_pause)
+            machine.reg_write(reg.UC_X86_REG_EBX, 0x11223344)
+            machine.reg_write(reg.UC_X86_REG_EDI, 0x55667788)
+        machine.emu_start(start, done, count=100000)
         assert machine.reg_read(reg.UC_X86_REG_EIP) == done
         assert machine.reg_read(reg.UC_X86_REG_ESP) == stack + 4, (variant, 'tick stack')
         assert machine.reg_read(reg.UC_X86_REG_ESI) == 0x12345678
+        if extra_work:
+            assert machine.reg_read(reg.UC_X86_REG_EBX) == 0x11223344
+            assert machine.reg_read(reg.UC_X86_REG_EDI) == 0x55667788
+            assert get(0x3e00134) == 0, 'Internal admission escaped native replay call'
         result = calls, get(sites['gameCore'] + 0x98), get(sites['paused'])
         return result + (get(countdown),) if navigation is not None else result
 
@@ -171,5 +185,19 @@ def check_tick_boundary(path, lua, root, variant):
                     assert viewing == original  # live MP ignores viewer state
                 inactive = run(True, 1, mode, local, paused, viewing=True, enabled=False, **options)
                 assert inactive == original
+                count += 1
+    # Replay enters the original coordinator, including the native countdown.
+    # Viewer pause/menu must not suppress recorded work; failure halt still must.
+    for logical_pause in (1, -1):
+        for viewer_pause in (0, 1, -1):
+            for period in (50, 200):
+                replayed = run(True, 0, 99, 0, viewer_pause, viewing=True, modal=True,
+                    navigation=1, reset_period=period, extra_work=(3, logical_pause))
+                assert replayed[1:] == (17, viewer_pause & 0xffffffff, period - 2), replayed
+                world = 0x456320 if extreme else 0x4560f0
+                assert replayed[0].count(world) == (3 if logical_pause == -1 else 0)
+                halted = run(True, 1, 99, 0, viewer_pause, viewing=True, navigation=1,
+                    extra_work=(3, logical_pause))
+                assert halted == ([], 17, viewer_pause & 0xffffffff, 1), halted
                 count += 1
     print(f'PASS: {variant} tick entry/endpoint halt and passive control flow ({count} cases)')

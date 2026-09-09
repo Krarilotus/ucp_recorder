@@ -32,6 +32,9 @@ function M.build(site,enabled,mode,seed,origin,returnAddresses,offline)
   if site.patch=='tickEntry' then
     emit(0x9c)
     compare(site.halt,0); rel({0x0f,0x85},'stopped')
+    -- Recorded unclocked work has its own native invocation. Viewer pause
+    -- remains independent; a failed/finished replay may never use this path.
+    if site.internalWork then compare(site.internalWork,1); rel({0x0f,0x84},'original') end
     compare(site.playback,1); rel({0x0f,0x85},'original')
     compare(site.paused,0); rel({0x0f,0x85},'stopped')
     -- The checked native query only reads menu state. Preserve the incoming
@@ -41,6 +44,29 @@ function M.build(site,enabled,mode,seed,origin,returnAddresses,offline)
     emit(0x85,0xc0,0x61) -- test eax,eax; popad preserves the query's flags
     rel({0x0f,0x84},'original')
     labels.stopped=#out; emit(0x9d,0xc3)
+  elseif site.patch=='maintenanceCount' then
+    emit(0x9c,0x60,0xa1); dword(out,site.clock)
+    emit(0x3b,0x05); dword(out,site.state+4); rel({0x0f,0x85},'advanced')
+    emit(0xc7,0x05); dword(out,site.state+16); dword(out,1)
+    emit(0x81,0x3d); dword(out,site.state+8); dword(out,2147483647)
+    rel({0x0f,0x84},'overflow')
+    emit(0xff,0x05); dword(out,site.state+8); rel({0xe9},'counted')
+    labels.advanced=#out
+    emit(0xa3); dword(out,site.state+4)
+    emit(0xc7,0x05); dword(out,site.state+16); dword(out,0)
+    rel({0xe9},'counted')
+    labels.overflow=#out
+    emit(0xc7,0x05); dword(out,site.state+12); dword(out,1)
+    labels.counted=#out; emit(0x61); rel({0xe9},'original')
+  elseif site.patch=='unclockedWorld' then
+    emit(0x9c,0x60)
+    compare(site.state+16,0); rel({0x0f,0x84},'worldDone')
+    compare(site.state+8,0); rel({0x0f,0x84},'worldOverflow')
+    emit(0xff,0x0d); dword(out,site.state+8); rel({0xe9},'worldCallback')
+    labels.worldOverflow=#out
+    emit(0xc7,0x05); dword(out,site.state+12); dword(out,1)
+    labels.worldCallback=#out; rel({0xe8},site.callback)
+    labels.worldDone=#out; emit(0x61); rel({0xe9},'original')
   elseif site.patch=='return' then
     if site.pop then emit(0xc2,site.pop,0) else emit(0xc3) end
   elseif site.patch=='constant' then emit(0xb8); dword(out,site.value)
@@ -68,7 +94,10 @@ function M.build(site,enabled,mode,seed,origin,returnAddresses,offline)
     rel({0xe8},site.originalCallback)
     emit(0x61,0x9d)
   end
-  if site.kind=='call' then
+  if site.kind=='prefixCall' then
+    for i=1,#site.bytes-5 do emit(site.bytes[i]) end
+    rel({0xe8},site.target)
+  elseif site.kind=='call' then
     rel({0xe8},site.target)
     if returnAddresses then returnAddresses[origin+#out]=site.address+#site.bytes end
   elseif site.kind=='tail' then rel({0xe9},site.target)

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.47.0
+
+- Record native maintenance that runs while the match clock is stopped, keeping
+  its order relative to executed commands. Replay uses the original coordinator;
+  it does not copy expected navigation or RNG values into the simulation.
+- Store maintenance-only passes as counts and distinguish unclocked world steps.
+  The journal is streamed, checked for damage and included in named snapshots.
+  Normal paused passes add no Lua callback or file write. Viewer pause remains
+  independent and failures still stop playback.
+- Preserve 0.46.1's integrated history, native buttons, player portraits and F3
+  information. Existing recordings cannot recover unrecorded paused work; use
+  fresh captures to validate this correction. Native SHC/Extreme checks cover
+  the phase contract; complete live replay and multiplayer acceptance are pending.
+
 ## 0.46.1
 
 - Select a history row with one click and open its statistics with a second.

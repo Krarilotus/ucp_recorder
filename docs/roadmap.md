@@ -13,7 +13,7 @@ unexplained SP divergence, before claiming full offline-MP completion.
 | Offline multiplayer | Human roster/actor translation, timed commands, transport isolation, local SP browser | Host and client replay completion with AIs and Automarket |
 | Connection recovery | Stable replacement worlds, linked intervals, independent named copies, prefix retention | Controlled loss/resync/host departure across multiple games |
 | Determinism/settings | Tick/command RNG checks, exact config/restart, asset fingerprints | Prove earlier RNG2 failures resolved; audit remaining module-owned state |
-| Menu integration | Native fonts/skin, library, naming/removal, pause/speed/player views | Ghost-preview/input audit, report navigation, more in-game languages, real current screenshots |
+| Menu integration | Native battle history, snapshot statistics, rename/right hand, portraits and F3 HUD | Packaged-build visual check, report navigation, more in-game languages, current screenshots |
 
 Launcher translations cover all nine languages; in-game translations currently
 cover English/German. Ghidra confirms that the supported executable's wide-text

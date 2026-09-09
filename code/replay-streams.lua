@@ -18,7 +18,7 @@ end
 
 function Streams:closeFiles()
   local failure
-  for _,field in ipairs({'commandsFile','rngFile','infoFile','tickFile'}) do
+  for _,field in ipairs({'commandsFile','rngFile','infoFile','tickFile','phaseFile'}) do
     local file=self[field]; self[field]=nil
     if file then
       local ok,closed,reason=pcall(file.close,file)

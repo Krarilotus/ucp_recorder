@@ -84,11 +84,12 @@ core={allocate=allocate,allocateCode=allocate,exposeCode=expose,hookCode=hook,de
  readByte=read_byte,writeByte=write_byte,writeCode=write_bytes,writeString=write_string}
 engine=require('code/engine').new(require('code/engine-sites')[variant])
 engine.haltingMenuNative=function() return 0 end -- UI query checked separately
-recorder={mode='play',status='playing',active=true,manifest={player=3,variant=variant}}
+recorder={mode='play',status='playing',active=true,engine=engine,manifest={player=3,variant=variant}}
+recorder.beforeCommandWork=require('code/session-recorder').beforeCommandWork
 function recorder:feed() end
 function recorder:guard(f)
  local ok,reason=pcall(f)
- if not ok then self.status='error'; self.error=reason; engine:abortPlayback() end
+ if not ok then self.status='error'; self.error=self.error or reason; engine:abortPlayback() end
  return ok
 end
 engine:install(recorder)
@@ -112,6 +113,25 @@ recorder.manifest.multiplayer=state
             lua.execute('''
 recorder.mode='record'; recorder.status='recording'; recorder.commands={}
 function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=command end
+''')
+        if replay and not offline:
+            # A replayed world phase may use command scratch fields. The hook
+            # must precede native context initialization, not the action CALL.
+            lua.execute('''
+recorder.manifest.phaseProfile='native-extra-work-v1'
+recorder.manifest.startTick=10; recorder.manifest.lastTick=16; recorder.manifest.commandCount=600
+json={decode=function(_,row) return row end}
+local rows={{time=10,commands=0,kind=1,count=7},{time=10,commands=50,kind=2,count=1},
+ {time=12,commands=230,kind=1,count=4}}
+local cursor=0
+recorder.phaseFile={read=function() cursor=cursor+1; return rows[cursor] end}
+recorder.phaseCalls=0
+recorder.phaseNative={replay=function()
+ recorder.phaseCalls=recorder.phaseCalls+1
+ for _,offset in ipairs({0x2d824,0x2d828,0x2d830,engine.sites.actorOffset}) do
+   core.writeInteger(engine.base+offset,0x123456)
+ end
+end}
 ''')
 
         def call(address,args=(),thiscall=0):
@@ -198,6 +218,7 @@ function recorder:onExecutedCommand(command) self.commands[#self.commands+1]=com
                 assert engine['journal']['executed']==sequence
                 assert not engine.commandsPending(engine)
         if replay:
+            if not offline: assert g.recorder['phaseCalls'] == 3
             assert [r[3] for r in observed]==list(range(1,601))
             assert [r[2] for r in observed]==[(1,3,8)[i%3] if offline else 3 for i in range(600)]
             assert [r[0] for r in observed]==[t for t in range(10,16) for _ in range(100)]

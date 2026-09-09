@@ -101,6 +101,10 @@ assert(not ok and tostring(reason):find('found [01 ?? ??]',1,true))
     def prepare_enable(self):
         self.check('''
 nativeSites=require('code/engine-sites').SHC
+for _,key in ipairs({'maintenance','world'}) do
+ local site=require('code/maintenance-native').profiles.SHC[key]
+ core.writeBytes(site.address,site.bytes)
+end
 for _,site in pairs(nativeSites) do
  if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
 end

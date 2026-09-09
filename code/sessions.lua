@@ -158,6 +158,10 @@ function M.copy(source,name,finalRngHash)
       'stream-commands.json','stream-rng-sync.json','stream-infself.json'}) do
       write(path..'/'..file,read(original..'/'..file))
     end
+    if source.phaseProfile then
+      local file=require('code/maintenance-journal').FILE
+      write(path..'/'..file,read(original..'/'..file))
+    end
     assert(sha.sha256(read(path..'/start.sav'))==copy.snapshotHash,'Starting save is damaged')
     assert(sha.sha256(read(path..'/rng.bin'))==copy.rngHash,'Starting RNG state is damaged')
     assert(sha.sha256(read(path..'/ucp-config.yml'))==copy.settingsHash,'Recorded settings are damaged')
@@ -231,6 +235,7 @@ function M.finish(manifest)
   assert(ok and inClosed and outClosed,reason or 'Cannot finish replay command stream')
   platform.replace(commandsPath..'.tmp',commandsPath)
   manifest.commandCount=count
+  require('code/maintenance-journal').seal(manifest,path,platform.replace)
   for name,file in pairs(streams) do manifest[name..'Hash']=sha.sha256(read(path..'/'..file)) end
   M.preflight(manifest)
   manifest.status='complete'

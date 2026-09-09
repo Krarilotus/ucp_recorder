@@ -2,6 +2,7 @@ local Base = require('code/replay-streams')
 local store = require('code/sessions')
 local native = require('code/native')
 local validation = require('code/validation')
+local work=require('code/maintenance-journal')
 local Session = setmetatable({}, {__index=Base})
 
 function Session:new(engine,config)
@@ -55,6 +56,7 @@ function Session:guard(callback)
     core.writeInteger(self.halt,stopSimulation and 1 or 0)
     if pauseGame then self.engine:pause() end
     if recordingFailed then
+      if self.phaseNative then self.phaseNative:stop() end
       -- A capture failure invalidates the recording, not the player's match.
       -- Keep the first error visible, but detach capture before native dispatch
       -- continues. Ordinary unpause must restore normal commands and ticking.
@@ -95,6 +97,10 @@ function Session:startRecording()
   self.manifest.automarket=automarket
   self:setName(store.path(self.manifest.id)..'/stream')
   self:openFiles('w')
+  if self.phaseNative then
+    self.manifest.phaseProfile=work.PROFILE
+    self.phaseFile=assert(io.open(store.path(self.manifest.id)..'/'..work.FILE,'w'))
+  end
   self.mode='record'; self.status='armed'; self.active=false
   self.error=nil; self.observedTick=false
   self.firstDesync=nil
@@ -123,6 +129,7 @@ function Session:activateRecording()
   self:saveInfo(0,seed,seed,r[1],r[2],r[4],r[3])
   self.manifest.status='recording'; store.save(self.manifest)
   self.active=true; self.status='recording'
+  if self.phaseNative then self.phaseNative:start() end
   if self.engine.battle then self.engine.battle:begin() end
   if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'record') end
   print('Recording '..self.manifest.id)
@@ -159,6 +166,8 @@ function Session:startPlayback(id,prepared,ready)
   self:setName(path..'/stream')
   self:openFiles('r')
   if manifest.multiplayer then self.tickFile=assert(io.open(path..'/ticks.bin','rb')) end
+  if manifest.phaseProfile then self.phaseFile=assert(io.open(path..'/'..work.FILE,'r')) end
+  self.nextWork=nil; self.workEnded=nil
   self.manifest=manifest
   self.firstDesync=nil
   self.preparedWorlds=ready.worlds
@@ -205,6 +214,17 @@ function Session:onExecutedCommand(command)
   self.manifest.commandCount=self.manifest.commandCount+1
 end
 
+function Session:onUnclockedWorld()
+  assert(self.active and self.status=='recording','Unexpected unclocked world capture')
+  work.capture(self)
+  work.write(self,2,1)
+end
+
+function Session:beforeCommandWork()
+  if self.mode=='record' then work.capture(self)
+  elseif self.status=='playing' then work.play(self) end
+end
+
 function Session:feed()
   self:reconcileMode()
   if self.status~='playing' then return end
@@ -231,6 +251,8 @@ function Session:onTick()
     self:activateRecording()
   end
   if not self.active then return end
+  if self.status=='recording' then work.capture(self)
+  elseif self.status=='playing' then work.play(self) end
   local now=self.engine:tick()
   -- Flush before replay checks can halt at the first mismatch.
   if self.rngTrace and now%64==0 then self.rngTrace:observe('checkpoint') end
@@ -278,6 +300,7 @@ function Session:onTick()
       self:checkRngData(expected.rngHash,'checkpoint')
     end
     if now>=self.manifest.lastTick then
+      work.finished(self)
       assert(self.playedCommands==self.manifest.commandCount,'Replay ended before all commands were scheduled')
       assert(not self.engine:commandsPending(),'Replay ended with commands still waiting to execute')
       assert(self.engine.journal.executed==self.manifest.commandCount,'Replay native execution count differs')
@@ -340,6 +363,8 @@ function Session:checkResources(expected,phase)
 end
 
 function Session:reset()
+  if self.phaseNative then self.phaseNative:stop() end
+  self.nextWork=nil; self.workEnded=nil
   core.writeInteger(self.playbackActive,0)
   core.writeInteger(self.resultsHold,0)
   if self.rngTrace then self.rngTrace:observe('finish','session ended') end

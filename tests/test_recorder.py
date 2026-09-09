@@ -98,6 +98,10 @@ assert(memory[0x191de0c]==777 and memory[0x01a275dc]==3)
         self.check('''
 package.loaded['code/native']={profile={name='SHC'},verify=function() end,addr=function(a) return a end}
 local sites=require('code/engine-sites').SHC
+for _,key in ipairs({'maintenance','world'}) do
+ local site=require('code/maintenance-native').profiles.SHC[key]
+ core.writeBytes(site.address,site.bytes)
+end
 for _,site in pairs(sites) do
  if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
 end

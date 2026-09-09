@@ -24,9 +24,12 @@ Window input / menu / audio / receive
 | Boundary | Crusader | Extreme | Current replay ownership |
 | --- | --- | --- | --- |
 | Timed command executor | `4892F0` | `489400` | Original handlers; observe actual actor, payload and execution order |
+| Before command context initialization | `489320` | `489430` | Replay preceding unclocked work before native actor/parameter setup |
 | Tick function entry | `45CD10` | `45CF20` | Reject stopped or viewer-paused local playback before any tick-owned maintenance; loading and recording retain native admission |
 | Pre-clock observer | `45CE44` | `45D054` | Starting snapshot and checkpoint describe state after preceding commands, before the next clock advancement |
 | Clock increment | `45CE58` | `45D068` | Native increment, conditional on menu/pause state |
+| Maintenance entry | `45CE7C` | `45D08C` | Count admitted passes without a clock increment during SP capture |
+| World-update entry | `45CF56` | `45D166` | Distinguish unclocked world admission from maintenance-only work |
 | Tick early-return epilogue | `45CDA8` | `45CFB8` | A halt detected by the pre-clock callback returns here immediately |
 | Main-loop return observer | `57C384` | `57C7B4` | Completes a pending MP tick frame only if its clock advanced exactly once |
 
@@ -106,13 +109,44 @@ MP behavior. The flood fill and other maintenance owners remain outside that
 check. A paused view refresh now waits for resume inside this tick owner; live
 inspection of flat view, reports and camera behavior is still required.
 
-**Record-time pause is a separate open contract.** Two command selections can
-share a match-clock value with maintenance between them. A timestamp-only stream
-cannot describe that ordering. Freezing a viewer must not erase source events:
-before changing the journal, trace source selection/maintenance boundaries and
-their consumers. Do not normalize this by resetting a countdown or changing the
-live game's pause rules. This finding does not attribute either archived RNG
-failure to navigation.
+### Recording unclocked work
+
+Two command selections can share a clock value with maintenance between them.
+In the investigated 27072 divergence, navigation recovery marked a poleturner
+for removal; the resulting census difference admitted a peasant earlier. Native
+paused-call counts explained three navigation schedule differences. Applying
+only those three schedule corrections in a private experiment made the named
+259784-tick snapshot finish with matching RNG and resource checks. This is causal
+evidence for that case, not proof that every older divergence has the same cause.
+
+Fresh SP captures now declare `phaseProfile: native-extra-work-v1` and hash a
+sparse `maintenance.jsonl` journal. Each row contains `time` (the current clock),
+`commands` (number actually executed), `kind` and `count`. Kind 1 is maintenance
+without a world update; kind 2 is maintenance followed by an unclocked world
+update, admitted by the negative logical-pause path. The native observer counts
+kind 1 without calling Lua per pass. Before kind 2 it flushes earlier work and
+records the distinct world admission. A clock advancement starts a new ordinary
+pass, which is already reproduced by normal playback and is not journaled twice.
+
+Playback applies due work before the next command's native context initialization
+or pre-clock checkpoint. This position matters: a world update must not overwrite
+an already prepared command actor or its parameters. It invokes the original
+coordinator with positive or negative logical pause, preserving the viewer's pause
+afterwards. Internal admission bypasses viewer pause, never the failure/endpoint
+halt. It neither resets navigation fields nor supplies expected RNG outcomes.
+
+The journal uses one-row lookahead and remembers EOF. Snapshots seal only work
+inside their verified prefix, without editing the live source. Older captures
+lack these events and cannot reconstruct omitted history. Their metadata is not
+rewritten. MP capture keeps its existing tick/segment contract; the SP journal
+does not silently change live network behavior.
+
+Portable tests cover ordering, invalid boundaries, prefix sealing and native
+register/flag preservation. Original-code SHC/Extreme checks exercise replay
+admission, viewer-pause restoration and the real navigation decrement/reset with
+both 200- and 50-call periods. Other subsystem callees remain stand-ins. Fresh
+in-game completion, long-pause playback cost and MP offline equivalence remain
+acceptance gates; these tests do not certify all maintenance inputs as deterministic.
 
 The existing optional `singleplayerRngDiagnostics` now samples this countdown
 at restoration/capture start and each RNG checkpoint. Its existing main-loop

@@ -37,6 +37,11 @@ def check(folder):
         native = lua.execute((root/'code/native.lua').read_text())
         profile = native.verify()
         assert profile['name'] == name
+        phases = lua.eval("require('code/maintenance-native')").profiles[name]
+        for key in ('maintenance', 'world'):
+            site = phases[key]
+            expected = bytes(site['bytes'].values())
+            assert reader(site['address'], len(expected)) == expected, f'{name}: {key} phase'
         world=lua.execute((root/'code/world-sections.lua').read_text())[name]
         table=reader(world['address'],world['bytes'])
         import hashlib

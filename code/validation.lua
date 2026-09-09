@@ -63,6 +63,11 @@ end
 
 function M.manifest(value)
   assert(type(value)=='table','Invalid replay manifest')
+  if value.phaseProfile~=nil then
+    assert(value.phaseProfile==require('code/maintenance-journal').PROFILE and not value.multiplayer,
+      'Unsupported recorded unclocked work profile')
+    M.hash(value.phaseHash,'unclocked work hash')
+  end
   if value.settingsCapture~=nil or value.restartSettingsHash~=nil then
     assert(value.settingsCapture=='resolved-v1','Unknown recorded settings profile')
     M.hash(value.restartSettingsHash,'recorded launch settings hash')

@@ -271,6 +271,14 @@ end
 
 function M:install(recorder)
   local originalQueue
+  -- Extra recorded work precedes command-context initialization. Running it
+  -- beside the handler would let world updates overwrite its actor/parameters.
+  core.detourCode(function(registers)
+    if self:localSession() and not self.loading and recorder.active then
+      recorder:guard(function() recorder:beforeCommandWork() end)
+    end
+    return registers
+  end,self.sites.commandBoundary.address,#self.sites.commandBoundary.bytes)
   local resources=require('code/resource-hooks')
   resources.install(self.sites.fileName,self.pathOverride,self.pathBuffer,true)
   local dummy=core.allocate(16,true); core.writeString(dummy,'replay\0')
