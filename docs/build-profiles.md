@@ -32,8 +32,11 @@ creating playback tables for every tick. Playback still decodes and validates
 the commands/states it actually consumes.
 
 Prepared native starting saves are cached by captured world identity, converter
-revision and executable. Every reuse verifies the source sections and prepared
-file digest. Missing, damaged or older derived caches are rebuilt; damaged
+revision and executable, using at most 32 proofs created by this game process.
+Metadata supplied alongside a recording is not a conversion proof. A fresh game
+launch rebuilds the derived save; repeated loads in that process can reuse it.
+Every reuse verifies the source sections and prepared file digest. Missing or
+damaged derived saves are rebuilt; damaged
 original recordings are rejected. Conversion still round-trips the original
 native compressor, and files are published only after complete writes.
 

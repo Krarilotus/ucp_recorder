@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.48.1
+
+- Reuse only native starting saves converted and verified by this game process.
+  Supplied cache metadata cannot authorize different native bytes; repeat loads
+  still verify the source and output. Retain at most 32 conversion proofs.
+- Show elapsed match time for replay snapshots even when no ordinary game save
+  refreshed the native duration field. Use the native wall-clock origin without
+  changing simulation state or adding timer calls to the simulation loop.
+- Remove the unused standalone replay browser's row, paging, double-click and
+  rename/delete helpers. Native history remains the owner of these interactions.
+  Clear stale preparation text when returning to history.
+
 ## 0.48.0
 
 - Publish separate release and diagnostic builds. Release retains all replay

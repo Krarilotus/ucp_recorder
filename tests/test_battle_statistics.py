@@ -34,6 +34,8 @@ core.exposeCode=function(a,count,convention)
 end
 engine={sites={gameCore=12000},tick=function() return now end,player=function() return 2 end}
 now=100
+wallClock=0
+require('code/platform').multimediaMilliseconds=function() return wallClock end
 sha={sha256=function(s) return s end}
 package.loaded['code/sessions']={path=function(id) return id end,write=function(p,s) files[p]=s end}
 package.loaded['code/world-reader']={read=function(p,n) return files[p] end}
@@ -61,6 +63,20 @@ saved.lastTick=99; assert(not pcall(stats.read,saved))
         self.check('''
 failPack=true; assert(not pcall(battle.begin,battle))
 assert(core.readString(layout.temporary,stats.SIZE)==string.rep('X',stats.SIZE))
+''')
+
+    def test_elapsed_time_does_not_require_a_native_save_and_handles_clock_wrap(self):
+        self.check('''
+core.writeInteger(engine.sites.gameCore+0x236c,4294907296)
+core.writeInteger(engine.sites.gameCore+0x2370,0) -- never refreshed by a save
+battle:begin(); wallClock=120000
+local saved={id='elapsed',lastTick=100}; battle:write(saved)
+assert(core.readInteger(battle.buffer+0x470)==3)
+assert(core.readInteger(engine.sites.gameCore+0x2370)==0)
+assert(core.readInteger(engine.sites.gameCore+0x236c)==4294907296)
+local raw=stats.read(saved)
+wallClock=180000; now=200; battle:observe(); battle:write({id='later',lastTick=200})
+assert(core.readInteger(battle.buffer+0x470)==4 and stats.read(saved)==raw)
 ''')
 
     def test_history_dates_and_names_do_not_change_snapshot_results(self):

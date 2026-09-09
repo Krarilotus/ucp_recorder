@@ -4,6 +4,7 @@ This tests the container writer independently of PKWARE. The original-codec
 checks separately exercise actual compressed bytes against both executables.
 """
 import json
+import hashlib
 from pathlib import Path
 import struct
 import unittest
@@ -115,6 +116,31 @@ assert(progress==122)
         self.lua.execute('container.prepare(virtual_path,engine); assert(compressions==2)')
         self.assertEqual((self.root/'world-native.sav').read_bytes(),expected)
         self.lua.execute("require('code/world-cache').REVISION=2; container.prepare(virtual_path,engine); assert(compressions==3)")
+
+    def test_supplied_cache_metadata_cannot_authorize_different_native_bytes(self):
+        self.prepare()
+        self.lua.execute('container.prepare(virtual_path,engine)')
+        expected=(self.root/'world-native.sav').read_bytes()
+        forged=b'x'*len(expected)
+        (self.root/'world-native.sav').write_bytes(forged)
+        metadata=json.loads((self.root/'world-native.json').read_text())
+        metadata['sha256']=hashlib.sha256(forged).hexdigest()
+        (self.root/'world-native.json').write_text(json.dumps(metadata))
+        # A new process has no proof about supplied derivative files, even when
+        # their metadata correctly names the genuine source and forged digest.
+        self.lua.execute("package.loaded['code/world-cache']=nil; container.prepare(virtual_path,engine); assert(compressions==2)")
+        self.assertEqual((self.root/'world-native.sav').read_bytes(),expected)
+
+    def test_returned_metadata_does_not_mutate_the_cached_proof(self):
+        self.prepare()
+        self.lua.execute('''
+local result=container.prepare(virtual_path,engine)
+result.sha256=string.rep('0',64)
+result=container.prepare(virtual_path,engine)
+assert(result.sha256~=string.rep('0',64) and compressions==1)
+result.sha256=string.rep('1',64)
+assert(container.prepare(virtual_path,engine).sha256~=string.rep('1',64))
+''')
 
     def test_conversion_does_not_run_during_a_match_or_with_a_traversal_path(self):
         self.prepare()

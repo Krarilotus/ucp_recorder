@@ -12,16 +12,6 @@ browser:select(2); browser:refresh(); assert(browser.selected.id=='old')
 table.insert(entries,1,entry('next')); recorder.lastCompletedReplay='next'
 browser:refresh(); assert(browser.selected.id=='next')
 ''')
-    def test_double_click_requires_same_recording_and_survives_clock_wrap(self):
-        self.check('''
-entries={entry('one'),entry('two')}; browser:refresh()
-assert(not browser:click(1,4294967200))
-assert(browser:click(1,100))
-assert(not browser:click(2,150))
-assert(not browser:click(2,650)) -- native threshold is strictly below 500 ms
-browser:select(1); assert(not browser:click(2,700)) -- keyboard movement breaks the pair
-assert(not browser:click(99,701) and browser.index==2)
-''')
     check = fixture.RecorderTests.check
 
     def setUp(self):
@@ -92,13 +82,6 @@ assert(not pcall(function() browser:play() end) and not restarted)
 assert(browser.message:find('Install'))
 ''')
 
-    def test_rename_keeps_identity_selection_and_displays_name(self):
-        self.check('''
-entries={entry('one'),entry('two')}; browser:refresh('two')
-browser:rename('Stream match'); assert(browser.selected.id=='two' and browser.index==2)
-assert(browser:row(2):find('Stream match',1,true))
-''')
-
     def test_missing_version_is_shown_even_when_config_text_matches(self):
         self.check('''
 package.loaded['code/launch-readiness']={
@@ -111,18 +94,8 @@ local ok,reason=pcall(function() browser:play() end)
 assert(not ok and reason:find('ui 1.0.1',1,true) and not restarted and not played)
 ''')
 
-    def test_paging_bounds_and_active_recording(self):
+    def test_active_recording_cannot_start_playback(self):
         self.check('''
-for i=1,15 do entries[i]=entry('recording'..i) end
-browser:refresh(); browser:page(1); assert(browser.index==7 and browser:firstRow()==7)
-browser:page(20); assert(browser.index==15 and browser:firstRow()==13)
-browser:page(-20); assert(browser.index==1 and browser:firstRow()==1)
+entries={entry('one')}; browser:refresh()
 recorder.mode='record'; assert(not pcall(function() browser:play() end)); assert(not played)
-''')
-
-    def test_malformed_summary_does_not_break_other_rows(self):
-        self.check('''
-entries={entry('bad'),entry('good')}; entries[1].lastTick=math.huge
-browser:refresh(); assert(browser:row(1):find('0 ticks',1,true))
-browser:select(2); assert(browser:row(2):find('100 ticks',1,true))
 ''')

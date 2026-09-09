@@ -35,6 +35,7 @@ function M:begin()
   end)
   core.copyMemory(self.layout.temporary,self.backup,M.SIZE)
   assert(ok,reason)
+  self.timeOrigin=core.readInteger(self.engine.sites.gameCore+0x236c)
   self:observe()
 end
 
@@ -47,14 +48,17 @@ function M:observe()
   core.copyMemory(self.alive,self.layout.alive,18)
   self.tick=self.engine:tick()
   core.writeInteger(self.buffer+0x474,self.tick)
-  local duration=core.readInteger(self.engine.sites.gameCore+0x2370)
-  core.writeInteger(self.buffer+0x470,math.floor(duration/60000))
   core.writeInteger(self.buffer+0x3ec,self.score(self.engine:player()))
 end
 
 function M:write(manifest)
   local tick=manifest.lastObservedTick or manifest.lastTick
   assert(tick==self.tick,'Battle statistics boundary differs from replay')
+  -- gameDuration is refreshed by native save/end processing, not every tick.
+  -- Snapshot history needs the same elapsed-time calculation even when no game
+  -- save occurred. Keep it in our private record and out of the simulation loop.
+  local duration=(require('code/platform').multimediaMilliseconds()-self.timeOrigin)%4294967296
+  core.writeInteger(self.buffer+0x470,math.floor(duration/60000))
   local date=os.date('*t')
   manifest.savedAt=os.date('!%Y-%m-%dT%H:%M:%SZ')
   core.writeInteger(self.buffer+0x464,date.day)

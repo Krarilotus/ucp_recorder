@@ -132,6 +132,7 @@ function M:publish()
 end
 
 function M:refresh()
+  self.message=nil -- A completed/previous preparation does not describe this page.
   self.model:refresh(); self:publish()
   local ffi=modules.cffi:cffi()
   local menu=ffi.tonumber(ffi.cast('unsigned long',modules.ui:access().manager.lookupMenu(58)))

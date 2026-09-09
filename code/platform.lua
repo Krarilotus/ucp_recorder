@@ -27,6 +27,17 @@ function M.milliseconds()
   return tickCount()%4294967296
 end
 
+-- Native save/history elapsed time uses WinMM's clock and its saved time origin.
+-- This is wall time for presentation, never the simulation tick clock.
+local multimediaClock
+function M.multimediaMilliseconds()
+  if not multimediaClock then
+    local imports={SHC=0x59e228,Extreme=0x59e22c}
+    multimediaClock=M.stdcallAddress(core.readInteger(assert(imports[require('code/native').profile.name])),0)
+  end
+  return multimediaClock()%4294967296
+end
+
 -- UCP's library loader accepts extension DLLs, not Windows system libraries.
 -- Bootstrap GetProcAddress from the already loaded kernel32 export directory;
 -- use the game's verified GetModuleHandleA import (ASLR-resolved by Windows).

@@ -111,6 +111,7 @@ function M.prepare(path,engine,progress)
   require('code/platform').replace(path..'/world-native.sav.tmp',path..'/world-native.sav')
   store.write(path..'/world-native.json.tmp',json:encode(result))
   require('code/platform').replace(path..'/world-native.json.tmp',path..'/world-native.json')
+  cache.remember(path,result)
   return result
 end
 return M
