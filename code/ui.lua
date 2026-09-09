@@ -118,6 +118,8 @@ function M.createButtons(recorder,sites)
   M.history=require('code/history-native').new(ui,recorder,browser,function(value,action)
     openName(value,action,-1,'Rename replay...')
   end)
+  M.hud.showStatistics=function() M.history:showFinishedStatistics() end
+  M.hud.controls.input=function(direction) ui.nativeSpeedKey(direction) end
   local historyKey=ui.onNativeKey
   ui.onNativeKey=function(message,key)
     return M.hud:key(message,key) or (historyKey and historyKey(message,key))

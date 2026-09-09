@@ -3,7 +3,7 @@
 local platform=require('code/platform')
 local binary=require('code/binary-memory')
 local M={CHUNK=65536}
-local api,buffers,busy
+local api,buffers,busy,nativeRead,nativeClose
 
 local function initialize()
   if api then return end
@@ -17,6 +17,13 @@ local function initialize()
   local allocated={input=storage,provider=storage+M.CHUNK+4,
     hash=storage+M.CHUNK+8,digest=storage+M.CHUNK+12,length=storage+M.CHUNK+44}
   api,buffers=functions,allocated
+  -- These are the framework's own CRT functions, paired with its VFS opener.
+  -- Reading straight into our buffer avoids a Lua string -> byte table -> native
+  -- buffer round trip on RPS versions whose writeString truncates at NUL.
+  if io.openFileDescriptor and io.ucrt and io.ucrt._read and io.ucrt._close then
+    nativeRead=core.exposeCode(io.ucrt._read,3,0)
+    nativeClose=core.exposeCode(io.ucrt._close,1,0)
+  end
 end
 
 function M.prepare()
@@ -38,9 +45,10 @@ local function hashChunks(nextChunk)
     while true do
       local chunk=nextChunk()
       if not chunk then break end
-      assert(type(chunk)=='string' and #chunk>0 and #chunk<=M.CHUNK,'Invalid SHA-256 chunk')
-      binary.write(buffers.input,chunk)
-      assert(api.CryptHashData(hash,buffers.input,#chunk,0)~=0,'Cannot update SHA-256 hash')
+      local size=type(chunk)=='number' and chunk or #chunk
+      assert(size>0 and size<=M.CHUNK,'Invalid SHA-256 chunk')
+      if type(chunk)=='string' then binary.write(buffers.input,chunk) end
+      assert(api.CryptHashData(hash,buffers.input,size,0)~=0,'Cannot update SHA-256 hash')
     end
     core.writeInteger(buffers.length,32)
     assert(api.CryptGetHashParam(hash,2,buffers.digest,buffers.length,0)~=0
@@ -67,6 +75,27 @@ function M.sha256(data)
   end)
 end
 function M.file(path,limit,onChunk)
+  initialize()
+  if nativeRead then
+    -- _O_RDONLY | _O_BINARY; VFS alias resolution and access policy stay with UCP.
+    local fd=io.openFileDescriptor(path,0x8000,0)
+    assert(type(fd)=='number' and fd>=0 and fd<2147483648,'Missing file: '..path)
+    local ok,result=pcall(function()
+      local count=0
+      return hashChunks(function()
+        local size=nativeRead(fd,buffers.input,M.CHUNK)
+        assert(size>=0 and size<=M.CHUNK,'Cannot read hashed file: '..path)
+        if size==0 then return end
+        count=count+size; assert(count<=limit,'File exceeds replay size limit: '..path)
+        if onChunk then onChunk(core.readString(buffers.input,size),count) end
+        return size
+      end)
+    end)
+    local closed=nativeClose(fd)==0
+    assert(ok,result)
+    assert(closed,'Cannot close hashed file: '..path)
+    return result
+  end
   local file=assert(io.open(path,'rb'),'Missing file: '..path)
   local ok,result=pcall(function()
     local count=0

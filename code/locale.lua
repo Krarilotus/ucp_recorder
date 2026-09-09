@@ -1,6 +1,8 @@
 -- GUI language is passed at launch. Older launchers fall back to the game language.
 local M={}
 local de={
+ ['Statistics']='Statistik',
+ ['Replay statistics are unavailable.']='Keine Statistik für diese Aufnahme verfügbar.',
  ['F3: replay information']='F3: Replay-Informationen',
  ['UCP framework: %s']='UCP-Framework: %s', ['Active packs:']='Aktive Pakete:',
  ['%d exact extension versions verified']='%d genaue Erweiterungsversionen geprüft',

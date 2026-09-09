@@ -6,14 +6,14 @@ recorded separately on each PC and played back locally in single-player.
 There is no multiplayer replay session to join or host.
 
 **Experimental test build:** the code supports Crusader and Extreme. The new
-offline multiplayer/recovery path still needs live verification. The native
-maintenance correction passed a fresh short single-player replay; broader
-determinism and live UI checks remain. See the [remaining work](docs/roadmap.md).
+offline multiplayer path completed one physical Steam host recording (288,568
+ticks, 3,951 commands) with RNG and resource checkpoints matching. Independent
+client completion, recovery and broader testing remain. See the [remaining work](docs/roadmap.md).
 
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.47.6.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.47.7.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -31,6 +31,9 @@ determinism and live UI checks remain. See the [remaining work](docs/roadmap.md)
    Tick/status stays visible at the top right; F3 toggles date, game/framework
    versions and active packs. Use the normal Escape menu to resume or leave.
    Mission restart is disabled during playback.
+   Speed keys and the HUD minus/plus buttons reuse the installed game's speed
+   policy, including UCP2-Legacy's extended limits. At completion, **Statistics**
+   leaves the world and opens this recording's native history statistics.
 
 All new recordings are stored under `ucp/replays`. Earlier multiplayer diagnostic
 captures remain under their original directories; they lack the new tick data

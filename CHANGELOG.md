@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.47.7
+
+- Hash files directly from UCP's virtual-filesystem descriptors into the native
+  SHA-256 buffer, avoiding Lua byte-table copies of every asset on older RPS.
+  Keep the same file/size/hash checks, virtual archive support and cleanup on
+  errors or cancellation. Retain the portable fallback for older API surfaces.
+- Report startup stage durations and replay preparation working/elapsed time.
+- Delegate replay speed keys and HUD buttons to the installed native keyboard
+  handler. Remove the recorder's custom speed steps and cap; UCP2-Legacy owns
+  extended speeds. Display the native unlimited range as 1000+.
+- Add Statistics beside finished replay status. Use native mission cleanup,
+  then open the same recorded statistics available through battle history.
+  The ordinary Escape menu and existing historical results remain unchanged.
+
 ## 0.47.6
 
 - Restore replay speed shortcuts on the main keyboard and numeric keypad.

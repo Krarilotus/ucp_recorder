@@ -57,6 +57,33 @@ hooked[sites.action.address](11)
 assert(returned and core.readInteger(0x191dd80)==99)
 ''')
 
+    def test_finished_replay_uses_quit_cleanup_then_its_existing_history_statistics(self):
+        self.check('''
+local switches={}; local closed=0
+modules.ui.switchToMenu=function(_,screen,delay)
+ assert(delay==0); switches[#switches+1]=screen
+end
+ui.close=function() closed=closed+1 end
+recorder.mode='play'; recorder.status='finished'; recorder.manifest={id='snapshot',battle={}}
+recorder.engine={localSession=function() return true end}
+core.writeInteger(0x1fe7d1c,14)
+history:showFinishedStatistics(); history:showFinishedStatistics()
+assert(closed==1 and #switches==1 and switches[1]==61)
+history:advance(); assert(#switches==1) -- no history while the world is alive
+recorder.mode='none'; core.writeInteger(0x1fe7d1c,61)
+history:advance(); assert(#switches==1) -- native cleanup still pending
+core.writeInteger(0x1fe7d1c,20); history:advance()
+assert(switches[2]==58)
+history.model.items={}; for i=1,20 do history.model.items[i]={id='other'..i} end
+history.model.items[18]={id='snapshot',manifest=recorder.manifest}
+core.writeInteger(0x1fe7d1c,58); history:advance()
+assert(not history.pendingStatistics and history.detail)
+assert(history.model.selected.id=='snapshot' and core.readInteger(sites.scroll)==12)
+assert(core.readInteger(0x1fe7d1c)==29)
+history:advance(); assert(#switches==2) -- never auto-start a replay or loop
+recorder.mode='record'; assert(not pcall(history.showFinishedStatistics,history))
+''')
+
     def test_footer_preserves_native_rows_count_scrollbar_and_mirrors_back_hand(self):
         self.check('''
 local rename,hand,progress=controls[1],controls[2],controls[3]

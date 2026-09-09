@@ -52,6 +52,7 @@ function M.new(ui,recorder,browser,rename)
     return originalAction(action)
   end,sites.action.address,1,0,#sites.action.bytes)
   o.back=function() originalAction(11) end
+  o.openDetail=function(row) o.detail=true; originalAction(row) end
   local function visible()
     return recorder.mode=='none' and ui:activeDialog()==-1
   end
@@ -156,6 +157,27 @@ function M:play()
 end
 
 function M:advance()
+  if self.pendingStatistics then
+    local pending=self.pendingStatistics
+    local screen=core.readInteger(native.addr(0x1fe7d1c))
+    if pending.stage=='leaving' and self.recorder.mode=='none' and screen==20 then
+      pending.stage='history'
+      modules.ui:switchToMenu(58,0)
+    elseif pending.stage=='history' and screen==58 then
+      self.pendingStatistics=nil
+      for index,item in ipairs(self.model.items) do
+        if item.id==pending.id then
+          self.model.selected=item
+          local scroll=math.min(index-1,math.max(0,#self.model.items-8))
+          core.writeInteger(self.sites.scroll,scroll)
+          self.openDetail(index-scroll-1)
+          return
+        end
+      end
+      self.message='Replay statistics are unavailable.'
+    end
+    return
+  end
   if not self.browser.preparation then return end
   if core.readInteger(native.addr(0x1fe7d1c))~=58 then self.browser:cancelPreparation() end
   if self.browser:advancePreparation(function()
@@ -167,5 +189,17 @@ function M:advance()
     self.message=self.browser.message
   else self.message=self.browser.message
   end
+end
+
+function M:showFinishedStatistics()
+  local r=self.recorder
+  assert(r.mode=='play' and r.status=='finished' and r.engine:localSession()
+    and r.manifest and r.manifest.battle,'No finished replay statistics')
+  if self.pendingStatistics then return end
+  self.pendingStatistics={id=r.manifest.id,stage='leaving'}
+  -- Native Quit Mission view owns world cleanup. Do not jump straight from a
+  -- live world into historical results or leave recorded multiplayer mode set.
+  self.ui:close()
+  modules.ui:switchToMenu(61,0)
 end
 return M

@@ -26,6 +26,11 @@ The tick/status display is always at the top right. F3 adds the saved date,
 game and UCP framework versions, and a compact summary of recorded packs.
 Full exact settings and asset checks still govern replay admission.
 Use the ordinary Escape menu to resume or leave; mission restart is disabled.
+The minus/plus buttons and keyboard shortcuts use the native speed handler,
+including UCP2-Legacy's installed extended-speed setting. Recorder defines no
+independent speed steps or limit. Native speeds from 1100 display as 1000+.
+After successful completion, **Statistics** replaces the speed strip and opens
+the current recording's existing statistics after the native world-exit cleanup.
 
 ## Validation status
 

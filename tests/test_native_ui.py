@@ -298,6 +298,25 @@ assert(hook(10,20,0x102,65,30)==42)
 assert(handled==3 and forwarded==4)
 ''')
 
+    def test_speed_buttons_reuse_native_key_dispatch_without_reentering_overlay(self):
+        self.check('''
+local hook,calls,filtered=nil,{},0
+core.hookCode=function(callback)
+ hook=callback
+ return function(ecx,window,message,key,data)
+  calls[#calls+1]={ecx,window,message,key,data}
+ end
+end
+ui.onNativeKey=function() filtered=filtered+1; return true end
+ui:installInput(function() return true end,function() end)
+assert(not pcall(ui.nativeSpeedKey,1))
+hook(0,123,0x200,0,0)
+ui.nativeSpeedKey(1); ui.nativeSpeedKey(-1)
+assert(filtered==1 and #calls==2)
+assert(calls[1][2]==123 and calls[1][3]==0x100 and calls[1][4]==107 and calls[1][5]==0)
+assert(calls[2][4]==109)
+''')
+
     def test_multiple_visibility_groups_install_only_one_native_hook(self):
         self.check('''
 local installs=0; local hook

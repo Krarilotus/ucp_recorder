@@ -75,10 +75,19 @@ function M:isPaused()
   return self:isLogicallyPaused() or self.haltingMenuNative(self.sites.gameCore)~=0
 end
 function M:presentationSpeed() return core.readInteger(self.sites.gameCore+0xc8) end
-function M:setPresentationSpeed(value)
+function M:withReplaySpeedInput(action)
   assert(self:localSession(),'Replay speed control requires a local session')
-  require('code/validation').integer(value,20,1000,'presentation speed')
-  core.writeInteger(self.sites.gameCore+0xc8,value)
+  -- Native +/- admits SP (0) and spectator (99), not a recorded MP mode.
+  -- Scope only the synchronous speed-key dispatch; restore the recorded mode
+  -- before returning to any simulation/transport work, including on failure.
+  local address=self.base+0x618
+  local mode=core.readInteger(address)
+  local changed=mode~=0 and mode~=99
+  if changed then core.writeInteger(address,99) end
+  local ok,result=xpcall(action,debug.traceback)
+  if changed then core.writeInteger(address,mode) end
+  assert(ok,result)
+  return result
 end
 
 function M:rngState()

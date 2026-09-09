@@ -11,7 +11,9 @@ local M={REPORT='ucp/recorder-startup.txt'}
 -- an exception after it starts cannot be recovered without a verified rollback.
 ---@param callback fun(check: fun(name: string, action: function): any, install: fun(action: function))
 ---@return RecorderStartupResult
-function M.run(callback)
+function M.run(callback,clock)
+  clock=clock or function() return os.clock()*1000 end
+  local started=clock()
   local lines={'UCP Recorder startup', 'UTC: '..os.date('!%Y-%m-%dT%H:%M:%SZ'),
     'Loaded extensions in order:'}
   for i,extension in ipairs(allActiveExtensions or {}) do
@@ -23,21 +25,24 @@ function M.run(callback)
     local function check(name,action)
       assert(not installing,'Recorder checks must precede installation')
       stage=name
+      local before=clock()
       local value=action()
-      lines[#lines+1]='OK: '..name
+      lines[#lines+1]=string.format('OK: %s (%.0f ms)',name,clock()-before)
       return value
     end
     callback(check,function(action)
       assert(not installing,'Recorder installation may only start once')
       installing=true
       stage='hook and menu installation'
+      local before=clock()
       action()
-      lines[#lines+1]='OK: '..stage
+      lines[#lines+1]=string.format('OK: %s (%.0f ms)',stage,clock()-before)
     end)
     assert(installing,'Recorder installation was not started')
   end,debug.traceback)
   local profile=require('code/native').profile
   lines[#lines+1]='Native profile: '..(profile and profile.name or 'unidentified')
+  lines[#lines+1]=string.format('Recorder startup: %.0f ms',clock()-started)
   lines[#lines+1]=ok and 'READY: replay hooks and menus installed; gameplay not validated.'
     or ((installing and 'FAILED: ' or 'DISABLED: ')..stage..'\n'..tostring(result))
   lines[#lines+1]='Setup and troubleshooting: docs/setup.md in the recorder release ZIP.'

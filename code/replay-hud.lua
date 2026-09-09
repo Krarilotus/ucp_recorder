@@ -64,11 +64,20 @@ function M:install(ui)
     local step=direction
     items[#items+1]={x=step==-1 and -230 or -48,y=76,width=36,height=28,
       label=step==-1 and '-' or '+',
-      enabled=function() return self.controls:available() and self.controls:nextSpeed(step)~=nil end,
+      visible=function() return self.recorder.status~='finished' end,
+      enabled=function() return self.controls:available() end,
       action=function() self.controls:stepSpeed(step) end}
   end
   items[#items+1]={x=-190,y=76,width=138,height=28,enabled=false,
-    render=function(x,y) ui:hudText(tr('Speed: %d',self.controls:speed()),x+132,y+6,-1,132) end}
+    visible=function() return self.recorder.status~='finished' end,
+    render=function(x,y)
+      local speed=self.controls:speed()
+      ui:hudText(tr('Speed: %d',math.min(speed,1000))..(speed>=1100 and '+' or ''),x+132,y+6,-1,132)
+    end}
+  items[#items+1]={x=-180,y=76,width=168,height=28,label=function() return tr('Statistics') end,
+    visible=function() return self.recorder.status=='finished' and self.recorder.manifest
+      and self.recorder.manifest.battle~=nil end,
+    action=function() self.showStatistics() end}
   ui:attachOverlay({14,16},items,function() return self.view:available() and ui:activeDialog()==-1 end,true)
 end
 

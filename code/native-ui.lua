@@ -300,6 +300,7 @@ function M:installInput(singlePlayer,handler)
   -- an unused ECX argument has the same stack cleanup (ret 16); native code
   -- never reads incoming ECX. No global game text buffer is borrowed.
   original=core.hookCode(function(unused,window,message,key,data)
+    self.inputWindow=window
     if singlePlayer() and self.dialogs[self:activeDialog()]
       and (message==0x100 or message==0x101 or message==0x102) then
       local ok,reason=pcall(handler,message,key)
@@ -312,6 +313,12 @@ function M:installInput(singlePlayer,handler)
     end
     return original(unused,window,message,key,data)
   end,self.sites.windowProc.address,5,1,#self.sites.windowProc.bytes)
+  self.nativeSpeedKey=function(direction)
+    assert(self.inputWindow,'Native game window is unavailable')
+    -- Call the preceding WndProc exactly once. No queued OS input or generated
+    -- WM_CHAR: native/UCP keyboard code supplies the speed arithmetic and limits.
+    return original(0,self.inputWindow,0x100,direction==1 and 107 or 109,0)
+  end
 end
 
 function M:extendPause(label,action,predicate,isPlayback)

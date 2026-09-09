@@ -135,6 +135,65 @@ hash=require('code/native-hash')
 
 
 class NativeHashTests(unittest.TestCase):
+    def descriptor_runtime(self, data):
+        backend=Backend(real=os.name=='nt'); backend.truncate=True
+        lua=backend.runtime(); state={'offset':0,'closed':0,'opened':0}
+        def read(fd,address,size):
+            self.assertEqual(fd,7); self.assertEqual(size,65536)
+            if state.get('fail'): return -1
+            chunk=data[state['offset']:state['offset']+size]
+            state['offset']+=len(chunk); backend.write(address,chunk)
+            return len(chunk)
+        def close(fd):
+            self.assertEqual(fd,7); state['closed']+=1
+            return -1 if state.get('close_fail') else 0
+        def opened(path,mode,permissions):
+            self.assertEqual(path,'ucp/modules/virtual-1.0.0/data.bin')
+            self.assertEqual((mode,permissions),(0x8000,0))
+            state['offset']=0; state['opened']+=1
+            return 4294967295 if state.get('missing') else 7
+        def expose(address,count,convention):
+            self.assertEqual(convention,0)
+            self.assertEqual(count,3 if address==1 else 1)
+            return read if address==1 else close
+        lua.globals().open_descriptor=opened; lua.globals().expose=expose
+        lua.execute('io.openFileDescriptor=open_descriptor; io.ucrt={_read=1,_close=2}; core.exposeCode=expose')
+        lua.execute('hash.prepare()')
+        backend.byte_writes.clear()
+        return backend,lua,state
+
+    def test_framework_descriptor_streams_binary_without_lua_byte_table_round_trip(self):
+        data=bytes(range(256))*1025
+        backend,lua,state=self.descriptor_runtime(data)
+        lua.execute("chunks={}; function chunk(data,count) chunks[#chunks+1]=data; total=count end")
+        result=lua.globals().hash.file('ucp/modules/virtual-1.0.0/data.bin',len(data),lua.globals().chunk)
+        self.assertEqual(result,hashlib.sha256(data).hexdigest())
+        self.assertEqual(lua.eval("table.concat(chunks)").encode('latin-1'),data)
+        self.assertEqual(lua.globals().total,len(data))
+        self.assertEqual(backend.byte_writes,[])
+        self.assertEqual(state['closed'],1)
+        self.assertFalse(backend.providers or backend.hashes)
+
+    def test_descriptor_errors_and_cancellation_close_once_without_leaking_hash_handles(self):
+        for fault in ('missing','fail','close_fail','limit','cancel'):
+            with self.subTest(fault=fault):
+                backend,lua,state=self.descriptor_runtime(b'x'*70000)
+                state[fault]=True
+                if fault=='cancel':
+                    lua.execute('''
+local now=0
+task=require('code/preparation-task').new(function(progress)
+ return hash.file('ucp/modules/virtual-1.0.0/data.bin',70000,function() progress('Hashing') end)
+end,function() now=now+20; return now end)
+task:step(); assert(task.status=='pending'); task:cancel(); task:step()
+assert(task.status=='cancelled')
+''')
+                else:
+                    with self.assertRaises(Exception):
+                        lua.globals().hash.file('ucp/modules/virtual-1.0.0/data.bin',69999 if fault=='limit' else 70000)
+                self.assertEqual(state['closed'],0 if fault=='missing' else 1)
+                self.assertFalse(backend.providers or backend.hashes)
+
     def check_vectors(self,real,truncate=False):
         backend=Backend(real); backend.truncate=truncate; lua=backend.runtime()
         lua.execute('hash.prepare()')

@@ -60,6 +60,14 @@ Recorder does not bundle or install them. The combination under investigation is
 | map-extensions | 1.0.0 for Automarket and UCP2 custom save sections |
 | ucp2-legacy | 2.15.2 with saved simulation state and its dependencies |
 | ui | 1.0.1 in the prepared Ascension test setup |
+| steam-multiplayer | 1.2.3 in the prepared test setup |
+
+If the store still offers UCP2-Legacy 2.15.1, use the saved-state
+[2.15.2 test release](https://github.com/Krarilotus/extension-ucp2-legacy/releases/tag/test-fbb634bb2331)
+from [its PR](https://github.com/UnofficialCrusaderPatch/extension-ucp2-legacy/pull/6).
+Likewise, if UI 1.0.1 is absent from the store, install the
+[UI 1.0.1 test release](https://github.com/Krarilotus/ucp-extension-ui/releases/tag/test-d3a807cfee70)
+from [the menu-array fix](https://github.com/gynt/ucp-extension-ui/pull/6).
 
 **Update UCP2-Legacy before recording with 0.45.0.** Version 2.15.1 leaves the AI
 attack target cycle outside saved worlds. This can desync playback even with
@@ -67,7 +75,6 @@ identical RNG and no player commands. UCP2-Legacy 2.15.2 saves that state throug
 map-extensions; install both, reload the launcher, and choose 2.15.2 in the active
 configuration. Record a new match. Older recordings do not contain the missing
 state; changing their version or settings metadata does not recover it.
-| steam-multiplayer | 1.2.3 in the prepared test setup |
 
 This is a test configuration, not complete compatibility certification. A
 different UI version is not automatically the cause of a startup failure.
@@ -85,7 +92,7 @@ See [adapter details](automarket-replay.md).
 
 ## First five-minute check
 
-1. Start a **new single-player Skirmish**, with an AI and **Auto: on** in the lobby.
+1. Start a **new single-player Skirmish**, with an AI and automatic recording enabled in the launcher.
    Do this before multiplayer diagnostics.
 2. Place a building and issue a troop order. With Automarket enabled, set a buy
    or sell threshold and commit it, then let several weeks pass.
@@ -95,8 +102,11 @@ See [adapter details](automarket-replay.md).
    process does not finalize it. The recorder's named-copy action is separate
    from saving a native game. Since 0.40.0, loading a saved single-player Skirmish
    closes the previous recording and automatically begins a new one after loading.
-5. Return to **Skirmish > Replays**. Play both the named copy and full recording;
+5. Return to **Skirmish > Battle history**. Select a recording and click the right
+   hand to play both the named copy and full recording;
    check that the shorter copy ends earlier.
+6. During playback try portrait selection, the speed keys/buttons and F3. At
+   completion click **Statistics** and check it shows that recording's results.
 
 Each session has its own folder under `<test game>/ucp/replays/`. Named copies
 preserve recording in the background; duplicate display names cannot overwrite

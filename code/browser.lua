@@ -112,6 +112,8 @@ function Browser:advancePreparation(beforeStart)
   task:step()
   self.message=task.message or self.message
   if task.status=='pending' then return false end
+  print(string.format('[recorder] Replay preparation %s: %.0f ms elapsed, %.0f ms working',
+    task.status,task.elapsedMs,task.workMs))
   self.preparation=nil
   if task.status=='cancelled' then self.message='Replay preparation cancelled.'; return false end
   if task.status=='failed' then
