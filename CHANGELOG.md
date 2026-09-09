@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.47.6
+
+- Restore replay speed shortcuts on the main keyboard and numeric keypad.
+  Keyboard input and visible native-style minus/plus HUD buttons use the same
+  viewer controller, with a localized current-speed display.
+- Extend viewer speed steps to 1000. Reaching a speed limit disables its button;
+  adjusting speed keeps pause state unchanged and sends no gameplay commands.
+  These controls are inactive during recording, live multiplayer or failed/ended
+  playback. Normal Escape/menu behavior is unchanged.
+
 ## 0.47.5
 
 - Allow multiplayer world preparation from the integrated single-player battle

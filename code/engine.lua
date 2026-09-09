@@ -77,7 +77,7 @@ end
 function M:presentationSpeed() return core.readInteger(self.sites.gameCore+0xc8) end
 function M:setPresentationSpeed(value)
   assert(self:localSession(),'Replay speed control requires a local session')
-  require('code/validation').integer(value,20,300,'presentation speed')
+  require('code/validation').integer(value,20,1000,'presentation speed')
   core.writeInteger(self.sites.gameCore+0xc8,value)
 end
 

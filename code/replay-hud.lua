@@ -1,10 +1,12 @@
 -- Presentation only: the existing view owns player choice; the recorder owns
--- validation and stopping. This strip never changes pause, speed or commands.
+-- validation and stopping. Viewer speed belongs to the shared playback controls;
+-- neither the strip nor keyboard handling dispatches gameplay commands.
 local tr=require('code/locale').text
 local M={}
 
 function M.new(recorder,view)
-  return setmetatable({recorder=recorder,view=view},{__index=M})
+  return setmetatable({recorder=recorder,view=view,
+    controls=require('code/playback-controls').new(recorder)},{__index=M})
 end
 
 function M:status()
@@ -58,10 +60,20 @@ function M:install(ui)
       end
       for index,line in ipairs(self.lines) do ui:hudText(line,x,y+(index-1)*18,0,320) end
     end}
+  for _,direction in ipairs({-1,1}) do
+    local step=direction
+    items[#items+1]={x=step==-1 and -230 or -48,y=76,width=36,height=28,
+      label=step==-1 and '-' or '+',
+      enabled=function() return self.controls:available() and self.controls:nextSpeed(step)~=nil end,
+      action=function() self.controls:stepSpeed(step) end}
+  end
+  items[#items+1]={x=-190,y=76,width=138,height=28,enabled=false,
+    render=function(x,y) ui:hudText(tr('Speed: %d',self.controls:speed()),x+132,y+6,-1,132) end}
   ui:attachOverlay({14,16},items,function() return self.view:available() and ui:activeDialog()==-1 end,true)
 end
 
 function M:key(message,key)
+  if self.view:available() and self.controls:key(message,key) then return true end
   if key~=114 then return false end -- F3, presentation only
   if message==0x101 then self.keyDown=false; return self.view:available() end
   if message~=0x100 or not self.view:available() then return false end
