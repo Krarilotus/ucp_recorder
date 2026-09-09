@@ -17,7 +17,10 @@ local all={extension('Private-Test','0.1.22','PluginLoader',{Ascension='^1.0.0'}
  extension('Ascension','1.0.11','PluginLoader',{AI='^1.0.0',automarket='^1.0.0'}),
  extension('AI','1.0.0','PluginLoader'),extension('automarket','1.1.0','ModuleLoader'),
  extension('recorder','0.46.0','ModuleLoader')}
+local loaded=0; local definition=all[2].definition; all[2].definition=nil
+all[2].loadDefinition=function(self) loaded=loaded+1; self.definition=definition end
 local info=require('code/playback-info').capture(all,'major: 3\\nminor: 0\\npatch: 7\\n')
+assert(loaded==1)
 assert(info.framework=='3.0.7' and info.count==5)
 assert(info.packs.Ascension=='1.0.11' and info.packs['Private-Test']=='0.1.22')
 assert(info.packs.recorder=='0.46.0' and not info.packs.AI and not info.packs.automarket)
@@ -47,7 +50,7 @@ local view={available=function() return available end,players=function() return 
 local hud=require('code/replay-hud').new(recorder,view)
 local ui={activeDialog=function() return -1 end,attachOverlay=function(_,ids,items,predicate)
  assert(ids[1]==14 and ids[2]==16); controls=items; visible=predicate end,
- text=function(_,label,x,y,alignment) texts[#texts+1]={label,x,y,alignment} end,
+ hudText=function(_,label,x,y,alignment) texts[#texts+1]={label,x,y,alignment} end,
  avatarNative=function(slot,x,y) assert(slot==3 and x==10 and y==152) end,
  border=function() end}
 hud:install(ui); assert(visible())

@@ -28,7 +28,17 @@ only the native tab's specified overlap rectangles from SCREEN_MENU into the
 map. It does not composite arbitrary top-corner or left-edge menu pixels.
 
 Consequently front-end overlays draw to SCREEN_MENU (0), and in-game overlays
-draw to MAP_GAME (1). `FontSizeClass::renderText` (SHC 0x472D60) overrides the
+draw to MAP_GAME (1). MAP_GAME is a scrolled backing surface, not screen space.
+The same native copy adds the current viewport origin (SHC 0x021AEC58/+4,
+Extreme 0x02C42158/+4) to its destination. The shared overlay renderer adds that
+origin to every drawing callback and its text clip. Input rectangles stay in
+screen space. It reads the live origin for each pass; camera movement and window
+size therefore need no individual control offsets or resolution special cases.
+In the failing live case the origin was (181,24): drawing at screen (10,110)
+placed portraits outside the visible crop, and the first tick line at y=12 was
+above it. No simulation or camera state is changed to correct presentation.
+
+`FontSizeClass::renderText` (SHC 0x472D60) overrides the
 sprite target with `TextManager.textSurfaceTarget` (+0x1C) and clips to the
 manager's horizontal range (+8/+12). The complete overlay therefore owns a
 temporary screen-wide text clip and matching text/sprite targets. It restores

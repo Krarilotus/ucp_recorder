@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.47.3
+
+- Translate replay overlays through the native map viewport when drawing.
+  The shared renderer now handles the scrolled backing surface for portraits,
+  tick/status text and F3 details, while mouse hitboxes remain in screen space.
+  This uses the game's current origin rather than resolution-specific offsets.
+- Use opaque, shadowed HUD text for readable information over terrain. Tick and
+  status lines remain independent of the F3 metadata toggle.
+- Resolve the framework's lazy extension definitions before deriving the F3
+  pack summary, so transitive modules do not all appear as independent packs.
+- A fresh 0.47.2 single-player recording replayed all 12,007 ticks with matching
+  RNG and resource checkpoints. This short UI test is not multiplayer acceptance.
+
 ## 0.47.2
 
 - Scope the native font surface and clipping together with the replay overlay.

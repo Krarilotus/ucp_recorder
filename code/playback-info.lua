@@ -5,6 +5,9 @@ local M={}
 function M.capture(extensions,framework)
   local nodes,depended={},{}
   for _,extension in ipairs(extensions) do
+    -- Framework definitions are lazy; load them through their owner before
+    -- deriving the pack summary. An absent cache is not an empty dependency graph.
+    if extension.loadDefinition then extension:loadDefinition() end
     local definition=extension.definition or {}
     nodes[extension.name]={name=extension.name,version=extension.version,
       plugin=extension:type()=='PluginLoader',dependencies=definition.dependencies or definition.depends or {}}

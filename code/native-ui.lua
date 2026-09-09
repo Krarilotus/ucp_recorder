@@ -54,7 +54,8 @@ end
 
 function M:renderOverlayItem(item)
   local state=self.sites.buttonState.value
-  item.render(core.readInteger(state),core.readInteger(state+4))
+  item.render(core.readInteger(state)+(self.overlayOriginX or 0),
+    core.readInteger(state+4)+(self.overlayOriginY or 0))
 end
 
 function M:windowAddress()
@@ -73,19 +74,30 @@ function M:renderOverlay(overlay,render)
   -- (TextureRenderCore::moveOverlappingMenuPartsToMapSurface). Screen-space HUD
   -- controls outside those rectangles must draw directly to MAP_GAME.
   local surface=overlay.items[1].frontEnd and 0 or 1
+  -- MAP_GAME is a scrolled backing surface. The native menu-to-map copy adds
+  -- this viewport origin too. Only drawing uses it; mouse hitboxes stay in
+  -- screen space, so panning cannot move the player's controls.
+  local oldX,oldY=self.overlayOriginX,self.overlayOriginY
+  local x,y=0,0
+  if surface==1 then
+    x=core.readInteger(self.sites.mapViewport.value)
+    y=core.readInteger(self.sites.mapViewport.value+4)
+  end
+  self.overlayOriginX,self.overlayOriginY=x,y
   local text=self.sites.textManager.value
   local cursor=core.readInteger(text)
   local left,right=core.readInteger(text+8),core.readInteger(text+12)
   local textSurface=core.readInteger(text+28)
   target[0]=surface
   core.writeInteger(text+28,surface)
-  core.writeInteger(text+8,0)
-  core.writeInteger(text+12,core.readInteger(self:windowAddress()+0x18))
+  core.writeInteger(text+8,x)
+  core.writeInteger(text+12,x+core.readInteger(self:windowAddress()+0x18))
   local ok,reason=pcall(render)
   core.writeInteger(text,cursor)
   core.writeInteger(text+8,left); core.writeInteger(text+12,right)
   core.writeInteger(text+28,textSurface)
   target[0]=previous
+  self.overlayOriginX,self.overlayOriginY=oldX,oldY
   assert(ok,reason)
 end
 
@@ -143,7 +155,7 @@ function M:callback(callback)
   end)
 end
 
-function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend)
+function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend,color)
   label=require('code/locale').native(label)
   label=tostring(label):gsub('[\r\n%z]',' '):sub(1,150)
   core.writeString(self.textBuffer,label..'\0')
@@ -159,8 +171,14 @@ function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend)
   -- Match native OptionsMenu_Buttons: font18, BGR24 colors and native blending.
   -- Alignment1 is centered on x; a positive width centers inside that width.
   self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,
-    disabled and 0x7F7F7F or (hover and 0xCCFAFF or 0xC2F0EB),font or 18,0,
+    color or (disabled and 0x7F7F7F or (hover and 0xCCFAFF or 0xC2F0EB)),font or 18,0,
     blend or (disabled and 0 or (hover and 2 or 4)))
+end
+
+-- Terrain needs opaque lettering with a dark edge, unlike shaded menu panels.
+function M:hudText(label,x,y,alignment,maxWidth)
+  self:text(label,x+1,y+1,alignment,18,false,maxWidth,false,0,0)
+  self:text(label,x,y,alignment,18,false,maxWidth,false,0,0xCCF4FF)
 end
 
 function M:header(label,x,y,width)

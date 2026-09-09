@@ -37,14 +37,18 @@ ui.updateOverlay=function(_,parent) return {menu=0x6000,items={{frontEnd=frontEn
 local text=sites.textManager.value
 memory[text]=31; memory[text+8]=560; memory[text+12]=1360; memory[text+28]=2
 memory[ui:windowAddress()+0x18]=1920
+memory[sites.mapViewport.value]=181; memory[sites.mapViewport.value+4]=24
+memory[sites.buttonState.value]=10; memory[sites.buttonState.value+4]=110
 core.hookCode=function(callback)
  hook=callback
  return function(parent,action)
   if parent==0x6000 then
    assert(action==1)
-   ui:renderOverlayItem({frontEnd=frontEnd,render=function()
+   ui:renderOverlayItem({frontEnd=frontEnd,render=function(x,y)
     assert(target[0]==(frontEnd and 0 or 1))
-    assert(memory[text+28]==target[0] and memory[text+8]==0 and memory[text+12]==1920)
+    local origin=frontEnd and 0 or 181
+    assert(x==10+origin and y==110+(frontEnd and 0 or 24))
+    assert(memory[text+28]==target[0] and memory[text+8]==origin and memory[text+12]==1920+origin)
     memory[text]=123 -- native rendering advances its text cursor
     if fail then error('draw failed') end
    end})
@@ -59,6 +63,37 @@ assert(memory[text]==31 and memory[text+8]==560 and memory[text+12]==1360 and me
 frontEnd=true; hook(0x7000,1); assert(target[0]==2)
 fail=true; assert(not pcall(hook,0x7000,1) and target[0]==2)
 assert(memory[text]==31 and memory[text+8]==560 and memory[text+12]==1360 and memory[text+28]==2)
+assert(ui.overlayOriginX==nil and ui.overlayOriginY==nil)
+''')
+
+    def test_overlay_tracks_native_viewport_without_moving_input_rectangles(self):
+        self.check('''
+local target={[0]=0}
+modules={ui={access=function() return {game={Rendering={pDrawBufferChoiceValue=target}}} end}}
+local item={x=10,y=110,width=36,height=36}
+ui.overlays={[7000]={visible=function() return true end,items={item}}}
+for _,case in ipairs({{800,0,0},{1920,181,24},{1280,800,400}}) do
+ memory[ui:windowAddress()+0x18]=case[1]
+ memory[sites.mapViewport.value]=case[2]; memory[sites.mapViewport.value+4]=case[3]
+ local overlay=ui:updateOverlay(7000)
+ memory[sites.buttonState.value]=memory[overlay.array+4]
+ memory[sites.buttonState.value+4]=memory[overlay.array+8]
+ item.render=function(x,y) assert(x==10+case[2] and y==110+case[3]) end
+ ui:renderOverlay(overlay,function() ui:renderOverlayItem(item) end)
+ assert(memory[overlay.array+4]==10 and memory[overlay.array+8]==110)
+ assert(target[0]==0 and ui.overlayOriginX==nil)
+end
+''')
+
+    def test_hud_text_is_opaque_with_a_dark_shadow(self):
+        self.check('''
+local calls={}; ui.widthNative=function() return 80 end
+ui.textNative=function(...) calls[#calls+1]={...} end
+ui:hudText('Replay: 20 / 100 ticks',788,12,-1,398)
+assert(#calls==2)
+assert(calls[1][3]==789 and calls[1][4]==13 and calls[1][6]==0 and calls[1][9]==0)
+assert(calls[2][3]==788 and calls[2][4]==12 and calls[2][6]==0xCCF4FF and calls[2][9]==0)
+assert(calls[1][5]==-1 and calls[2][5]==-1)
 ''')
 
     def test_restart_replacement_preserves_initialized_callbacks_and_never_overwrites_recording_row(self):
