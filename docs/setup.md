@@ -9,6 +9,16 @@ equivalence is still being verified.
 
 ## Download and install
 
+When **UCP-Recorder 0.48.5** is available in the UCP3 `3.0.7` extension store,
+install it there together with its dependencies. Store publication signs the
+package through UCP's normal pipeline; the unsigned-PR instructions below are
+only for manual preview downloads. If using UCP2-Legacy, select **2.15.2** as
+described below. UI **1.0.1** is a required dependency for this release.
+
+Store integration is a testing rollout, not a claim of complete multiplayer
+recovery support. Archive identities can differ between store and PR builds;
+keep the exact installed ZIP with your recordings.
+
 Ordinary testing uses the release ZIP. The separate diagnostic bundle contains
 an inner module ZIP for targeted investigations; see [build profiles](build-profiles.md).
 Install one build at a time and retain its artifact with your recordings.

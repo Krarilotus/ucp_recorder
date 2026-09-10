@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.48.5
+
+- Prepare the UCP extension-store build through the same packager as downloadable
+  releases. Store Release builds omit optional diagnostics and analysis tools;
+  Debug builds retain them. Both include menus, documentation and all nine languages.
+- Limit store packaging to the prepared module files, excluding development tests
+  and source tooling. Verify matching file contents and repeated profile builds.
+- Document store installation and the remaining multiplayer/recovery acceptance
+  limits. This release does not change simulation hooks or the replay format.
+
 ## 0.48.4
 
 - Finalize automatic recordings when the native victory/defeat results open,

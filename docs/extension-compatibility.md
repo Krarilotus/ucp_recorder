@@ -1,7 +1,7 @@
 # Extension compatibility and required settings
 
-Recorder has no mandatory dependency on Ascension, Automarket, Steam multiplayer,
-UCP2 Legacy, a texture pack, or the `ui` module. Keep the graphics wrapper your
+Recorder requires UCP3 >=3.0.7 and `ui` ^1.0.1. It has no mandatory dependency on
+Ascension, Automarket, Steam multiplayer, UCP2 Legacy or a texture pack. Keep the graphics wrapper your
 installation needs. Installing recorder does not install other extensions or
 change their gameplay options. Automatic recording is on by default; caller-level
 RNG diagnostics are optional and off by default. A fixed starting seed is optional:
@@ -50,7 +50,7 @@ address: modules also locate code through AOB patterns and compute patch offsets
 | aiSwapper / aicloader / aivloader / aiv-troops-behaviour / hopfarm-limit-fix | AI definitions, castle/troop setup and behaviour affect the starting world and subsequent simulation. Exact versions and resolved options are recorded; changed external AI files are not yet certified by a content manifest. |
 | custom-skirmish-trails / maploader / startResources | Mission setup and external map/trail data affect initial state. Trail-specific runtime registries and load fixups require further restore analysis; Skirmish testing does not certify every trail. |
 | files / gmResourceModifier / textResourceModifier / graphicsApiReplacer / winProcHandler | File, rendering, text and input infrastructure. Keep installed assets and dependencies. Visual/input compatibility still needs pixel and interaction tests with the actual wrapper and selected game language. |
-| steam-multiplayer | Owns transport and lobby behaviour. Capture observes executed commands and sync evidence on each PC. It does not reimplement Steam transport, recover lost commands, or enable offline multiplayer playback. |
+| steam-multiplayer | Owns transport and lobby behaviour. Recorder observes executed commands and sync evidence on each PC for offline single-player playback. It does not reimplement Steam transport or guarantee recovery of lost commands. |
 
 Recorder stores loaded extension versions/order and resolved options. Those values
 do **not** prove that mutable maps, AI files, injected DLLs or private extension
