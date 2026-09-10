@@ -1,4 +1,4 @@
--- GUI language is passed at launch. Older launchers fall back to the game language.
+-- In-game labels follow UCP's game-language provider, never the launcher locale.
 local M={}
 local de={
  ['Statistics']='Statistik',
@@ -94,8 +94,7 @@ local de={
  ['Selected: %s']='Ausgewählt: %s', ['Page %d / %d']='Seite %d / %d',
 }
 function M.language()
- local lang=os.getenv('UCP_GUI_LANGUAGE')
- if not lang or lang=='' then
+ local lang
   -- UCP's global version is its semantic-version utility. The game-language
   -- provider lives in data.version; the utility must not shadow that provider.
   local v=(rawget(_G,'data') or {}).version
@@ -103,7 +102,6 @@ function M.language()
   if type(v)=='table' and type(v.getGameLanguage)=='function' then
    local ok,value=pcall(v.getGameLanguage); if ok then lang=value end
   end
- end
  lang=type(lang)=='string' and lang:lower():gsub('_','-') or 'en'
  return (lang=='german' or lang=='de' or lang:match('^de%-')) and 'de' or 'en'
 end

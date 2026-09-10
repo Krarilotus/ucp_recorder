@@ -16,19 +16,21 @@ assert(l.language()=='de' and l.text('Auto: on')=='Auto: ein')
 version.getGameLanguage=function() return 'english' end
 assert(l.language()=='de')
 os.getenv=function() return 'en' end
-assert(l.language()=='en')
+assert(l.language()=='de')
 ''')
 
-    def test_launcher_language_precedes_game_language_with_fallback(self):
+    def test_game_language_ignores_launcher_language(self):
         self.check('''
 local l=require('code/locale')
 local environment=nil
 os.getenv=function(key) assert(key=='UCP_GUI_LANGUAGE'); return environment end
 version={getGameLanguage=function() return 'german' end}
 assert(l.language()=='de' and l.text('Play')=='Abspielen')
-environment='en'; assert(l.language()=='en' and l.text('Play')=='Play')
+environment='en'; assert(l.language()=='de' and l.text('Play')=='Abspielen')
 environment='de-DE'; assert(l.text('Player %d',4)=='Spieler 4')
-environment='xx'; assert(l.language()=='en')
+environment='xx'; assert(l.language()=='de')
+version.getGameLanguage=function() return 'english' end
+environment='de'; assert(l.language()=='en' and l.text('Play')=='Play')
 environment=nil; version.getGameLanguage=function() return nil end; assert(l.language()=='en')
 version.getGameLanguage=function() error('not initialized') end; assert(l.language()=='en')
 assert(l.text('Unknown diagnostic')=='Unknown diagnostic')
