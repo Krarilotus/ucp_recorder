@@ -65,11 +65,15 @@ ui={
  trackVisibility=function() end,
 }
 package.loaded['code/native-ui']={ITEM_SIZE=80,new=function() return ui end}
+package.loaded['code/fixes']={install=function(_,enabled)
+ assert(enabled==recorder.playbackActive)
+end}
 package.loaded['code/history-native']={new=function(_,_,browser,rename)
  historyRename=rename
  return {advance=function() browser:advancePreparation() end}
 end}
-recorder.engine={singlePlayer=function() return true end,isPaused=function() return false end,
+recorder.playbackActive=1234
+recorder.engine={base=0x191d768,singlePlayer=function() return true end,isPaused=function() return false end,
  localSession=function(self) return self:singlePlayer() end,
  presentationSpeed=function() return 90 end,
  isLogicallyPaused=function(self) return self:isPaused() end}

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.48.3
+
+- Allow the native book/report buttons while replay is paused or finished. Scope
+  this to their existing pause check; simulation pause, actor and command gates
+  remain unchanged. Ordinary matches retain native report-button behavior.
+- Stream the starting-save hash through the existing native SHA-256 owner when
+  recording begins, avoiding another complete save allocation in Lua.
+- Correct all nine launcher descriptions for offline multiplayer playback and
+  include actual native-history and replay-control screenshots in both builds.
+  Keep experimental acceptance limits visible in the installation descriptions.
+
 ## 0.48.2
 
 - Copy named single-player replay snapshots in bounded 64 KiB chunks using the

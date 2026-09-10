@@ -6,6 +6,22 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_starting_save_is_hashed_without_loading_it_into_lua(self):
+        self.check('''
+local store=require('code/sessions'); local read=store.read
+store.read=function(path)
+ assert(not path:find('start.sav',1,true),'Starting save must stay streamed')
+ return read(path)
+end
+local hashed=false
+package.loaded['code/native-hash'].file=function(path,limit)
+ assert(snapshots==1 and path=='ucp/replays/test/start.sav' and limit==1024*1024*1024)
+ hashed=true; return string.rep('b',64)
+end
+local r=session(); r:startRecording(); r:activateRecording()
+assert(hashed and r.active and r.manifest.snapshotHash==string.rep('b',64))
+''')
+
     def test_results_timer_hold_survives_completion_and_failure_until_exit(self):
         self.check('''
 for _,fail in ipairs({false,true}) do

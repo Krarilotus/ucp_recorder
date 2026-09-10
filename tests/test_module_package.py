@@ -28,6 +28,10 @@ class ModulePackageTests(unittest.TestCase):
                     self.assertFalse(any(name.startswith('tools/') for name in production.namelist()))
                     self.assertIn('tools/inspect_replay.py',diagnostic.namelist())
                     self.assertEqual(production.read('definition.yml'),diagnostic.read('definition.yml'))
+                    for image in ('replay-history.jpg','replay-controls.jpg'):
+                        member='docs/images/'+image
+                        self.assertEqual(production.read(member),diagnostic.read(member))
+                        self.assertTrue(production.read(member).startswith(b'\xff\xd8\xff'))
                     self.assertNotIn(b'RngDiagnostics',production.read('options.yml'))
                     self.assertNotIn(b'multiplayerDiagnostics',production.read('options.yml'))
                     self.assertIn(b'recorder.autoRecord',production.read('options.yml'))

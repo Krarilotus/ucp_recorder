@@ -2,6 +2,7 @@
 -- Signatures and ABI: UCP ui module ui/game.lua and ui/headers/latest/ui.h.
 return {
   SHC = {
+    reportPause = {address=0x00444EB3, bytes={131,61,84,160,254,1,0}, kind='raw', patch='equalFlags'},
     mapViewport = {address=0x00454FA4, bytes={139,61,92,236,26,2,3,207,3,206,105,201,216,15,0,0,3,202,3,13,88,236,26,2}, value=0x021AEC58},
     avatar = {address=0x004D8AE0, bytes={83,139,92,36,8,85,86,51,237}},
     header = {address=0x00468FE0, bytes={131,68,36,8,8,83,139,92,36,8,85,139,108,36,20,131,195,8,131,237,16,86,51,192,87}},
@@ -27,6 +28,7 @@ return {
     modalStack = {address=0x004A9E40, bytes={139,21,164,66,223,0,137,80,36}, value=0x00DF42A4},
   },
   Extreme = {
+    reportPause = {address=0x004450E3, bytes={131,61,84,213,167,2,0}, kind='raw', patch='equalFlags'},
     mapViewport = {address=0x004551D4, bytes={139,61,92,33,196,2,3,207,3,206,105,201,216,15,0,0,3,202,3,13,88,33,196,2}, value=0x02C42158},
     avatar = {address=0x004D8E70, bytes={83,139,92,36,8,85,86,51,237}},
     header = {address=0x00469210, bytes={131,68,36,8,8,83,139,92,36,8,85,139,108,36,20,131,195,8,131,237,16,86,51,192,87}},

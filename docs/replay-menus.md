@@ -31,14 +31,25 @@ including UCP2-Legacy's installed extended-speed setting. Recorder defines no
 independent speed steps or limit. Native speeds from 1100 display as 1000+.
 After successful completion, **Statistics** replaces the speed strip and opens
 the current recording's existing statistics after the native world-exit cleanup.
+Report buttons also remain usable during paused and completed replay playback.
+
+## In-game previews
+
+Captured from the packaged module using the game's German UI. Layout and controls
+are shared with the English UI; these are actual game captures, not mockups.
+
+![Native battle history, selection and replay hand](images/replay-history.jpg)
+
+![Player portraits, permanent tick status and F3 details](images/replay-controls.jpg)
 
 ## Validation status
 
-The recent native-history entry/return and ordinary recording Escape fixes were
-exercised live. The latest selection, hand, HUD/render-pass, date and preparation
-changes pass portable regression checks and original SHC/Extreme hook checks;
-their final appearance still needs an in-game check. The historical 0.46.0
-recording omitted native paused maintenance and reproducibly failed at tick27072.
-The 0.47.0 correction passed a fresh 35,815-tick capture including two recorded
-pause windows. Old recordings cannot supply the omitted work. Multiplayer
-host/client offline playback is not yet signed off.
+0.48.2 completed fresh named and automatic single-player recordings, followed by
+a loaded-save continuation from tick 94,548 to 248,979. Snapshot statistics and
+return to history were checked in game. The host capture from one physical Steam
+match completed offline on the second PC; its client capture also passed on
+0.48.0. These results do not cover repeated multiplayer games or connection loss.
+
+0.48.3 removes the native logical-pause rejection specifically for report actions
+71..79 during replay. Original-binary branch checks cover both executable variants;
+live acceptance of this correction is tracked separately from playback checks.

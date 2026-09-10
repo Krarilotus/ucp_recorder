@@ -139,6 +139,8 @@ def check(folder):
         from check_replay_view_native import check_replay_view, check_book_resources
         check_replay_view(reader,lua,native,root,name)
         check_book_resources(folder/file,reader,lua,native,root,name)
+        from check_report_pause_native import check_report_pause
+        check_report_pause(reader,lua,root,name)
         from check_header_native import check_header
         check_header(reader,lua,root,name)
         from check_dispatch_native import check_dispatch

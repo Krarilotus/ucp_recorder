@@ -5,6 +5,11 @@ local tr=require('code/locale').text
 local M={}
 
 function M.createButtons(recorder,sites)
+  -- Native report actions 71..79 reject logical pause before opening the book.
+  -- A viewer may inspect a frozen/finished replay. Admit only that UI branch;
+  -- never clear the world's pause, change its actor or release the tick gate.
+  require('code/fixes').install({sites.reportPause},recorder.playbackActive,
+    recorder.engine.base+0x618,nil,recorder.engine.offlineFlag)
   local browser=Browser:new(recorder)
   local editor,editorAction,editorBack,editorTitle,editorError,nameDialog
   local function short(reason) return tostring(reason):match('^[^\n]+'):gsub('^.-:%d+: ','') end

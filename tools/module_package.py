@@ -35,7 +35,7 @@ def build_module(source: Path, destination: Path, *, profile: str | None = None)
         raise ValueError('Invalid recorder version')
     version = match.group(1)
     files = [source / name for name in ('definition.yml', 'options.yml', 'init.lua', 'README.md', 'CHANGELOG.md')]
-    for folder, pattern in (('code', '*.lua'), ('docs', '*.md'), ('locale', '*.yml'), ('locale', '*.md')):
+    for folder, pattern in (('code', '*.lua'), ('docs', '*.md'), ('docs/images', '*.jpg'), ('locale', '*.yml'), ('locale', '*.md')):
         files.extend(sorted((source / folder).rglob(pattern)))
     for name in ('compare_multiplayer.py', 'inspect_replay.py'):
         tool = source / 'tools' / name

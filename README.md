@@ -14,7 +14,7 @@ and broader testing remain. See the [remaining work](docs/roadmap.md).
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.48.2.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.48.3.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -41,6 +41,9 @@ captures remain under their original directories; they lack the new tick data
 and are not converted into playable recordings. Do not terminate the process to
 finish a recording. See [multiplayer playback and recovery](docs/offline-multiplayer.md)
 and [menu controls](docs/replay-menus.md).
+
+See the [in-game previews](docs/replay-menus.md#in-game-previews) for native history,
+player portraits and playback information.
 
 ## Recorded settings
 
