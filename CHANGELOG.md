@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.48.6
+
+- Remove Python from the extension-store build. Use the existing PowerShell/.NET
+  toolchain and a shared package-file manifest for store and preview file selection.
+- Verify both profiles through the real PowerShell entry point, including rebuilding
+  Release after Debug. Python remains only in existing developer tests/PR publishing;
+  the game and the store build do not require it for Recorder.
+
 ## 0.48.5
 
 - Prepare the UCP extension-store build through the same packager as downloadable

@@ -9,7 +9,7 @@ equivalence is still being verified.
 
 ## Download and install
 
-When **UCP-Recorder 0.48.5** is available in the UCP3 `3.0.7` extension store,
+When **UCP-Recorder 0.48.6** is available in the UCP3 `3.0.7` extension store,
 install it there together with its dependencies. Store publication signs the
 package through UCP's normal pipeline; the unsigned-PR instructions below are
 only for manual preview downloads. If using UCP2-Legacy, select **2.15.2** as
