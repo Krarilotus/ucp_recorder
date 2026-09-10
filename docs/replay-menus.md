@@ -42,6 +42,47 @@ are shared with the English UI; these are actual game captures, not mockups.
 
 ![Player portraits, permanent tick status and F3 details](images/replay-controls.jpg)
 
+## Language and native fonts
+
+In-game labels use `data.version.getGameLanguage()`, never `UCP_GUI_LANGUAGE`.
+Translated installations may retain the original executable's language enum:
+once TextManager is ready, its loaded language marker (text group 6, entry 0)
+takes priority. The renderer reads it through the existing UI text getter, so
+TextResourceModifier replacements are respected. Unknown markers fall back to
+the game-language provider, then English; the legacy global game provider is
+used only when `data.version` has no language API.
+
+English and German are joined by French, Russian, Hungarian, Turkish, Chinese,
+Spanish, Persian, Italian and Polish. Each catalog covers all 113 current labels
+and preserves formatting arguments. Catalogs contain UTF-8; conversion uses the
+loaded TextManager's codepage, not the Windows system locale or a guessed page
+for the selected language. Until TextManager is ready, the original 1252 fallback
+applies. Labels that cannot be represented fall back to their English source.
+Unrepresentable characters in dynamic values, such as names, become `?`.
+
+`text-encoding.lua` owns conversion and character-safe clipping. It reuses UCP's
+native ABI adapter and the Windows conversion functions, with no new DLL, shell
+or runtime dependency. Conversions reject invalid UTF-8 and lossy best-fit
+substitutions. Windows-1256 has no Persian yeh slot: for this codepage only, the
+encoder maps Persian yeh to Arabic yeh, as used by legacy Persian text/fonts.
+UTF-8 output retains the original character. See Microsoft's
+[conversion flags and default-character rules](https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte).
+
+Measurement and drawing use the same encoded bytes and existing native fonts
+(18 for controls, 15 for headings). Clipping respects whole characters, including
+two-byte Chinese glyphs, and the existing width and buffer bounds. Conversion is
+lazy and cached with a fixed limit; it runs in presentation, not simulation.
+
+Automated tests cover all catalogs/placeholders, real Windows codepage conversion,
+language priority, fallback, native font selection and multibyte clipping.
+The screenshots above predate these additional languages. Visual glyph coverage,
+Persian shaping/direction, and clipping in every translated installation remain
+live acceptance checks: open battle history, the name editor and replay HUD/F3
+at the smallest supported resolution, including long player/map names. Test with
+a conflicting launcher language and confirm the game language remains selected.
+Conversion success alone does not establish that an installation supplies every
+glyph; Recorder reuses its fonts and does not install replacement fonts.
+
 ## Validation status
 
 0.48.2 completed fresh named and automatic single-player recordings, followed by

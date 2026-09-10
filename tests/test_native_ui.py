@@ -5,6 +5,30 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_loaded_text_manager_marker_and_codepage_share_the_native_font_path(self):
+        self.check('''
+local calls=0
+memory[sites.textManager.value+0x10]=1251
+modules={ui={}}
+modules.ui.access=function() return {game={Rendering={textManager=sites.textManager.value,
+ getTextStringInGroupAtOffset=function(manager,group,entry)
+  assert(manager==sites.textManager.value and group==6 and entry==0); calls=calls+1; return 5000
+ end}}} end
+modules.cffi={cffi=function() return {cast=function(_,value) return value end,tonumber=tonumber,
+ string=function(address) assert(address==5000); return 'RUSSIAN' end} end}
+data={version={getGameLanguage=function() return 'english' end}}
+local l=require('code/locale'); local language,codepage=l.context()
+assert(language=='ru' and codepage==1251 and calls==1)
+require('code/text-encoding').encode=function(text,page) assert(page==1251); return 'encoded' end
+local drawn,measured
+ui.widthNative=function(_,_,font) measured=font; return 30 end
+ui.textNative=function(...) drawn={...} end
+ui:text(l.text('Play'),50,60,1,18,false,100)
+assert(drawn[7]==18 and measured==18 and drawn[5]==1)
+ui:header(l.text('Recorded Skirmishes'),10,20,400)
+assert(drawn[7]==15 and measured==15 and drawn[5]==1)
+''')
+
     def test_gameplay_overlay_input_uses_root_view_when_native_dispatches_a_subtab(self):
         self.check('''
 local visible=true

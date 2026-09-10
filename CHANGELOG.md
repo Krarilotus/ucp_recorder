@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.49.1
+
+- In-game text follows the game language, never `UCP_GUI_LANGUAGE`. Translated
+  installations use the loaded TextManager language marker and codepage.
+- Add French, Russian, Hungarian, Turkish, Chinese, Spanish, Persian, Italian
+  and Polish catalogs alongside English/German, preserving format arguments.
+- Convert UTF-8 through native codepage APIs and clip whole characters using the
+  same native font metrics as drawing. Unrepresentable labels fall back to English.
+- Cover launcher/game language disagreement, all catalogs, real Windows encoding,
+  native font selection and multibyte clipping with regression tests. Visual font
+  acceptance in the additional translated installations remains pending.
+
 ## 0.49.0
 
 - Separate replay inputs from verification evidence. Release records one compact

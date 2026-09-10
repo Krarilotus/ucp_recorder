@@ -26,6 +26,17 @@ function M.new(sites,onError)
   o.modalConstructor=core.exposeCode(sites.modalConstructor.address,10,1)
   o.activateNative=core.exposeCode(sites.activateModal.address,3,1)
   o.avatarNative=core.exposeCode(sites.avatar.address,3,0)
+  require('code/locale').bind(function()
+    -- TextManager::codePage belongs to the loaded CR.TEX/font setup. The UI
+    -- module's getter also respects textResourceModifier's replacement strings.
+    local codepage=core.readInteger(sites.textManager.value+0x10)
+    if codepage<=0 then return end
+    local rendering=modules.ui:access().game.Rendering
+    local ffi=modules.cffi:cffi()
+    local marker=rendering.getTextStringInGroupAtOffset(rendering.textManager,6,0)
+    if marker==nil or ffi.tonumber(ffi.cast('unsigned long',marker))==0 then return nil,codepage end
+    return ffi.string(marker),codepage
+  end)
   return o
 end
 
@@ -168,18 +179,12 @@ function M:callback(callback)
 end
 
 function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend,color)
-  label=require('code/locale').native(label)
-  label=tostring(label):gsub('[\r\n%z]',' '):sub(1,150)
-  core.writeString(self.textBuffer,label..'\0')
-  if maxWidth then
-    local function width() return self.widthNative(self.sites.textManager.value,self.textBuffer,font or 18) end
-    if width()>maxWidth then
-      repeat
-        label=label:sub(1,-2)
-        core.writeString(self.textBuffer,label..'...\0')
-      until #label==0 or width()<=maxWidth
-    end
+  local measure=maxWidth and function(bytes)
+    core.writeString(self.textBuffer,bytes..'\0')
+    return self.widthNative(self.sites.textManager.value,self.textBuffer,font or 18)
   end
+  label=require('code/locale').fit(label,150,measure,maxWidth)
+  core.writeString(self.textBuffer,label..'\0')
   -- Match native OptionsMenu_Buttons: font18, BGR24 colors and native blending.
   -- Alignment1 is centered on x; a positive width centers inside that width.
   self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,

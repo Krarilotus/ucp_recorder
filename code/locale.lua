@@ -93,28 +93,71 @@ local de={
  ['Replay %s. Leave the mission to return to the library.']='Aufnahmestatus: %s. Mission beenden, um zur Liste zurückzukehren.',
  ['Selected: %s']='Ausgewählt: %s', ['Page %d / %d']='Seite %d / %d',
 }
-function M.language()
- local lang
-  -- UCP's global version is its semantic-version utility. The game-language
-  -- provider lives in data.version; the utility must not shadow that provider.
-  local v=(rawget(_G,'data') or {}).version
-  if type(v)~='table' or type(v.getGameLanguage)~='function' then v=rawget(_G,'version') end
-  if type(v)=='table' and type(v.getGameLanguage)=='function' then
-   local ok,value=pcall(v.getGameLanguage); if ok then lang=value end
+local aliases={english='en',american='en',german='de',french='fr',russian='ru',
+ hungarian='hu',turkish='tr',chinese='zh',spanish='es',persian='fa',farsi='fa',italian='it',polish='pl',ch='zh'}
+M.supported={'en','de','fr','ru','hu','tr','zh','es','fa','it','pl'}
+local supported={}; for _,language in ipairs(M.supported) do supported[language]=true end
+local function normalize(value)
+ if type(value)~='string' then return end
+ value=value:lower():gsub('_','-'):match('^%s*(.-)%s*$')
+ local language=aliases[value] or value:match('^([a-z]+)%-') or value
+ language=aliases[language] or language
+ return supported[language] and language or nil
+end
+local contextReader
+-- The renderer supplies the loaded TextManager, not an executable-language
+-- guess. Before CR.TEX loads, the game provider may legitimately return nil.
+function M.bind(readContext) contextReader=readContext end
+function M.context()
+ local provider=(rawget(_G,'data') or {}).version
+ if type(provider)~='table' or type(provider.getGameLanguage)~='function' then provider=rawget(_G,'version') end
+ local language
+ if type(provider)=='table' and type(provider.getGameLanguage)=='function' then
+  local ok,value=pcall(provider.getGameLanguage); if ok then language=normalize(value) end
+ end
+ if contextReader then
+  local ok,marker,codepage=pcall(contextReader)
+  if ok and type(codepage)=='number' and codepage>0 then
+   return normalize(marker) or language or 'en',codepage
   end
- lang=type(lang)=='string' and lang:lower():gsub('_','-') or 'en'
- return (lang=='german' or lang=='de' or lang:match('^de%-')) and 'de' or 'en'
+ end
+ return language or 'en',1252 -- original bitmap fallback until TextManager is ready
+end
+function M.language() local language=M.context(); return language end
+M.translations=setmetatable({de=de},{__index=function(self,language)
+ if not supported[language] or language=='en' then return end
+ local catalog=require('code/locale-'..language); rawset(self,language,catalog); return catalog
+end})
+local encoding=require('code/text-encoding')
+local cache,count={},0
+local function encoded(text,codepage)
+ if not text:find('[\128-\255]') then return text end
+ local key=codepage..':'..text
+ if cache[key]~=nil then return cache[key] or nil end
+ local ok,value=pcall(encoding.encode,text,codepage)
+ if count>=256 then cache={}; count=0 end
+ cache[key]=ok and value or false; count=count+1
+ return ok and value or nil
 end
 function M.text(key,...)
- local value=M.language()=='de' and de[key] or key
- return select('#',...)>0 and string.format(value or key,...) or value or key
+ local language,codepage=M.context()
+ local catalog=M.translations[language]
+ local value=catalog and catalog[key] or key
+ -- A translated installation must supply fonts and a matching codepage. If
+ -- conversion cannot represent a label, show its English source, not mojibake.
+ if not encoded(value,codepage) then value=key end
+ return select('#',...)>0 and string.format(value,...) or value
 end
--- The original bitmap renderer consumes Windows-1252 bytes, not UTF-8.
--- UI translations remain UTF-8 in source. Replay names are currently ASCII.
-local glyphs={['Ä']=196,['Ö']=214,['Ü']=220,['ä']=228,['ö']=246,['ü']=252,['ß']=223}
+local function native(text,codepage)
+ return encoded(text,codepage) or (text:gsub('[\128-\255]+','?'))
+end
 function M.native(text)
- for glyph,byte in pairs(glyphs) do text=text:gsub(glyph,string.char(byte)) end
- return text
+ local _,codepage=M.context()
+ return native(tostring(text),codepage)
 end
-M.translations={de=de}
+function M.fit(text,limit,measure,width)
+ local _,codepage=M.context()
+ text=tostring(text):gsub('[\r\n%z]',' ')
+ return encoding.fit(text,function(value) return native(value,codepage) end,limit,measure,width)
+end
 return M
