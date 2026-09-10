@@ -101,8 +101,8 @@ function M.prepare(path,engine,progress)
     local closed=file:close()
     assert(ok and closed,reason or 'Cannot close prepared world')
     local size=0
-    local digest=require('code/native-hash').file(path..'/world-native.sav.tmp',M.MAX_PAYLOAD+110000,
-      function(_,count) size=count end)
+    local digest=require('code/native-hash').file(path..'/world-native.sav.tmp',M.MAX_PAYLOAD+110000,nil,
+      function(count) size=count end)
     assert(size==#prefix+3036+bytes,'Prepared native world length differs')
     return {format=1,sourceWorldHash=reader.capture.world.hash,variant=native.profile.name,
       executable=native.profile.sha256,converterRevision=cache.REVISION,sha256=digest,bytes=size,

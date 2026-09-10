@@ -5,6 +5,26 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_progress_uses_native_fill_and_keeps_inclusive_bounds_inside_its_track(self):
+        self.check('''
+local calls={}
+ui.fillNative=function(...) calls[#calls+1]={...} end
+ui.border=function(_,x,y,w,h) assert(x==20 and y==30 and w==95 and h==9) end
+memory[sites.loadingColor.value]=-1
+for _,fraction in ipairs({-1,0,0.5,1,2}) do
+ calls={}; ui:progressBar(20,30,96,10,fraction)
+ local track=calls[1]
+ assert(track[1]==sites.pencil.value and track[2]==20 and track[3]==30)
+ assert(track[4]==115 and track[5]==39 and track[6]==0)
+ if fraction<=0 then assert(#calls==1)
+ else
+  local fill=calls[2]; local pixels=math.floor(92*math.min(fraction,1))
+  assert(fill[1]==sites.pencil.value and fill[2]==22 and fill[3]==32)
+  assert(fill[4]==21+pixels and fill[5]==37 and fill[6]==65535)
+ end
+end
+''')
+
     def test_loaded_text_manager_marker_and_codepage_share_the_native_font_path(self):
         self.check('''
 local calls=0

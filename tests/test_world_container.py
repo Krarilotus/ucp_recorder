@@ -35,9 +35,10 @@ end
 core.readInteger=function() return 20 end
 engine.sites={gameCore=0x1fe7d10}; engine.singlePlayer=function() return true end
 require('code/platform').replace=replace_virtual
-require('code/native-hash').file=function(path,limit,onChunk)
+require('code/native-hash').file=function(path,limit,onChunk,onProgress)
  local data=require('code/world-reader').read(path,limit)
  if onChunk then onChunk(data,#data) end
+ if onProgress then onProgress(#data) end
  return sha.sha256(data)
 end
 compressions=0

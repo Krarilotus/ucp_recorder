@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.49.4
+
+- Show a native-style progress bar beside the persistent replay tick counter.
+  Sample progress four times per second and refresh completion immediately.
+  The bar is display-only; seeking still requires world-restoration work.
+- Avoid copying native file buffers into Lua for progress-only hash callbacks.
+  Keep byte-consuming readers, integrity checks, size limits and cancellation.
+- Cover progress throttling, clock wrap, completion, native drawing bounds and
+  count-only hashing cleanup. Document measured gains and seeking requirements.
+
 ## 0.49.3
 
 - Fix automatic recording after loading a saved skirmish: check the native

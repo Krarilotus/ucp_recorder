@@ -174,6 +174,24 @@ class NativeHashTests(unittest.TestCase):
         self.assertEqual(state['closed'],1)
         self.assertFalse(backend.providers or backend.hashes)
 
+    def test_progress_only_hash_never_copies_native_file_payload_to_lua(self):
+        data=bytes(range(256))*1025
+        backend,lua,state=self.descriptor_runtime(data)
+        lua.execute('''
+local read=core.readString
+core.readString=function(address,size)
+ assert(size==32,'Progress copied a native file payload')
+ return read(address,size)
+end
+progressCounts={}
+function progress(count) progressCounts[#progressCounts+1]=count end
+''')
+        result=lua.globals().hash.file('ucp/modules/virtual-1.0.0/data.bin',len(data),None,lua.globals().progress)
+        self.assertEqual(result,hashlib.sha256(data).hexdigest())
+        self.assertEqual(list(lua.globals().progressCounts.values()),[65536,131072,196608,262144,len(data)])
+        self.assertEqual(state['closed'],1)
+        self.assertFalse(backend.providers or backend.hashes)
+
     def test_descriptor_errors_and_cancellation_close_once_without_leaking_hash_handles(self):
         for fault in ('missing','fail','close_fail','limit','cancel'):
             with self.subTest(fault=fault):
@@ -183,7 +201,7 @@ class NativeHashTests(unittest.TestCase):
                     lua.execute('''
 local now=0
 task=require('code/preparation-task').new(function(progress)
- return hash.file('ucp/modules/virtual-1.0.0/data.bin',70000,function() progress('Hashing') end)
+ return hash.file('ucp/modules/virtual-1.0.0/data.bin',70000,nil,function() progress('Hashing') end)
 end,function() now=now+20; return now end)
 task:step(); assert(task.status=='pending'); task:cancel(); task:step()
 assert(task.status=='cancelled')

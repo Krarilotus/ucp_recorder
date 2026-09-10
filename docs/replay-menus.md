@@ -22,7 +22,11 @@ with an inline error only when saving fails. Normal mission exit saves the full
 recording. An abrupt crash preserves files but does not guarantee a playable prefix.
 
 During playback, portraits on the left select whose reports/book to inspect.
-The tick/status display is always at the top right. F3 adds the saved date,
+The progress bar and adjacent tick counter stay at the top right, with status
+below. Progress is sampled four times per second; completion updates immediately.
+The bar reuses the native loading-bar fill and palette on the existing gameplay
+overlay surface. It is currently display-only: clicking does not seek.
+F3 adds the saved date,
 game and UCP framework versions, and a compact summary of recorded packs.
 Full exact settings and asset checks still govern replay admission.
 Use the ordinary Escape menu to resume or leave; mission restart is disabled.

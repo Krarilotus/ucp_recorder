@@ -74,7 +74,9 @@ function M.sha256(data)
     return chunk
   end)
 end
-function M.file(path,limit,onChunk)
+-- Consumers that parse bytes use onChunk. Progress-only callers need a count,
+-- not a Lua copy of every native input buffer (hundreds of MiB for assets).
+function M.file(path,limit,onChunk,onProgress)
   initialize()
   if nativeRead then
     -- _O_RDONLY | _O_BINARY; VFS alias resolution and access policy stay with UCP.
@@ -88,6 +90,7 @@ function M.file(path,limit,onChunk)
         if size==0 then return end
         count=count+size; assert(count<=limit,'File exceeds replay size limit: '..path)
         if onChunk then onChunk(core.readString(buffers.input,size),count) end
+        if onProgress then onProgress(count) end
         return size
       end)
     end)
@@ -105,6 +108,7 @@ function M.file(path,limit,onChunk)
       if chunk then
         count=count+#chunk; assert(count<=limit,'File exceeds replay size limit: '..path)
         if onChunk then onChunk(chunk,count) end
+        if onProgress then onProgress(count) end
       end
       return chunk
     end)

@@ -2,6 +2,8 @@
 -- Signatures and ABI: UCP ui module ui/game.lua and ui/headers/latest/ui.h.
 return {
   SHC = {
+    fill = {address=0x00470E90,bytes={86,139,241,232,184,125,255,255,139,68,36,24,139,76,36,20}},
+    loadingColor = {address=0x0044C863,bytes={15,183,21,192,51,223,0},value=0x00DF33C0},
     reportPause = {address=0x00444EB3, bytes={131,61,84,160,254,1,0}, kind='raw', patch='equalFlags'},
     mapViewport = {address=0x00454FA4, bytes={139,61,92,236,26,2,3,207,3,206,105,201,216,15,0,0,3,202,3,13,88,236,26,2}, value=0x021AEC58},
     avatar = {address=0x004D8AE0, bytes={83,139,92,36,8,85,86,51,237}},
@@ -28,6 +30,8 @@ return {
     modalStack = {address=0x004A9E40, bytes={139,21,164,66,223,0,137,80,36}, value=0x00DF42A4},
   },
   Extreme = {
+    fill = {address=0x004710B0,bytes={86,139,241,232,200,125,255,255,139,68,36,24,139,76,36,20}},
+    loadingColor = {address=0x0044CA93,bytes={15,183,21,96,53,223,0},value=0x00DF3560},
     reportPause = {address=0x004450E3, bytes={131,61,84,213,167,2,0}, kind='raw', patch='equalFlags'},
     mapViewport = {address=0x004551D4, bytes={139,61,92,33,196,2,3,207,3,206,105,201,216,15,0,0,3,202,3,13,88,33,196,2}, value=0x02C42158},
     avatar = {address=0x004D8E70, bytes={83,139,92,36,8,85,86,51,237}},

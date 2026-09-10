@@ -19,8 +19,16 @@ end
 
 function M:progress()
   local r=self.recorder
-  local first,last=r.manifest.startTick,r.manifest.lastTick
-  return tr('Replay: %d / %d ticks',math.max(0,math.min(r.engine:tick(),last)-first),last-first)
+  local now=require('code/platform').milliseconds()
+  if self.progressManifest~=r.manifest or self.progressStatus~=r.status
+    or not self.progressAt or (now-self.progressAt)%4294967296>=250 then
+    local first,last=r.manifest.startTick,r.manifest.lastTick
+    local elapsed=math.max(0,math.min(r.engine:tick(),last)-first)
+    self.progressLabel=tr('Replay: %d / %d ticks',elapsed,last-first)
+    self.progressFraction=last>first and elapsed/(last-first) or (r.status=='finished' and 1 or 0)
+    self.progressAt=now; self.progressManifest=r.manifest; self.progressStatus=r.status
+  end
+  return self.progressLabel,self.progressFraction
 end
 
 -- Native RenderPlayerAvatars uses 72x72 images. Reserve the native bottom
@@ -47,7 +55,9 @@ function M:install(ui)
   end
   items[#items+1]={x=-410,y=12,width=398,height=58,enabled=false,
     render=function(x,y)
-      ui:hudText(self:progress(),x+398,y,-1,398)
+      local label,fraction=self:progress()
+      ui:progressBar(x,y+4,96,10,fraction)
+      ui:hudText(label,x+398,y,-1,292)
       ui:hudText(self:status(),x+398,y+18,-1,398)
       ui:hudText(tr('F3: replay information'),x+398,y+36,-1,398)
     end}

@@ -101,6 +101,30 @@ singleplayer mode after a successful reader completion. The starting snapshot
 still waits for the first simulation boundary. No menu-loop or simulation patch
 is needed for this correction.
 
+## Progress-only hashing and playback display (0.49.4)
+
+Asset verification and save/container progress callbacks now receive byte counts
+directly. Native hashing no longer copies each 64 KiB input buffer into a Lua
+string just to report progress. Byte-parsing consumers retain their existing
+callback; hash, size-limit and cancellation checks remain in both paths.
+
+An offline comparison using the shipped 32-bit RPS runtime hashed 644 assets
+(303,744,585 bytes), with 5,004 progress callbacks. Median times over three runs
+were 380.27 ms with byte copies and 361.25 ms with count-only callbacks. These
+physical-file, warm/uncontrolled timings are not a game VFS load benchmark. The
+direct improvement is avoiding about 304 MB of temporary Lua payload copies.
+
+The live 0.49.3 loaded-save replay completed with matching verification, but
+preparation took 2,188 ms. Its small stream scan took about 1.8 ms in a separate
+offline test. Asset enumeration/VFS work and the native recording-start snapshot
+remain profiling targets; this change does not establish sub-100-ms loading.
+
+The display-only HUD bar shares the existing overlay renderer, native Pencil
+fill and loading-bar palette. Its progress value and tick label are sampled at
+250 ms intervals, with immediate refresh on completion or session replacement.
+Drawing remains part of normal frame rendering so camera redraws cannot erase
+the bar. It adds no simulation callback, replay data or per-tick allocation.
+
 ## Platform status
 
 The 0.49.2 presentation review removed 35 unused labels from each of ten catalogs

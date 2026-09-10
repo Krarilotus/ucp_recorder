@@ -7,6 +7,25 @@ class PlaybackInfoTests(unittest.TestCase):
 
     def setUp(self):
         fixture.RecorderTests.setUp(self)
+        self.check("require('code/platform').milliseconds=function() return clock or 0 end")
+
+    def test_progress_throttles_presentation_but_refreshes_completion_and_new_sessions(self):
+        self.check('''
+local tick,reads=1,0
+local r={status='playing',manifest={startTick=1,lastTick=101},
+ engine={tick=function() reads=reads+1; return tick end}}
+local hud=require('code/replay-hud').new(r,{})
+local label,fraction=hud:progress(); assert(fraction==0 and reads==1)
+clock=249; tick=51; label,fraction=hud:progress(); assert(fraction==0 and reads==1)
+clock=250; label,fraction=hud:progress(); assert(fraction==0.5 and reads==2)
+tick=102; r.status='finished'; label,fraction=hud:progress()
+assert(fraction==1 and label=='Replay: 100 / 100 ticks' and reads==3)
+r.manifest={startTick=51,lastTick=51}; tick=51
+label,fraction=hud:progress(); assert(fraction==1)
+r.status='playing'; label,fraction=hud:progress(); assert(fraction==0)
+clock=4294967200; hud:progress(); local before=reads
+clock=154; hud:progress(); assert(reads==before+1)
+''')
 
     def test_native_portraits_do_not_overlap_or_enter_the_bottom_controls(self):
         self.check('''
@@ -68,7 +87,9 @@ local ui={activeDialog=function() return -1 end,attachOverlay=function(_,ids,ite
  assert(ids[1]==14 and ids[2]==16 and screenInput); controls=items; visible=predicate end,
  hudText=function(_,label,x,y,alignment) texts[#texts+1]={label,x,y,alignment} end,
  avatarNative=function(slot,x,y) assert(slot==3 and x==10 and y==152) end,
- border=function() end}
+ border=function() end,progressBar=function(_,x,y,width,height,fraction)
+  assert(x==390 and y==16 and width==96 and height==10 and fraction==1)
+ end}
 hud:install(ui); assert(visible())
 assert(controls[1].width==72 and controls[1].height==72)
 assert(controls[1].visible() and controls[2].visible() and not controls[3].visible())

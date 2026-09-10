@@ -143,6 +143,8 @@ def check(folder):
         check_report_pause(reader,lua,root,name)
         from check_header_native import check_header
         check_header(reader,lua,root,name)
+        from check_fill_native import check_fill
+        check_fill(reader,lua,root,name)
         from check_dispatch_native import check_dispatch
         check_dispatch(reader,name)
         from check_world_hash_native import check_world_hash

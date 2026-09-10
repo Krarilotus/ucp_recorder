@@ -22,7 +22,7 @@ function M.prepare(id,engine,worlds,progress)
     local world=assert(worlds[id],'Recovery world was not prepared')
     snapshotPath,snapshotHash=world.path,world.hash
   end
-  local hash=digest.file(snapshotPath,1024*1024*1024,progress and function()
+  local hash=digest.file(snapshotPath,1024*1024*1024,nil,progress and function()
     progress('Checking starting state...')
   end)
   assert(hash==snapshotHash,'Starting save is damaged')

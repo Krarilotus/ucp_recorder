@@ -21,6 +21,7 @@ function M.new(sites,onError)
   o.widthNative=core.exposeCode(sites.textWidth.address,3,1)
   o.headerNative=core.exposeCode(sites.header.address,5,1)
   o.borderNative=core.exposeCode(sites.border.address,6,1)
+  o.fillNative=core.exposeCode(sites.fill.address,6,1)
   o.buttonNative=core.exposeCode(sites.basicButton.address,3,1)
   o.menuConstructor=core.exposeCode(sites.menuConstructor.address,2,1)
   o.modalConstructor=core.exposeCode(sites.modalConstructor.address,10,1)
@@ -65,6 +66,19 @@ function M:attachOverlay(menuIDs,items,visible,screenInput)
       self.inputOverlays[id]=menu
     end
   end
+end
+
+-- Same Pencil fill and palette entry as the game's loading bar. Its complete
+-- loader renderer has fixed screen coordinates/blits, so only reuse the drawing
+-- primitive here; overlay ownership supplies the correct gameplay surface.
+function M:progressBar(x,y,width,height,fraction)
+  self.fillNative(self.sites.pencil.value,x,y,x+width-1,y+height-1,0)
+  local pixels=math.floor((width-4)*math.max(0,math.min(1,fraction)))
+  if pixels>0 then
+    local color=core.readSmallInteger(self.sites.loadingColor.value)%65536
+    self.fillNative(self.sites.pencil.value,x+2,y+2,x+pixels+1,y+height-3,color)
+  end
+  self:border(x,y,width-1,height-1)
 end
 
 function M:renderOverlayItem(item)
