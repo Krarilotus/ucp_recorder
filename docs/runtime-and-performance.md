@@ -70,6 +70,14 @@ separate measurement; a 100 ms complete replay start is not established.
 
 ## Platform status
 
+The 0.49.2 presentation review removed 35 unused labels from each of ten catalogs
+(about 21 KB of source text). Catalogs now load only for the selected language;
+English loads none. A recognized TextManager marker bypasses the fallback language
+provider. HUD shadow and lettering share one encoding/measurement pass. Tests
+check these call counts and lazy loading; this is not a whole-game speed benchmark.
+Recording inputs, verification, recovery state, asset checks and native restoration
+were retained because the current replay path requires them.
+
 Runtime logic is Lua with native game/UCP and Windows APIs. Python is used only
 for developer tests, preview packaging and optional offline inspection tools.
 The release runtime requires no Python installation.

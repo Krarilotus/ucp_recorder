@@ -178,13 +178,17 @@ function M:callback(callback)
   end)
 end
 
-function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend,color)
+local function prepareText(self,label,font,maxWidth)
   local measure=maxWidth and function(bytes)
     core.writeString(self.textBuffer,bytes..'\0')
     return self.widthNative(self.sites.textManager.value,self.textBuffer,font or 18)
   end
   label=require('code/locale').fit(label,150,measure,maxWidth)
   core.writeString(self.textBuffer,label..'\0')
+end
+
+function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend,color)
+  prepareText(self,label,font,maxWidth)
   -- Match native OptionsMenu_Buttons: font18, BGR24 colors and native blending.
   -- Alignment1 is centered on x; a positive width centers inside that width.
   self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,
@@ -194,8 +198,10 @@ end
 
 -- Terrain needs opaque lettering with a dark edge, unlike shaded menu panels.
 function M:hudText(label,x,y,alignment,maxWidth)
-  self:text(label,x+1,y+1,alignment,18,false,maxWidth,false,0,0)
-  self:text(label,x,y,alignment,18,false,maxWidth,false,0,0xCCF4FF)
+  -- Both passes draw the same glyphs: convert and measure only once.
+  prepareText(self,label,18,maxWidth)
+  self.textNative(self.sites.textManager.value,self.textBuffer,x+1,y+1,alignment or 0,0,18,0,0)
+  self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,0xCCF4FF,18,0,0)
 end
 
 function M:header(label,x,y,width)

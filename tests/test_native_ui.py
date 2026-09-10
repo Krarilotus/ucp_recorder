@@ -25,7 +25,7 @@ ui.widthNative=function(_,_,font) measured=font; return 30 end
 ui.textNative=function(...) drawn={...} end
 ui:text(l.text('Play'),50,60,1,18,false,100)
 assert(drawn[7]==18 and measured==18 and drawn[5]==1)
-ui:header(l.text('Recorded Skirmishes'),10,20,400)
+ui:header(l.text('Replays'),10,20,400)
 assert(drawn[7]==15 and measured==15 and drawn[5]==1)
 ''')
 
@@ -137,10 +137,10 @@ end
 
     def test_hud_text_is_opaque_with_a_dark_shadow(self):
         self.check('''
-local calls={}; ui.widthNative=function() return 80 end
+local calls={}; local measured=0; ui.widthNative=function() measured=measured+1; return 80 end
 ui.textNative=function(...) calls[#calls+1]={...} end
 ui:hudText('Replay: 20 / 100 ticks',788,12,-1,398)
-assert(#calls==2)
+assert(#calls==2 and measured==1)
 assert(calls[1][3]==789 and calls[1][4]==13 and calls[1][6]==0 and calls[1][9]==0)
 assert(calls[2][3]==788 and calls[2][4]==12 and calls[2][6]==0xCCF4FF and calls[2][9]==0)
 assert(calls[1][5]==-1 and calls[2][5]==-1)

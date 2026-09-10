@@ -36,6 +36,23 @@ data.version.getGameLanguage=function() return 'fr-FR' end
 l.bind(function() error('not loaded') end); assert(l.language()=='fr')
 ''')
 
+    def test_only_selected_catalog_loads_and_known_marker_skips_fallback_provider(self):
+        self.check('''
+local l=require('code/locale')
+local calls=0
+data={version={getGameLanguage=function() calls=calls+1; return 'german' end}}
+for _,language in ipairs(l.supported) do assert(not package.loaded['code/locale-'..language]) end
+l.bind(function() return 'English',1252 end)
+assert(l.text('Save replay')=='Save replay' and calls==0)
+assert(not package.loaded['code/locale-de'])
+l.bind(function() return 'French',1252 end)
+assert(l.text('Save replay')~='Save replay' and calls==0)
+assert(package.loaded['code/locale-fr'] and not package.loaded['code/locale-de'])
+l.bind(function() return 'Unknown marker',1252 end)
+assert(l.text('Save replay')=='Replay speichern' and calls==1)
+assert(package.loaded['code/locale-de'])
+''')
+
     def test_all_translations_preserve_placeholders_and_encode_for_their_fonts(self):
         self.check('''
 local l=require('code/locale')
@@ -59,11 +76,11 @@ end
         self.check('''
 local l=require('code/locale')
 l.bind(function() return 'Russian',1252 end)
-assert(l.language()=='ru' and l.text('Player %d',7)=='Player 7')
-assert(l.native(l.text('Player %d',7))=='Player 7')
+assert(l.language()=='ru' and l.text('Speed: %d',7)=='Speed: 7')
+assert(l.native(l.text('Speed: %d',7))=='Speed: 7')
 assert(l.text('Unknown diagnostic %s','detail')=='Unknown diagnostic detail')
 l.bind(function() return 'Russian',1251 end)
-assert(l.text('Player %d',7)=='Игрок 7')
+assert(l.text('Speed: %d',7)==string.format(l.translations.ru['Speed: %d'],7))
 ''')
 
     def test_multibyte_clipping_fits_complete_characters_and_handles_tiny_widths(self):
@@ -89,7 +106,7 @@ local l=require('code/locale')
 os.getenv=function() return nil end
 version={parse=function() error('semantic version utility is unrelated') end}
 data={version={getGameLanguage=function() return 'german' end}}
-assert(l.language()=='de' and l.text('Auto: on')=='Auto: ein')
+assert(l.language()=='de' and l.text('Save replay')=='Replay speichern')
 version.getGameLanguage=function() return 'english' end
 assert(l.language()=='de')
 os.getenv=function() return 'en' end
@@ -104,7 +121,7 @@ os.getenv=function(key) assert(key=='UCP_GUI_LANGUAGE'); return environment end
 version={getGameLanguage=function() return 'german' end}
 assert(l.language()=='de' and l.text('Play')=='Abspielen')
 environment='en'; assert(l.language()=='de' and l.text('Play')=='Abspielen')
-environment='de-DE'; assert(l.text('Player %d',4)=='Spieler 4')
+environment='de-DE'; assert(l.text('Speed: %d',4)=='Tempo: 4')
 environment='xx'; assert(l.language()=='de')
 version.getGameLanguage=function() return 'english' end
 environment='de'; assert(l.language()=='en' and l.text('Play')=='Play')

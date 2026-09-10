@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.49.2
+
+- Remove 35 obsolete labels from each translation catalog and load German lazily,
+  like the other languages. English requires no translation catalog.
+- Skip the fallback executable-language lookup when the loaded TextManager marker
+  identifies the language. Keep unknown-marker and uninitialized-game fallbacks.
+- Convert and clip each HUD label once, sharing its bytes between the shadow and
+  foreground draw calls. Replay inputs, checks, recovery and controls are unchanged.
+
 ## 0.49.1
 
 - In-game text follows the game language, never `UCP_GUI_LANGUAGE`. Translated

@@ -53,7 +53,7 @@ the game-language provider, then English; the legacy global game provider is
 used only when `data.version` has no language API.
 
 English and German are joined by French, Russian, Hungarian, Turkish, Chinese,
-Spanish, Persian, Italian and Polish. Each catalog covers all 113 current labels
+Spanish, Persian, Italian and Polish. Each catalog covers all 78 retained labels
 and preserves formatting arguments. Catalogs contain UTF-8; conversion uses the
 loaded TextManager's codepage, not the Windows system locale or a guessed page
 for the selected language. Until TextManager is ready, the original 1252 fallback
@@ -72,6 +72,10 @@ Measurement and drawing use the same encoded bytes and existing native fonts
 (18 for controls, 15 for headings). Clipping respects whole characters, including
 two-byte Chinese glyphs, and the existing width and buffer bounds. Conversion is
 lazy and cached with a fixed limit; it runs in presentation, not simulation.
+Only the selected language catalog loads, and a recognized TextManager marker
+avoids querying the fallback executable-language provider. HUD shadow and foreground
+share one conversion/clipping pass. Labels from the retired standalone menus are
+omitted; this does not remove controls from the current native menus.
 
 Automated tests cover all catalogs/placeholders, real Windows codepage conversion,
 language priority, fallback, native font selection and multibyte clipping.
