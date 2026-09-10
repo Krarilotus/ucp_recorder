@@ -6,6 +6,24 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_prepared_recovery_segment_reuses_validated_data_without_rescanning(self):
+        self.check('''
+local preparation=require('code/replay-preparation')
+local store=require('code/sessions')
+store.load=function() error('Already admitted recovery metadata') end
+store.preflight=function() error('Already validated command streams') end
+store.read=function() error('Already retained environment and RNG') end
+local world={manifest={id='recovery'},path='recovery.sav',hash=string.rep('a',64),rng=string.rep('x',0x9c50)}
+local first={worlds={recovery=world},info={title='Recorded settings'}}
+local ready=preparation.segment(first,'recovery')
+assert(ready.manifest==world.manifest and ready.rng==world.rng and ready.worlds==first.worlds)
+assert(ready.snapshotPath==world.path and ready.snapshotHash==world.hash and ready.info==first.info)
+assert(not pcall(preparation.segment,first,'missing'))
+world.manifest={id='wrong'}; assert(not pcall(preparation.segment,first,'recovery'))
+world.manifest={id='recovery'}; world.rng=nil
+assert(not pcall(preparation.segment,first,'recovery'))
+''')
+
     def test_release_keeps_sparse_fingerprints_and_decodes_only_on_save(self):
         self.check('''
 require('code/build-profile').diagnostics=false
@@ -98,6 +116,10 @@ for _,fail in ipairs({false,true}) do
  store.load=function() return manifest end
  store.compatible=function() return true end; store.preflight=function() end
  store.read=function(path) return path:find('rng.bin',1,true) and string.rep('x',0x9c50) or 'snapshot' end
+ package.loaded['code/world-reader']={read=function(path,limit)
+  assert(path=='ucp/replays/test/rng.bin' and limit==0x9c50)
+  return string.rep('x',limit)
+ end}
  engine.loadSnapshot=function()
   assert(memory[r.resultsHold]==1 and memory[r.playbackActive]==0); now=1
  end

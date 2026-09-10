@@ -1,7 +1,8 @@
 -- Use the game's PKWARE primitives on private data, never its global decoder or
--- multiplayer save routine. Conversion belongs outside an active match.
+-- multiplayer save routine. Callers own source stability; the codec never yields.
 local native=require('code/native')
 local binary=require('code/binary-memory')
+local build=require('code/build-profile')
 local M={MAX_SECTION=32*1024*1024}
 local entries={SHC={implode=0x4724c0,explode=0x4725a0},
   Extreme={implode=0x4726e0,explode=0x4727c0}}
@@ -43,12 +44,15 @@ function Codec:compress(data)
   if size+12>=#data then return end
   local checksum=core.readString(self.state+8,4)
   local header=core.readString(self.state+12,8)..checksum
-  -- Reuse the input allocation as the round-trip destination. This runs the
-  -- original decompressor and checks all bytes before publishing a container.
-  assert(functions.explode(self.state,self.state+8,self.output,size,self.input,#data)==1,
-    'Native world compression failed to round-trip')
-  assert(core.readString(self.state+8,4)==checksum and core.readString(self.input,#data)==data,
-    'Native world compression changed section bytes')
+  -- Release uses the original encoder's status, bounds and CRC, just as the
+  -- native container does. The diagnostic build additionally decodes/compares
+  -- each section; that duplicate work does not belong in live release capture.
+  if build.diagnostics then
+    assert(functions.explode(self.state,self.state+8,self.output,size,self.input,#data)==1,
+      'Native world compression failed to round-trip')
+    assert(core.readString(self.state+8,4)==checksum and core.readString(self.input,#data)==data,
+      'Native world compression changed section bytes')
+  end
   local result=header..core.readString(self.output,size)
   assert(#result==size+12,'Short native compressed section read')
   return result

@@ -73,7 +73,8 @@ function Snapshots:observe()
   if not available then
     self.disabled=true; print('[recorder] Optional snapshot directory unavailable: '..tostring(path)); return
   end
-  local point,reason=storage.capture(r,path,month)
+  local commands=r.mode=='record' and r.manifest.commandCount or r.playedCommands
+  local point,reason=storage.capture(r.engine,path,month,commands,r:bookmark())
   if not point then
     self.disabled=true
     print('[recorder] Optional snapshot capture disabled: '..tostring(reason))
@@ -118,9 +119,18 @@ function Snapshots:advance()
   if not self.requested then return end
   local r=self.session; local target,id=self.requested,self.requestedId
   self.requested=nil; self.requestedId=nil
+  if id==r.manifest.id and r.status=='playing' and target>=r.engine:tick() then
+    local nextPoint=self:nearest(target)
+    if not nextPoint or nextPoint.point.tick<=r.engine:tick() then
+      -- The active world is already closer than every restore point. Continue
+      -- the normal simulation instead of loading and redoing completed work.
+      self.error=nil; self.target=target; r.engine:setPaused(false)
+      return
+    end
+  end
   local preparation=require('code/replay-preparation')
   local valid,ready,cached=pcall(function()
-    local ready=self.prepared[id] or preparation.prepare(id,r.engine,self.ready.worlds)
+    local ready=self.prepared[id] or preparation.segment(self.ready,id)
     local point=self:nearest(target,ready.manifest)
     -- Preparation only reads files. Validate before dropping the active world.
     local cached
@@ -161,14 +171,14 @@ function Snapshots:load(ready,cached)
   self.cadences[ready.manifest.id]=self.cadence
 end
 
-function Snapshots:transition(id,worlds)
-  local ready=self.prepared[id] or require('code/replay-preparation').prepare(id,self.session.engine,worlds)
+function Snapshots:transition(id)
+  local ready=self.prepared[id] or require('code/replay-preparation').segment(self.ready,id)
   require('code/replay-preparation').checkStartingState(ready)
   self:load(ready)
 end
 
-function Snapshots:progress()
-  return self.timeline:position(self.session.manifest.id,self.session.engine:tick())
+function Snapshots:progress(tick)
+  return self.timeline:position(self.session.manifest.id,tick or self.session.engine:tick())
 end
 
 -- Called before reading the target tick's RNG journal. Halting this invocation

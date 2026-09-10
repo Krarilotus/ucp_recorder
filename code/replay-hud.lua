@@ -14,7 +14,10 @@ function M:status()
   if r.status=='error' then return tostring(r.error or tr('Playback failed.')) end
   if r.status=='finished' then return tr('Playback finished.') end
   if r.snapshots and r.snapshots.error then return tostring(r.snapshots.error):match('[^\r\n]+') end
-  if r.snapshots and r.snapshots.target then return tr('Seeking to tick %d',r.snapshots.target-r.manifest.startTick) end
+  if r.snapshots and r.snapshots.target then
+    local position=r.snapshots:progress(r.snapshots.target)
+    return tr('Seeking to tick %d',position)
+  end
   if r.engine:isPaused() then return tr('Playback paused.') end
   return tr('Checks matching')
 end

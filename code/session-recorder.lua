@@ -362,7 +362,7 @@ function Session:afterTick()
     -- processGameTick has unwound. Outer-loop callbacks still follow this point;
     -- their replacement-world safety remains part of the execution-phase audit.
     local id,prepared=self.nextReplay,self.preparedWorlds
-    if self.snapshots then self.snapshots:transition(id,prepared)
+    if self.snapshots then self.snapshots:transition(id)
     else self:reset(); self:startPlayback(id,prepared) end
     return
   end

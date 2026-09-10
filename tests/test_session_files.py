@@ -249,13 +249,16 @@ package.path=source_root..'/?.lua;'..package.path
 json={encode=function(_,v) return encode_json(v) end,decode=function(_,v) return decode_json(v) end}
 sha={sha256=hash_string}
 -- Keep real Lua streaming/decoding; replace only the Windows hashing boundary.
-package.loaded['code/native-hash']={sha256=hash_string,file=function(path,limit,onChunk)
+package.loaded['code/native-hash']={sha256=hash_string,file=function(path,limit,onChunk,onProgress)
  if onChunk then
   local f=assert(io.open(path,'rb'))
   local ok,reason=pcall(function()
    while true do local chunk=f:read(65536); if not chunk then break end; onChunk(chunk) end
   end)
   assert(f:close()); assert(ok,reason)
+ end
+ if onProgress then
+  local f=assert(io.open(path,'rb')); local size=assert(f:seek('end')); assert(f:close()); onProgress(size)
  end
  return hash_file(path,limit)
 end}

@@ -24,7 +24,7 @@ function M:write(value)
   self.bytes=(self.bytes or 0)+#line
 end
 
-function M:open()
+function M:open(snapshotOrigin)
   if self.file then return end
   self.bytes=0
   self.lastNamedCopy=nil
@@ -34,6 +34,7 @@ function M:open()
   self.recoveryPending=nil; self.boundaryEvents=nil
   Trace.open(self)
   self.capture=files.begin(self.path,self.engine,store.settings())
+  self.snapshots=require('code/multiplayer-snapshots').new(self,snapshotOrigin)
   self.capture.verificationProfile=self.verificationProfile
   if self.engine.battle then self.engine.battle:begin() end
   self.tickFile=assert(io.open(self.path..'/ticks.bin','wb'))
@@ -71,6 +72,7 @@ function M:onTick()
   self.clock=self.engine:tick()
   self.observedTick=self.clock
   assert(not self.pendingTick,'Native simulation tick did not return to the game loop')
+  self.snapshots:observe()
   self.pendingTick={time=self.observedTick,before=require('code/tick-journal').state(self.engine)}
   self.capture.finalRng=self.engine:rngState()
   self.finalResourceData=self.engine:resourceData()
@@ -100,7 +102,7 @@ function M:recover()
   local received=self.received
   previous.replayEvents=self.boundaryEvents or 0
   self:stop('native world or player roster changed')
-  self:open()
+  self:open(previous.snapshotOriginMonth)
   self.simulationObserved=true
   self.received=received
   self.capture.previousReplay=previous.id
@@ -184,7 +186,7 @@ function M:stop(reason)
     self.lastReplay=files.seal(capture)
     self.lastCapture=capture
   end
-  self.capture=nil; self.observedTick=nil; self.pendingTick=nil; self.finalRngData=nil; self.finalResourceData=nil
+  self.capture=nil; self.snapshots=nil; self.observedTick=nil; self.pendingTick=nil; self.finalRngData=nil; self.finalResourceData=nil
   assert(ok,err)
 end
 

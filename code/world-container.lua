@@ -1,5 +1,5 @@
--- Construct the native directory outside a match. No game world or transport
--- state is written; a prepared file is not by itself a playable MP replay.
+-- Shared native container encoder and prepared-file cache. Sources supply
+-- sections; this owner never writes game state or invokes network transport.
 local store=require('code/sessions')
 local native=require('code/native')
 local M={MAX_PAYLOAD=6000000}
@@ -70,11 +70,26 @@ function M.prepare(path,engine,progress)
     end)
     return cached
   end
+  local result=M.write(path..'/world-native.sav.tmp',reader,progress)
+  result.sourceWorldHash=reader.capture.world.hash
+  result.converterRevision=cache.REVISION
+  require('code/platform').replace(path..'/world-native.sav.tmp',path..'/world-native.sav')
+  store.write(path..'/world-native.json.tmp',json:encode(result))
+  require('code/platform').replace(path..'/world-native.json.tmp',path..'/world-native.json')
+  cache.remember(path,result)
+  return result
+end
+-- Shared container encoder. Sources own section validation and lifetime;
+-- callers own atomic publication. No native save, load, or transport dispatch.
+---@param filename string Output temporary file.
+---@param reader table Read-only section source with header and extension bytes.
+---@param progress function|nil Only disk sources may yield to a progress UI.
+function M.write(filename,reader,progress)
   local capacity=40512
   for _,entry in ipairs(reader.entries) do capacity=math.max(capacity,entry.size) end
-  local result=require('code/world-codec').withBuffers(capacity,function(codec)
+  return require('code/world-codec').withBuffers(capacity,function(codec)
     local prefix=header(reader,codec)
-    local file=assert(io.open(path..'/world-native.sav.tmp','wb'))
+    local file=assert(io.open(filename,'wb'))
     local rows,bytes={},0
     local ok,reason=xpcall(function()
       assert(file:write(prefix,directory({},0)))
@@ -101,17 +116,12 @@ function M.prepare(path,engine,progress)
     local closed=file:close()
     assert(ok and closed,reason or 'Cannot close prepared world')
     local size=0
-    local digest=require('code/native-hash').file(path..'/world-native.sav.tmp',M.MAX_PAYLOAD+110000,nil,
+    local digest=require('code/native-hash').file(filename,M.MAX_PAYLOAD+110000,nil,
       function(count) size=count end)
     assert(size==#prefix+3036+bytes,'Prepared native world length differs')
-    return {format=1,sourceWorldHash=reader.capture.world.hash,variant=native.profile.name,
-      executable=native.profile.sha256,converterRevision=cache.REVISION,sha256=digest,bytes=size,
+    return {format=1,variant=native.profile.name,
+      executable=native.profile.sha256,sha256=digest,bytes=size,
       payloadBytes=bytes,sections=#rows,preview='neutral-placeholder',playable=false}
   end)
-  require('code/platform').replace(path..'/world-native.sav.tmp',path..'/world-native.sav')
-  store.write(path..'/world-native.json.tmp',json:encode(result))
-  require('code/platform').replace(path..'/world-native.json.tmp',path..'/world-native.json')
-  cache.remember(path,result)
-  return result
 end
 return M

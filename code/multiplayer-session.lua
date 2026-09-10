@@ -24,7 +24,7 @@ function M.seal(capture)
     settingsHash=capture.settingsHash,environmentHash=capture.environmentHash,
     settingsCapture=capture.settingsCapture,restartSettingsHash=capture.restartSettingsHash,
     automarket=capture.automarket,player=capture.initialNetwork.localPlayer,
-    startTick=capture.startTick,lastTick=capture.lastObservedTick,
+    startTick=capture.startTick,lastTick=capture.lastObservedTick,snapshotOriginMonth=capture.snapshotOriginMonth,
     startResources=capture.initialResources,finalResources=capture.finalResources,
     finalRng=capture.finalRng,finalRngHash=capture.finalRngHash,rngHash=capture.rngHash,
     snapshotHash=capture.world and capture.world.hash,commandCount=0}
@@ -50,6 +50,7 @@ function M.seal(capture)
     end
     local commands=open('stream-commands.json','wb')
     local checkpoints=open('stream-rng-sync.json','wb')
+    local snapshotBoundary=require('code/multiplayer-snapshots').indexer(capture,manifest,commands,checkpoints)
     local journal=open('commands.jsonl','rb')
     assert(journal:seek('end')==capture.bytes,'Multiplayer journal length differs')
     assert(journal:seek('set',0))
@@ -91,6 +92,7 @@ function M.seal(capture)
           'Multiplayer journal ending counts differ')
         footer=true
       else error('Unframed multiplayer event') end
+      if snapshotBoundary then snapshotBoundary(sequence,previous) end
     end
     assert(header and (footer or capture.status=='snapshot'),'Multiplayer journal was not sealed')
     assert(sequence==capture.events and commandCount==capture.commands,'Multiplayer capture counts differ')
@@ -148,8 +150,11 @@ function M.prepareChain(first,engine,progress)
     assert(manifest.simulationProfile==M.PROFILE and manifest.environmentHash==first.environmentHash
       and manifest.executable==first.executable,'Recovery segment requires a different environment')
     store.preflight(manifest,progress)
+    local rng=require('code/world-reader').read(store.path(manifest.id)..'/rng.bin',0x9c50)
+    assert(#rng==0x9c50 and require('code/native-hash').sha256(rng)==manifest.rngHash,
+      'Starting RNG state is damaged')
     local path,hash=M.prepare(manifest,engine,progress)
-    prepared[manifest.id]={path=path,hash=hash,manifest=manifest}
+    prepared[manifest.id]={path=path,hash=hash,manifest=manifest,rng=rng}
     if not manifest.nextReplay then return prepared end
     local loaded,nextManifest=pcall(store.load,manifest.nextReplay,require('code/native').profile)
     if not loaded then

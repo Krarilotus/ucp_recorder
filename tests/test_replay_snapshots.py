@@ -26,7 +26,7 @@ local engine={calendarMonth=function() return month end,tick=function() return t
  commandsPending=function() return pending or false end,
  isPaused=function() return paused or false end,
  pause=function() paused=true end,setPaused=function(_,v) paused=v end}
-r={mode='play',active=true,status='playing',halt=5000,engine=engine,
+r={bookmark=function() return {} end,mode='play',active=true,status='playing',halt=5000,engine=engine,
  manifest={id='test',startTick=100,lastTick=1000,snapshotOriginMonth=12000}}
 ready={manifest=r.manifest}
 Snapshots=require('code/replay-snapshots')
@@ -76,7 +76,7 @@ assert(not s:afterTick() and not s:atBoundary(550))
 
     def test_cache_failure_falls_back_to_normal_start_without_silently_loading_bad_data(self):
         self.check('''
-month=12012; tick=400; s:observe()
+month=12012; tick=400; s:observe(); tick=800
 require('code/snapshot-store').prepare=function() error('damaged cache') end
 r.reset=function(self) self.mode='none' end
 r.startPlayback=function(self,id,_,actual,cached)
@@ -97,10 +97,21 @@ s:observe(); assert(s.disabled and r.status=='playing' and #s.entries==0)
     def test_damaged_starting_save_does_not_drop_running_world(self):
         self.check('''
 require('code/replay-preparation').checkStartingState=function() error('damaged start') end
+tick=800
 r.reset=function() error('Must retain active world') end
 s:request(0.1); s:advance()
 assert(r.snapshots==s and r.status=='playing' and s.error:find('damaged start',1,true))
 assert(not s.target and not s.requested)
+''')
+
+    def test_forward_seek_reuses_current_world_when_it_is_the_nearest_start(self):
+        self.check('''
+tick=400; paused=true
+r.reset=function() error('Forward seek must not reload the current world') end
+require('code/replay-preparation').checkStartingState=function() error('No disk read is needed') end
+s:request(.5); s:advance()
+assert(s.target==550 and not paused and not s.error)
+assert(not s:atBoundary(549) and s:atBoundary(550) and paused)
 ''')
 
     def test_locked_cache_disables_new_writes_before_exceeding_budget(self):
@@ -120,7 +131,7 @@ local second={id='recovered',startTick=50,lastTick=550,snapshotOriginMonth=12024
 first.nextReplay='recovered'; second.previousReplay='test'
 ready.worlds={test={manifest=first},recovered={manifest=second}}
 local recovered={manifest=second,worlds=ready.worlds}
-require('code/replay-preparation').prepare=function(id) assert(id=='recovered'); return recovered end
+require('code/replay-preparation').segment=function(first,id) assert(first==ready and id=='recovered'); return recovered end
 s=Snapshots.new(r,ready); r.snapshots=s
 month=12012; tick=400; s:observe()
 r.reset=function(self) assert(not self.snapshots); self.mode='none' end

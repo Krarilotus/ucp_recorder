@@ -70,6 +70,7 @@ function M.copy(source,name,bytes,events,commands,tick)
     end
     prefix(source.path..'/commands.jsonl',path..'/commands.jsonl',bytes)
     if source.tickProfile then prefix(source.path..'/ticks.bin',path..'/ticks.bin',source.tickBytes) end
+    require('code/multiplayer-snapshots').copy(source,copy)
     copy.status='snapshot'; M.save(copy)
   end)
   if not ok then copy.status='interrupted'; pcall(M.save,copy); error(err) end

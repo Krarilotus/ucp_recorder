@@ -16,19 +16,32 @@ function M.prepare(id,engine,worlds,progress)
     require('code/replay-assets').verify(environment.assets,progress)
   end
   if progress then progress('Checking starting state...') end
-  local snapshotPath,snapshotHash=path..'/start.sav',manifest.snapshotHash
+  local snapshotPath,snapshotHash,rng=path..'/start.sav',manifest.snapshotHash
   if manifest.multiplayer then
     worlds=worlds or require('code/multiplayer-session').prepareChain(manifest,engine,progress)
     local world=assert(worlds[id],'Recovery world was not prepared')
     snapshotPath,snapshotHash=world.path,world.hash
+    rng=world.rng
   end
   local hash=digest.file(snapshotPath,1024*1024*1024,nil,progress and function()
     progress('Checking starting state...')
   end)
   assert(hash==snapshotHash,'Starting save is damaged')
-  local rng=store.read(path..'/rng.bin')
-  assert(#rng==0x9c50 and digest.sha256(rng)==manifest.rngHash,'Starting RNG state is damaged')
+  if not rng then
+    rng=require('code/world-reader').read(path..'/rng.bin',0x9c50)
+    assert(#rng==0x9c50 and digest.sha256(rng)==manifest.rngHash,'Starting RNG state is damaged')
+  end
   return {manifest=manifest,snapshotPath=snapshotPath,snapshotHash=snapshotHash,rng=rng,worlds=worlds,info=environment.display}
+end
+
+-- The full recovery chain was admitted before entering the first world. Reuse
+-- those validated streams, environment and RNG blocks instead of rescanning
+-- every recorded command and installed asset on each recovery transition.
+function M.segment(first,id)
+  local world=assert(first.worlds and first.worlds[id],'Recovery world was not prepared')
+  assert(world.manifest and world.manifest.id==id and world.rng,'Recovery segment was not validated')
+  return {manifest=world.manifest,snapshotPath=world.path,snapshotHash=world.hash,
+    rng=world.rng,worlds=first.worlds,info=first.info}
 end
 
 -- A seek can happen long after initial preparation. Check the starting file

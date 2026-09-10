@@ -14,7 +14,7 @@ import os
 
 from native_image import load_image
 from check_executables import image_reader
-from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
+from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
 from unicorn import x86_const as reg
 import pefile
 
@@ -153,17 +153,19 @@ function encodeSection(data)
 end
 ''')
     failure = None
-    for data in cases:
-        encoded = lua.globals().encodeSection(data)
-        assert not allocations
-        assert not lua.eval("pcall(function() retained:compress('x') end)")[0]
-        if encoded is not None:
-            encoded = encoded.encode('latin-1')
-            raw_size, packed_size, crc = struct.unpack_from('<3I', encoded)
-            assert raw_size == len(data) and packed_size == len(encoded) - 12 and crc == zlib.crc32(data)
-            machine.mem_write(packed, encoded[12:])
-            assert call(decode, state + 8, packed, packed_size, restored, raw_size) == 1
-            assert bytes(machine.mem_read(restored, raw_size)) == data
+    for diagnostics in (False,True):
+        lua.execute("require('code/build-profile').diagnostics="+str(diagnostics).lower())
+        for data in cases:
+            encoded = lua.globals().encodeSection(data)
+            assert not allocations
+            assert not lua.eval("pcall(function() retained:compress('x') end)")[0]
+            if encoded is not None:
+                encoded = encoded.encode('latin-1')
+                raw_size, packed_size, crc = struct.unpack_from('<3I', encoded)
+                assert raw_size == len(data) and packed_size == len(encoded) - 12 and crc == zlib.crc32(data)
+                machine.mem_write(packed, encoded[12:])
+                assert call(decode, state + 8, packed, packed_size, restored, raw_size) == 1
+                assert bytes(machine.mem_read(restored, raw_size)) == data
     lua.execute("assert(not pcall(function() codec.withBuffers(64,function() error('injected') end) end))")
     assert not allocations
     # Drive the complete capture -> validated reader -> native container path on
@@ -202,9 +204,10 @@ json={encode=function(_,v) return encode_json(v) end,decode=function(_,v) return
 sha={sha256=hash_data}; core.readByte=readByte
 require('code/native').profile.sha256=executable_hash
 require('code/native-hash').sha256=hash_data
-require('code/native-hash').file=function(path,limit,onChunk)
+require('code/native-hash').file=function(path,limit,onChunk,onProgress)
  local data=require('code/world-reader').read(path,limit)
  if onChunk then onChunk(data,#data) end
+ if onProgress then onProgress(#data) end
  return hash_data(data)
 end
 package.loaded['code/platform']={replace=replace_file}
@@ -218,6 +221,21 @@ prepared=require('code/world-container').prepare(virtual_path,engine)
 ''')
         assert not allocations
         container=(folder/'world-native.sav').read_bytes()
+        game_writes=[]
+        hook=machine.hook_add(UC_HOOK_MEM_WRITE,
+            lambda uc,access,address,size,value,user:game_writes.append((address,size)) if address<heap else None)
+        try:
+            lua.execute('''
+engine.networkState=function() return {mode=1,syncStatus=0} end
+engine.singlePlayer=function() return false end
+require('code/build-profile').diagnostics=false
+require('code/world-capture').writeSnapshot(virtual_path..'/periodic.sav',engine)
+''')
+        finally:machine.hook_del(hook)
+        assert not game_writes,game_writes[:10]
+        assert (folder/'periodic.sav').read_bytes()==container
+        assert not allocations
+        print(f'PASS: {variant} live-source release container equals disk-source container; no emulated game-memory writes',flush=True)
         def decode_block(block):
             length,compressed,crc=struct.unpack_from('<3I',block)
             assert compressed==len(block)-12 and 0<length<=32*1024*1024

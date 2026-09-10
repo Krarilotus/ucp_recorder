@@ -1,4 +1,4 @@
-# Replay seeking (development branch)
+# Replay seeking (0.50.0 preview)
 
 This branch adds a clickable progress bar beside the persistent tick counter.
 It is not the published 0.49.4 build. Native restoration and capture latency
@@ -6,8 +6,9 @@ still require acceptance testing before this feature is released.
 
 ## Storage and playback
 
-Single-player recording writes an additional restore point every 25 elapsed
-game years. Offline playback creates a local point every elapsed game year.
+Single-player and multiplayer recording write an additional restore point every
+25 elapsed game years. Each multiplayer peer owns its own points; playback is
+always offline. Offline playback creates a local point every elapsed game year.
 The native calendar, measured from the recording's starting date, drives both
 schedules; a loaded game does not immediately save decades of duplicate points.
 Capture waits for an idle command boundary. A calendar jump produces one point
@@ -70,17 +71,29 @@ scoped offline save gate suppresses the transport call without changing actual
 simulation mode. Original SHC and Extreme branch/ABI tests cover that guard.
 Live multiplayer saving remains prohibited by this provider.
 
+Live multiplayer uses `world-capture.writeSnapshot` instead: it reads the existing
+122-section world layout and registered extension state into the same native
+container encoder used for the starting world. It neither calls the native save
+writer nor yields between sections. Capture waits during synchronization and
+pending command execution. `multiplayer-snapshots` converts trace positions into
+replay byte bookmarks during the existing journal scan, and preserves the
+25-year cadence through recovery. Named prefixes copy only included points.
+
+The release encoder retains native status, bounds and checksum handling, but
+omits the diagnostic build's immediate decode-and-compare pass. Native tests
+independently decode both build profiles. Preparing a recovery chain validates
+each segment once and retains its small RNG block; subsequent transitions reuse
+that admission instead of rescanning all commands and assets. Native starting
+files are still hash-checked before replacing an active world.
+
 ## Remaining completion gates
 
-1. Implement embedded 25-year points for live multiplayer capture through its
-   read-only world owner, including journal-to-replay bookmark conversion. The
-   single-player writer must not be enabled against live network state.
-2. Compare continuous playback with repeated native restore-and-continue runs,
+1. Compare continuous playback with repeated native restore-and-continue runs,
    including recorded maintenance, command boundaries, loaded-save starts,
    extension state, player statistics, completion-to-backward seeks and recovery.
-3. Measure native capture and restore stalls in representative saves before
+2. Measure native capture and restore stalls in representative saves before
    release. Timing is logged at each point; no sub-100 ms claim has been verified.
-4. Publish/install a distinct verified preview, then provide one complete
+3. Publish/install a distinct verified preview, then provide one complete
    single-player acceptance sequence before requesting further multiplayer tests.
 
 Offline regression coverage includes calendar scheduling, binary bookmarks

@@ -25,7 +25,9 @@ During playback, portraits on the left select whose reports/book to inspect.
 The progress bar and adjacent tick counter stay at the top right, with status
 below. Progress is sampled four times per second; completion updates immediately.
 The bar reuses the native loading-bar fill and palette on the existing gameplay
-overlay surface. It is currently display-only: clicking does not seek.
+overlay surface. Click it to seek, including backwards after completion. Playback
+restores the nearest usable embedded or local point and simulates the remainder.
+See [seeking and storage limits](replay-seeking.md); arbitrary jumps are not instant.
 F3 adds the saved date,
 game and UCP framework versions, and a compact summary of recorded packs.
 Full exact settings and asset checks still govern replay admission.

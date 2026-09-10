@@ -9,7 +9,7 @@ local M={PROFILE='native-before-clock-v1',MAX_WORLD=7*1024*1024,MAX_POINTS=512}
 local function world(path) return path..'.sav' end
 local function rng(path) return path..'.rng' end
 
-function M.validate(point,manifest)
+function M.validateState(point,manifest)
   assert(type(point)=='table' and point.profile==M.PROFILE,'Unsupported restore point')
   validation.integer(point.tick,manifest.startTick,manifest.lastTick,'snapshot tick')
   validation.integer(point.month,-1200000,1200011,'snapshot calendar')
@@ -18,6 +18,11 @@ function M.validate(point,manifest)
   validation.hash(point.worldHash,'snapshot world hash')
   validation.hash(point.rngHash,'snapshot RNG hash')
   validation.hash(point.stateHash,'snapshot state hash')
+  return point
+end
+
+function M.validate(point,manifest)
+  M.validateState(point,manifest)
   require('code/replay-streams').validateBookmark(point.bookmark,{commandsFile=true,rngFile=true,infoFile=true,
     tickFile=manifest.multiplayer and true or nil,phaseFile=manifest.phaseProfile and true or nil})
   if point.bookmark.nextCommand then validation.sessionCommand(point.bookmark.nextCommand,manifest) end
@@ -46,21 +51,29 @@ function M.remove(path)
   return not failed,failed
 end
 
-function M.capture(session,path,month)
-  local engine=session.engine
-  assert(not engine.executing and not engine:commandsPending() and not session.pendingTick,
+---@param commands integer Already executed command count at the capture boundary.
+---@param bookmark table|nil Multiplayer converts its trace position when sealing.
+---@param writeWorld function|nil Synchronous read-only provider for live multiplayer.
+function M.capture(engine,path,month,commands,bookmark,writeWorld)
+  assert(not engine.executing and not engine:commandsPending(),
     'Restore point requires an idle command/tick boundary')
   local tick=engine:tick()
   local started=platform.milliseconds()
   local random,resources=engine:rngData(),engine:resourceData()
   local point={profile=M.PROFILE,tick=tick,month=month,
-    commands=session.mode=='record' and session.manifest.commandCount or session.playedCommands,
-    bookmark=session:bookmark(),rngHash=digest.sha256(random),stateHash=digest.sha256(random..resources)}
+    commands=commands,bookmark=bookmark,rngHash=digest.sha256(random),stateHash=digest.sha256(random..resources)}
   local ok,reason=xpcall(function()
-    engine:saveSnapshot(world(path)..'.tmp')
+    local encoded
+    if writeWorld then encoded=writeWorld(world(path)..'.tmp')
+    else engine:saveSnapshot(world(path)..'.tmp') end
     point.saveMilliseconds=(platform.milliseconds()-started)%4294967296
-    point.bytes=0
-    point.worldHash=digest.file(world(path)..'.tmp',M.MAX_WORLD,nil,function(count) point.bytes=count end)
+    if encoded then
+      point.bytes=validation.integer(encoded.bytes,1001,M.MAX_WORLD,'snapshot size')
+      validation.hash(encoded.sha256,'snapshot world hash'); point.worldHash=encoded.sha256
+    else
+      point.bytes=0
+      point.worldHash=digest.file(world(path)..'.tmp',M.MAX_WORLD,nil,function(count) point.bytes=count end)
+    end
     store.write(rng(path)..'.tmp',random)
     assert(engine:tick()==tick and engine:rngData()==random and engine:resourceData()==resources,
       'Snapshot capture changed simulation state')
@@ -88,6 +101,10 @@ function M.prepare(manifest,point,path)
     local bytes=file:seek('end'); local closed=file:close()
     assert(bytes and closed and offset<=bytes,'Snapshot stream position is outside its source')
   end
+  return M.readWorld(point,path)
+end
+
+function M.readWorld(point,path)
   local size=0
   local hash=digest.file(world(path),M.MAX_WORLD,nil,function(count) size=count end)
   assert(hash==point.worldHash and size==point.bytes,'Cached world is damaged')
@@ -99,6 +116,13 @@ function M.prepare(manifest,point,path)
   return {point=point,snapshotPath=world(path),rng=random}
 end
 
+function M.copyWorld(point,from,to)
+  M.readWorld(point,from)
+  local copy=require('code/replay-files').copy
+  copy(world(from),world(to),point.bytes)
+  copy(rng(from),rng(to),0x9c50)
+end
+
 function M.copy(source,target)
   target.snapshots={}
   for _,point in ipairs(source.snapshots or {}) do
@@ -108,9 +132,7 @@ function M.copy(source,target)
       if point.tick>target.lastTick then return end
       platform.mkdir(store.path(target.id)..'/snapshots')
       local from=M.path(source,point); to=M.path(target,point)
-      M.prepare(source,point,from)
-      require('code/replay-files').copy(world(from),world(to),point.bytes)
-      require('code/replay-files').copy(rng(from),rng(to),0x9c50)
+      M.copyWorld(point,from,to)
       target.snapshots[#target.snapshots+1]=point
     end)
     if not ok then

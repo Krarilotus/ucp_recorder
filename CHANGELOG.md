@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.50.0 (seeking preview)
+
+- Click the persistent progress bar to seek, including backwards after playback
+  finishes. Reuse the nearest restore point or continue the current world when
+  it is closer. The remaining distance still needs normal simulation.
+- Save compressed embedded points every 25 game years in singleplayer and on
+  each multiplayer peer. Cache yearly points during offline playback, with a
+  256 MiB per-viewer limit, crash cleanup and independent process leases.
+- Reuse the original native container and codec for multiplayer points without
+  native save or transport calls. Preserve recovery segments, named prefixes,
+  recorded extension state, RNG and exact command/tick stream positions.
+- Reuse admitted recovery data instead of rescanning every command and asset on
+  transitions. Release compression omits the diagnostic decode-and-compare pass.
+  Disk failure disables optional points without stopping command recording.
+- Preserve pause and selected-player state across seeking. Use binary stream
+  offsets so sealing on Windows does not invalidate saved command bookmarks.
+- Native SHC/Extreme codec, container and loader checks pass. Live restore
+  equivalence, capture stalls and rendered controls still require acceptance;
+  this preview makes no sub-100 ms loading guarantee.
+
 ## 0.49.4
 
 - Show a native-style progress bar beside the persistent replay tick counter.

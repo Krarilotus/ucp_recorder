@@ -48,7 +48,7 @@ path=folder..'/point'
 
     def test_capture_and_prepare_verify_files_and_leave_world_unchanged(self):
         self.lua.execute('''
-point=assert(snapshot.capture(r,path,12000))
+point=assert(snapshot.capture(engine,path,12000,4,r:bookmark()))
 assert(point.bytes==2000 and point.commands==4 and point.tick==100)
 local ready=snapshot.prepare(manifest,point,path)
 assert(ready.rng==random and ready.snapshotPath==path..'.sav')
@@ -58,7 +58,7 @@ assert(not io.open(path..'.sav','rb') and not io.open(path..'.rng','rb'))
 ''')
 
     def test_corrupt_world_oversized_rng_and_bad_stream_offset_are_rejected(self):
-        self.lua.execute('point=assert(snapshot.capture(r,path,12000))')
+        self.lua.execute('point=assert(snapshot.capture(engine,path,12000,4,r:bookmark()))')
         world=self.path/'point.sav'; original=world.read_bytes()
         world.write_bytes(b'z'+original[1:])
         self.lua.execute('assert(not pcall(snapshot.prepare,manifest,point,path))')
@@ -78,7 +78,7 @@ require('code/platform').replace=function(from,to)
  if to:match('%.rng$') then error('disk failure') end
  return replace(from,to)
 end
-local point,reason=snapshot.capture(r,path,12000)
+local point,reason=snapshot.capture(engine,path,12000,4,r:bookmark())
 assert(not point and reason:find('disk failure',1,true))
 assert(not io.open(path..'.sav','rb') and not io.open(path..'.rng.tmp','rb'))
 assert(manifest.commandCount==4 and engine:tick()==100)
@@ -88,14 +88,14 @@ assert(manifest.commandCount==4 and engine:tick()==100)
         self.lua.execute('''
 local save=engine.saveSnapshot
 engine.saveSnapshot=function(...) save(...); tick=tick+1 end
-local ok,reason=pcall(snapshot.capture,r,path,12000)
+local ok,reason=pcall(snapshot.capture,engine,path,12000,4,r:bookmark())
 assert(not ok and reason:find('changed simulation state',1,true))
 assert(not io.open(path..'.sav','rb'))
 ''')
 
     def test_missing_optional_restore_point_does_not_prevent_named_replay_copy(self):
         self.lua.execute('''
-point=assert(snapshot.capture(r,path,12000))
+point=assert(snapshot.capture(engine,path,12000,4,r:bookmark()))
 manifest.snapshots={point}
 local target={id='copy',startTick=1,lastTick=500,commandCount=4}
 -- The capture is deliberately not in the embedded source directory.
