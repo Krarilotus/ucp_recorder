@@ -24,19 +24,26 @@ end
 function M:refresh()
   local count=core.readInteger(self.sites.storedCount)
   assert(count>=0 and count<=250,'Native battle history count is invalid')
-  local items={}
+  local items,nativeItems={},{}
   for index=0,count-1 do
     local raw=validate(core.readString(self.sites.records+index*stats.SIZE,stats.SIZE))
     local id='native-'..sha.sha256(raw)
-    items[#items+1]={id=id,raw=raw,
+    nativeItems[#nativeItems+1]={id=id,raw=raw,
       created=string.format('%04d-%02d-%02dT00:00:00Z',word(raw,0x46c),word(raw,0x468),word(raw,0x464))}
   end
+  local linked={}
   for _,manifest in ipairs(store.list()) do
     if manifest.variant==native.profile.name and manifest.battle then
       local raw=validate(stats.read(manifest))
       items[#items+1]={id=manifest.id,raw=raw,manifest=manifest,name=manifest.displayName,
         created=manifest.savedAt or manifest.created}
+      if manifest.nativeBattleHash then linked['native-'..manifest.nativeBattleHash]=true end
     end
+  end
+  for _,item in ipairs(nativeItems) do
+    -- Merge one explicitly linked native result into its replay row. The
+    -- game's persistent history stays untouched, including identical older rows.
+    if linked[item.id] then linked[item.id]=nil else items[#items+1]=item end
   end
   self.items=items
   self:sort()

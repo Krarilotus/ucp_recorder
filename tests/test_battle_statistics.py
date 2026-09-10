@@ -104,3 +104,24 @@ history:sort(4); assert(history.items[1].id=='a' and not history.descending)
 history:sort(4); assert(history.items[1].id=='b' and history.descending)
 history.selected={id='native',raw=raw}; assert(not pcall(history.rename,history,'Leave alone'))
 ''')
+
+    def test_only_an_explicit_native_result_link_merges_one_history_entry(self):
+        self.check(r'''
+realNative.profile.name='SHC'
+battle:begin(); local replay={id='replay',lastTick=100,variant='SHC',created='2026-09-10T01:00:00Z'}
+battle:write(replay)
+local raw=stats.read(replay)
+local sites={records=20000,storedCount=19000}
+core.writeInteger(sites.storedCount,2)
+core.writeString(sites.records,raw); core.writeString(sites.records+stats.SIZE,raw)
+require('code/sessions').list=function() return {replay} end
+local history=require('code/battle-history').new(sites)
+history:refresh(); assert(#history.items==3) -- same fields are not an identity proof
+replay.nativeBattleHash=sha.sha256(raw)
+history:refresh(); assert(#history.items==2)
+assert(history.items[1].manifest==replay and not history.items[2].manifest)
+assert(core.readInteger(sites.storedCount)==2)
+assert(core.readString(sites.records,2*stats.SIZE)==raw..raw)
+require('code/sessions').list=function() return {} end
+history:refresh(); assert(#history.items==2) -- removing a replay reveals the native result again
+''')

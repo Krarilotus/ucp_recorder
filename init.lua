@@ -21,6 +21,7 @@ local function enable(self,config,stage,install)
   local uiSites=stage('menu hook checks',require('code/native-ui').verify)
   stage('battle history checks',require('code/history-native').verify)
   local battleLayout=stage('battle statistics checks',require('code/battle-statistics').verify)
+  local resultSite=stage('match result checks',require('code/match-results').verify)
   local fixes=require('code/fixes')
   local fixSites=stage('simulation hook checks',function() return fixes.verify(seed) end)
   if multiplayerObserve then
@@ -53,6 +54,7 @@ local function enable(self,config,stage,install)
     if recorder.rngTrace then recorder.rngTrace.returnAddresses=rngReturnAddresses end
     self.recorder=recorder
     local loadLifecycle=require('code/load-lifecycle').new(recorder)
+    local matchResults=require('code/match-results').new(recorder,resultSite)
     engine:install(recorder)
     if engine.trace then
       require('code/network-observer').install(engine.trace)
@@ -84,6 +86,7 @@ local function enable(self,config,stage,install)
       ui.resetButtons()
     end)
     observe(native.addr(0x46b358),6,function(registers)
+      matchResults:onMenuView(registers.EBP)
       recorder:onMenuView(registers.EBP)
     end)
     observe(native.addr(0x495337),6,function()

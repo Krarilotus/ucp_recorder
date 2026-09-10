@@ -171,7 +171,7 @@ function M:stop(reason)
     capture.events=self.events; capture.commands=self.count; capture.bytes=self.bytes
     capture.coverageGaps=self.gaps or 0
     files.save(capture)
-    files.seal(capture)
+    self.lastReplay=files.seal(capture)
     self.lastCapture=capture
   end
   self.capture=nil; self.observedTick=nil; self.pendingTick=nil; self.finalRngData=nil

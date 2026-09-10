@@ -112,6 +112,7 @@ local history=require('code/history-sites').SHC
 for _,name in ipairs({'prepareList','prepare','action','frame','helpText'}) do local s=history[name]; core.writeBytes(s.address,s.bytes) end
 for _,s in ipairs(history.operands) do core.writeBytes(s.address,s.bytes) end
 core.writeBytes(0x4d1700,{139,68,36,4,163,88,86,223,0}); core.writeBytes(0x4d172a,{232})
+local result=require('code/match-results').sites.SHC; core.writeBytes(result.address,result.bytes)
 local world=require('code/world-hash-sites').SHC; core.writeBytes(world.address,world.bytes)
 core.hookCode=function() return function() return 0 end end
 core.writeString=function() end

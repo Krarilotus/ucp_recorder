@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.48.4
+
+- Finalize automatic recordings when the native victory/defeat results open,
+  instead of waiting for Leave. Time spent reviewing statistics no longer adds
+  to the recorded duration, and the complete replay is already saved there.
+- Link a completed recording to the exact result inserted by the native game,
+  showing one combined history entry. Keep the game's stored results unchanged;
+  old matches and independently named snapshots retain their own entries.
+- Validate the insertion hook against both original executables, including a
+  full 250-entry history and results rejected by the native score ranking.
+
 ## 0.48.3
 
 - Allow the native book/report buttons while replay is paused or finished. Scope

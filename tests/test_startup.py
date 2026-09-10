@@ -117,6 +117,7 @@ realNative.verify=function() return realNative.profile end
 require('code/native-ui').verify=function() return {} end
 require('code/history-native').verify=function() return {} end
 require('code/battle-statistics').verify=function() return {} end
+local result=require('code/match-results').sites.SHC; core.writeBytes(result.address,result.bytes)
 require('code/fixes').verify=function() return {} end
 require('code/sessions').captureSettings=function() error('settings sentinel') end
 modules={['map-extensions']={}}
