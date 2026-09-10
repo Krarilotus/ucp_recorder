@@ -13,6 +13,8 @@ function M:status()
   local r=self.recorder
   if r.status=='error' then return tostring(r.error or tr('Playback failed.')) end
   if r.status=='finished' then return tr('Playback finished.') end
+  if r.snapshots and r.snapshots.error then return tostring(r.snapshots.error):match('[^\r\n]+') end
+  if r.snapshots and r.snapshots.target then return tr('Seeking to tick %d',r.snapshots.target-r.manifest.startTick) end
   if r.engine:isPaused() then return tr('Playback paused.') end
   return tr('Checks matching')
 end
@@ -24,8 +26,10 @@ function M:progress()
     or not self.progressAt or (now-self.progressAt)%4294967296>=250 then
     local first,last=r.manifest.startTick,r.manifest.lastTick
     local elapsed=math.max(0,math.min(r.engine:tick(),last)-first)
-    self.progressLabel=tr('Replay: %d / %d ticks',elapsed,last-first)
-    self.progressFraction=last>first and elapsed/(last-first) or (r.status=='finished' and 1 or 0)
+    local total=last-first
+    if r.snapshots then elapsed,total=r.snapshots:progress() end
+    self.progressLabel=tr('Replay: %d / %d ticks',elapsed,total)
+    self.progressFraction=total>0 and elapsed/total or (r.status=='finished' and 1 or 0)
     self.progressAt=now; self.progressManifest=r.manifest; self.progressStatus=r.status
   end
   return self.progressLabel,self.progressFraction
@@ -56,7 +60,6 @@ function M:install(ui)
   items[#items+1]={x=-410,y=12,width=398,height=58,enabled=false,
     render=function(x,y)
       local label,fraction=self:progress()
-      ui:progressBar(x,y+4,96,10,fraction)
       ui:hudText(label,x+398,y,-1,292)
       ui:hudText(self:status(),x+398,y+18,-1,398)
       ui:hudText(tr('F3: replay information'),x+398,y+36,-1,398)
@@ -88,6 +91,15 @@ function M:install(ui)
     visible=function() return self.recorder.status=='finished' and self.recorder.manifest
       and self.recorder.manifest.battle~=nil end,
     action=function() self.showStatistics() end}
+  items[#items+1]={x=-410,y=12,width=96,height=18,
+    enabled=function() return self.recorder.snapshots~=nil and
+      (self.recorder.status=='playing' or self.recorder.status=='finished') end,
+    render=function(x,y)
+      local _,fraction=self:progress(); ui:progressBar(x,y+4,96,10,fraction)
+    end,
+    action=function(x)
+      self.recorder.snapshots:request(math.max(0,math.min(1,x/95)))
+    end}
   ui:attachOverlay({14,16},items,function() return self.view:available() and ui:activeDialog()==-1 end,true)
 end
 

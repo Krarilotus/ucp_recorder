@@ -9,12 +9,15 @@ local function temporarily(run, restore)
 end
 
 function M:saveSnapshot(path)
-  assert(#path<500 and self:singlePlayer(), 'Snapshot requires a single-player game')
+  assert(#path<500 and (self:singlePlayer() or (self.offline and self.offlineInstalled)),
+    'Snapshot requires single-player or isolated offline playback')
   local resource=self.sites.resources
   local oldType=core.readInteger(resource+0xbc4)
   local filename=resource+0x7aee0+1001
   local oldName=core.readBytes(filename,1001)
   local oldProgress=core.readInteger(self.sites.packager+0x20)
+  local duration=self.sites.gameCore+0x2370
+  local oldDuration=core.readInteger(duration)
   core.writeInteger(resource+0xbc4,1)
   core.writeString(filename,path..'\0')
   core.writeInteger(self.sites.packager+0x20,0) -- no progress callback/audio during capture
@@ -22,6 +25,7 @@ function M:saveSnapshot(path)
     core.writeBytes(filename,oldName) -- Restore all bytes of the fixed native array.
     core.writeInteger(resource+0xbc4,oldType)
     core.writeInteger(self.sites.packager+0x20,oldProgress)
+    core.writeInteger(duration,oldDuration)
   end)
   local f=assert(io.open(path,'rb'),'Native save did not produce a starting snapshot')
   local size=f:seek('end'); local closed=f:close()

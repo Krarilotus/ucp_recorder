@@ -1,5 +1,6 @@
 -- UTF-8 in-game labels. Format arguments follow the English key.
 return {
+ ["Seeking to tick %d"]="正在跳转到第 %d 帧",
  [" (+%d more)"]=" （另有 %d 项）",
  ["%d commands; %d uncovered network events."]="%d 条指令；%d 个未处理的网络事件。",
  ["%d exact extension versions verified"]="已验证 %d 个扩展的确切版本",

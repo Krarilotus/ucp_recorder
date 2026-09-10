@@ -145,6 +145,8 @@ def check(folder):
         check_header(reader,lua,root,name)
         from check_fill_native import check_fill
         check_fill(reader,lua,root,name)
+        from check_save_pacing_native import check_save_pacing
+        check_save_pacing(reader,lua,root,name)
         from check_dispatch_native import check_dispatch
         check_dispatch(reader,name)
         from check_world_hash_native import check_world_hash

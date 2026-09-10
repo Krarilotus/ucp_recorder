@@ -1,5 +1,6 @@
 -- UTF-8 in-game labels. Format arguments follow the English key.
 return {
+ ["Seeking to tick %d"]="در حال رفتن به تیک %d",
  [" (+%d more)"]=" (و %d مورد دیگر)",
  ["%d commands; %d uncovered network events."]="%d فرمان؛ %d رویداد شبکه پوشش‌داده‌نشده.",
  ["%d exact extension versions verified"]="%d نسخه دقیق افزونه تأیید شد",

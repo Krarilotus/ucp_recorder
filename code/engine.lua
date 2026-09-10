@@ -56,6 +56,10 @@ function M:resetCommands()
 end
 
 function M:tick() return core.readInteger(native.addr(0x1fe7da8)) end
+function M:calendarMonth()
+  local address=self.sites.calendar.value
+  return require('code/snapshot-cadence').month(core.readInteger(address+4),core.readInteger(address))
+end
 function M:player() return core.readInteger(native.addr(0x1a275dc)) end
 function M:singlePlayer()
   local mode=core.readInteger(self.base+0x618)

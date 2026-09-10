@@ -12,6 +12,30 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_sealing_preserves_byte_offsets_and_prefetched_command(self):
+        self.lua.execute('''
+local m=recording(); local path=store.path(m.id)
+local work=require('code/maintenance-journal'); m.phaseProfile=work.PROFILE
+local before=json:encode({time=5,commands=0,kind=1,count=2})
+local after=json:encode({time=65,commands=1,kind=1,count=1})
+-- Keep a CRLF journal alongside an LF command stream. Both prefixes must
+-- retain exact offsets when future rows are trimmed by their sealers.
+local f=assert(io.open(path..'/'..work.FILE,'wb'))
+assert(f:write(before..'\\r\\n'..after..'\\r\\n')); assert(f:close())
+local r=require('code/replay-streams'):new({name=path..'/stream'})
+r:openFiles('r'); r.mode='play'
+r.phaseFile=assert(io.open(path..'/'..work.FILE,'rb'))
+assert(json:decode(r.phaseFile:read()).time==5)
+assert(r:peekCommand().time==10)
+local bookmark=r:bookmark(); r:reset()
+store.finish(m)
+r:openFiles('r'); r.mode='play'; r.phaseFile=assert(io.open(path..'/'..work.FILE,'rb'))
+r:restoreBookmark(bookmark)
+assert(r:consumeSavedCommand().time==10)
+assert(r:peekCommand()==nil and r.phaseFile:read()==nil)
+r:reset()
+''')
+
     def test_native_metadata_hashing_keeps_identity_and_rejects_modified_files(self):
         self.lua.execute('''
 local m=recording(); store.finish(m)

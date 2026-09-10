@@ -162,6 +162,19 @@ function M.identity()
   return {executable=core.readString(path,bytes),processId=getPID()}
 end
 
+local openLease,closeLease
+-- A share-denied, delete-on-close lease lives exactly as long as its native
+-- handle. A failed open means leave that owner's cache alone, for any reason.
+function M.tryTemporaryLease(path)
+  openLease=openLease or M.stdcall('kernel32.dll','CreateFileA',7)
+  closeLease=closeLease or M.stdcall('kernel32.dll','CloseHandle',1)
+  local handle=openLease(buffer('cache-lease',path),0xC0000000,0,0,4,0x04000100,0)
+  if handle==-1 or handle==4294967295 or handle==0 then return end
+  return function()
+    if handle then assert(closeLease(handle)~=0,'Cannot close snapshot cache lease'); handle=nil end
+  end
+end
+
 function M.spawnHidden(executable,commandLine)
   local create=M.stdcall('kernel32.dll','CreateProcessW',10)
   local toWide=M.stdcall('kernel32.dll','MultiByteToWideChar',6)

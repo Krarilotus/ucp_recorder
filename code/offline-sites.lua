@@ -8,6 +8,8 @@ for _,variant in ipairs({'SHC','Extreme'}) do
   local cookie=extreme and {176,67,185,0} or {32,66,185,0}
   local mode=extreme and {240,77,53,2} or {128,221,145,1}
   M[variant]={
+    savePacing={address=extreme and 0x47485b or 0x47462b,
+      bytes={161,mode[1],mode[2],mode[3],mode[4]},patch='constant',value=99},
     pacing={address=0x487a67+early,bytes={139,129,24,6,0,0},patch='constant',value=99},
     pauseMenu={address=extreme and 0x46bf40 or 0x46bd20,
       bytes={161,mode[1],mode[2],mode[3],mode[4]},patch='constant',value=99},

@@ -21,12 +21,17 @@ function M:players()
  for slot=1,8 do
   if slot==r.manifest.player or state.roster[slot].kind~='empty' then result[#result+1]=slot end
  end
+ if self.selected and self.selected~=r.manifest.player and state.roster[self.selected].kind=='empty' then
+  self.selected=nil
+ end
  self.roster=result
  return self.roster
 end
 function M:player()
  local r=self.recorder
- if self.session~=r.manifest then self.session=r.manifest; self.selected=nil; self.roster=nil end
+ local session=r.snapshots or r.manifest
+ if self.session~=session then self.session=session; self.selected=nil; self.roster=nil end
+ if self.manifest~=r.manifest then self.manifest=r.manifest; self.roster=nil end
  return self.selected or (r.manifest and r.manifest.player)
 end
 function M:select(slot)

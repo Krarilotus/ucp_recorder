@@ -146,7 +146,10 @@ function M:updateOverlay(menu,action)
       local address=array+(index-1)*self.ITEM_SIZE
       self:button(address,item.x,item.y,item.width,item.height,item.label or '',function()
         overlay.consumed=true
-        if item.action then item.action() end
+        if item.action then
+          item.action(core.readInteger(overlay.menu+0x1c)-core.readInteger(address+4),
+            core.readInteger(overlay.menu+0x20)-core.readInteger(address+8))
+        end
       end,nil,nil,item.enabled==false and function() return false end or item.enabled)
       core.writeInteger(address+0x4c,overlay.menu)
       if item.render then core.writeInteger(address+28,self:callback(function()

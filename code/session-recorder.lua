@@ -109,7 +109,7 @@ function Session:startRecording()
   self:openFiles('w')
   if self.phaseNative then
     self.manifest.phaseProfile=work.PROFILE
-    self.phaseFile=assert(io.open(store.path(self.manifest.id)..'/'..work.FILE,'w'))
+    self.phaseFile=assert(io.open(store.path(self.manifest.id)..'/'..work.FILE,'wb'))
   end
   self.mode='record'; self.status='armed'; self.active=false
   self.error=nil; self.observedTick=false
@@ -134,6 +134,7 @@ function Session:activateRecording()
   self.manifest.player=self.engine:player()
   self.manifest.startTick=self.engine:tick()
   self.manifest.lastTick=self.manifest.startTick
+  self.manifest.snapshotOriginMonth=self.engine:calendarMonth()
   self.manifest.startResources=self.engine:resourceState()
   self.manifest.finalResources=self.manifest.startResources
   local r=self.engine:rngState()
@@ -141,6 +142,7 @@ function Session:activateRecording()
   self:saveInfo(0,seed,seed,r[1],r[2],r[4],r[3])
   self.manifest.status='recording'; store.save(self.manifest)
   self.active=true; self.status='recording'
+  self.snapshots=require('code/replay-snapshots').new(self)
   if self.phaseNative then self.phaseNative:start() end
   if self.engine.battle then self.engine.battle:begin() end
   if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'record') end
@@ -159,7 +161,7 @@ function Session:preparePlayback(id,prepared,progress)
   return require('code/replay-preparation').prepare(id,self.engine,prepared,progress)
 end
 
-function Session:startPlayback(id,prepared,ready)
+function Session:startPlayback(id,prepared,ready,cached)
   assert(self.mode=='none','A replay session is already active')
   assert(self.engine:singlePlayer(),'Replay playback is single-player only')
   if not id then
@@ -175,10 +177,11 @@ function Session:startPlayback(id,prepared,ready)
   assert(store.compatible(manifest),'Replay requires its recorded UCP settings')
   local path=store.path(id)
   local snapshotPath,rng=ready.snapshotPath,ready.rng
+  if cached then snapshotPath,rng=cached.snapshotPath,cached.rng end
   self:setName(path..'/stream')
   self:openFiles('r')
   if manifest.multiplayer then self.tickFile=assert(io.open(path..'/ticks.bin','rb')) end
-  if manifest.phaseProfile then self.phaseFile=assert(io.open(path..'/'..work.FILE,'r')) end
+  if manifest.phaseProfile then self.phaseFile=assert(io.open(path..'/'..work.FILE,'rb')) end
   self.nextWork=nil; self.workEnded=nil
   self.manifest=manifest
   self.firstDesync=nil
@@ -203,11 +206,19 @@ function Session:startPlayback(id,prepared,ready)
   else self.engine:loadSnapshot(snapshotPath) end
   local bytes={}; for i=1,#rng do bytes[i]=rng:byte(i) end
   core.writeBytes(self.engine.rng,bytes)
-  self:checkRngData(manifest.rngHash,'starting save')
-  assert(self.engine:tick()==manifest.startTick,'Loaded save has a different starting tick')
+  self:checkRngData(cached and cached.point.rngHash or manifest.rngHash,'starting save')
+  assert(self.engine:tick()==(cached and cached.point.tick or manifest.startTick),'Loaded save has a different starting tick')
   assert(self.engine:player()==manifest.player,'Loaded save has a different player slot')
-  self:checkResources(manifest.startResources,'starting save')
+  if cached then
+    assert(require('code/native-hash').sha256(self.engine:rngData()..self.engine:resourceData())==cached.point.stateHash,
+      'Restored snapshot state differs')
+    self:restoreBookmark(cached.point.bookmark)
+    self.engine.journal.executed=cached.point.commands
+    self.engine.journal.nextSequence=cached.point.commands+1
+  else self:checkResources(manifest.startResources,'starting save') end
   self.active=true; self.status='playing'; self.playedCommands=0
+  if cached then self.playedCommands=cached.point.commands end
+  self.snapshots=require('code/replay-snapshots').new(self,ready)
   core.writeInteger(self.playbackActive,1)
   if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'play') end
   self:playbackResult('playing')
@@ -266,6 +277,10 @@ function Session:onTick()
   elseif self.status=='playing' then work.play(self) end
   local now=self.engine:tick()
   -- Flush before replay checks can halt at the first mismatch.
+  if self.snapshots then
+    self.snapshots:observe()
+    if self.mode=='play' and self.snapshots:atBoundary(now) then return end
+  end
   if self.rngTrace and now%64==0 then self.rngTrace:observe('checkpoint') end
   if self.status=='recording' then
     if self.engine.battle then self.engine.battle:observe() end
@@ -342,12 +357,13 @@ function Session:onTick()
 end
 
 function Session:afterTick()
+  if self.snapshots and self.snapshots:afterTick() then return end
   if self.nextReplay then
     -- processGameTick has unwound. Outer-loop callbacks still follow this point;
     -- their replacement-world safety remains part of the execution-phase audit.
     local id,prepared=self.nextReplay,self.preparedWorlds
-    self:reset()
-    self:startPlayback(id,prepared)
+    if self.snapshots then self.snapshots:transition(id,prepared)
+    else self:reset(); self:startPlayback(id,prepared) end
     return
   end
   local frame=self.pendingTick
@@ -383,6 +399,7 @@ function Session:checkResources(expected,phase)
 end
 
 function Session:reset()
+  if self.snapshots then self.snapshots:close(); self.snapshots=nil end
   if self.phaseNative then self.phaseNative:stop() end
   self.nextWork=nil; self.workEnded=nil
   core.writeInteger(self.playbackActive,0)

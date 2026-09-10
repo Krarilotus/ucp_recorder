@@ -149,7 +149,7 @@ function M.prepareChain(first,engine,progress)
       and manifest.executable==first.executable,'Recovery segment requires a different environment')
     store.preflight(manifest,progress)
     local path,hash=M.prepare(manifest,engine,progress)
-    prepared[manifest.id]={path=path,hash=hash}
+    prepared[manifest.id]={path=path,hash=hash,manifest=manifest}
     if not manifest.nextReplay then return prepared end
     local loaded,nextManifest=pcall(store.load,manifest.nextReplay,require('code/native').profile)
     if not loaded then

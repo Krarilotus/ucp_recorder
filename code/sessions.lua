@@ -165,6 +165,7 @@ function M.copy(source,name,finalRngHash)
       local file=require('code/maintenance-journal').FILE
       copyFile(original..'/'..file,path..'/'..file)
     end
+    require('code/snapshot-store').copy(source,copy)
     assert(digest.file(path..'/start.sav',1024*1024*1024)==copy.snapshotHash,'Starting save is damaged')
     assert(digest.sha256(read(path..'/rng.bin'))==copy.rngHash,'Starting RNG state is damaged')
     assert(digest.sha256(read(path..'/ucp-config.yml'))==copy.settingsHash,'Recorded settings are damaged')

@@ -57,7 +57,7 @@ the game-language provider, then English; the legacy global game provider is
 used only when `data.version` has no language API.
 
 English and German are joined by French, Russian, Hungarian, Turkish, Chinese,
-Spanish, Persian, Italian and Polish. Each catalog covers all 78 retained labels
+Spanish, Persian, Italian and Polish. Each catalog covers all 79 retained labels
 and preserves formatting arguments. Catalogs contain UTF-8; conversion uses the
 loaded TextManager's codepage, not the Windows system locale or a guessed page
 for the selected language. Until TextManager is ready, the original 1252 fallback

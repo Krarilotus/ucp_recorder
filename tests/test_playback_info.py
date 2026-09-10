@@ -96,6 +96,7 @@ assert(controls[1].visible() and controls[2].visible() and not controls[3].visib
 controls[2].action(); assert(chosen==3); controls[2].render(10,152)
 for _,item in ipairs(controls) do assert(not item.frontEnd) end
 controls[9].render(390,12)
+controls[15].render(390,12)
 assert(texts[1][1]=='Replay: 100 / 100 ticks')
 for _,text in ipairs(texts) do assert(text[4]==-1 and text[2]==788) end
 assert(not controls[10].visible()); hud:key(0x100,114); assert(controls[10].visible())

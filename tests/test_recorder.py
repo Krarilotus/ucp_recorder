@@ -40,6 +40,7 @@ core = {
 utils = {createLuaFunctionWrapper=function() return 0 end}
 json = {encode=function(_,value) return value end, decode=function(_,value) return value end}
 io.open = function(path,mode)
+  mode=mode:gsub('b','')
   if path==failPath then return nil, 'injected failure' end
   if mode=='r' and not files[path] then return nil, 'missing' end
   if mode=='w' then files[path]={} end

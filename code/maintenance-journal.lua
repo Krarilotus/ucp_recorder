@@ -53,8 +53,8 @@ end
 function M.seal(manifest,path,replace)
   if not manifest.phaseProfile then return end
   local filename=path..'/'..M.FILE
-  local input=assert(io.open(filename,'r'))
-  local output,reason=io.open(filename..'.tmp','w')
+  local input=assert(io.open(filename,'rb'))
+  local output,reason=io.open(filename..'.tmp','wb')
   if not output then input:close(); error(reason) end
   local ok,err=xpcall(function()
     for line in input:lines() do

@@ -111,6 +111,32 @@ for _,fail in ipairs({false,true}) do
 end
 ''')
 
+    def test_cached_restore_keeps_absolute_command_counts_and_prefetch_owner(self):
+        self.check('''
+local r=session(); local store=require('code/sessions'); local hash=string.rep('a',64)
+local manifest={id='test',startTick=1,lastTick=1000,player=1,commandCount=20,
+ snapshotHash=hash,rngHash=hash,startResources=resourceState()}
+store.compatible=function() return true end
+engine.loadSnapshot=function(_,path) assert(path=='cached.sav'); now=400 end
+local bookmark={positions={}}
+local restored=false
+r.restoreBookmark=function(self,value) assert(value==bookmark and self.mode=='play'); restored=true end
+local ready={manifest=manifest,snapshotPath='start.sav',rng=string.rep('x',0x9c50)}
+r:startPlayback('test',nil,ready,{snapshotPath='cached.sav',rng=ready.rng,
+ point={tick=400,commands=8,rngHash=hash,stateHash=hash,bookmark=bookmark}})
+assert(restored and r.playedCommands==8 and engine.journal.executed==8 and engine.journal.nextSequence==9)
+assert(r.status=='playing' and memory[r.playbackActive]==1)
+''')
+
+    def test_seek_stop_does_not_consume_multiplayer_frame_before_clock_advance(self):
+        self.check('''
+local r=session(); r.mode='play'; r.active=true; r.status='playing'
+r.manifest={id='test',multiplayer={},lastTick=1000}
+r.snapshots={observe=function() end,atBoundary=function(_,tick) assert(tick==500); return true end}
+r.tickFile={read=function() error('Target halt must not consume a frame') end}
+now=500; r:onTick(); assert(not r.pendingTick)
+''')
+
     def test_return_from_results_seals_last_observed_tick_and_selects_full_match(self):
         self.check('''
 for _,view in ipairs({20,41,61}) do
@@ -330,6 +356,7 @@ engine={rng=0x1a279c0,
  singlePlayer=function() return true end,
  localSession=function(self) return self.offline~=nil or self:singlePlayer() end,
  tick=function() return now end,
+ calendarMonth=function() return 12000 end,
  player=function() return 1 end,
  rngState=function() return {11,22,3,4} end,
  saveSnapshot=function() snapshots=snapshots+1 end,

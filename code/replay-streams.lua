@@ -2,6 +2,7 @@
 -- native buffers, scheduling and RNG state belong to their respective owners.
 local Streams={}
 local keys={'commands','rng','info'}
+local streamFields={'commandsFile','rngFile','infoFile','tickFile','phaseFile'}
 
 function Streams:new(params)
   local self=setmetatable({mode='none'},{__index=self})
@@ -18,7 +19,7 @@ end
 
 function Streams:closeFiles()
   local failure
-  for _,field in ipairs({'commandsFile','rngFile','infoFile','tickFile','phaseFile'}) do
+  for _,field in ipairs(streamFields) do
     local file=self[field]; self[field]=nil
     if file then
       local ok,closed,reason=pcall(file.close,file)
@@ -26,6 +27,45 @@ function Streams:closeFiles()
     end
   end
   assert(not failure,tostring(failure))
+end
+
+-- A file position alone loses a command or maintenance event already prefetched
+-- by its reader. Keep both in one bookmark; native world state is owned elsewhere.
+function Streams:bookmark()
+  local positions={}
+  for _,field in ipairs(streamFields) do
+    if self[field] then positions[field]=assert(self[field]:seek(),'Cannot bookmark replay stream') end
+  end
+  return {positions=positions,nextCommand=self.nextCommand,nextWork=self.nextWork,workEnded=self.workEnded}
+end
+
+function Streams.validateBookmark(bookmark,opened)
+  assert(type(bookmark)=='table' and type(bookmark.positions)=='table',
+    'Invalid replay stream bookmark')
+  -- Validate every stream before moving any cursor. Journals use binary I/O:
+  -- CRT text cookies change when a later suffix is trimmed during sealing.
+  local integer=require('code/validation').integer
+  for key in pairs(bookmark.positions) do
+    local known=false; for _,field in ipairs(streamFields) do if key==field then known=true end end
+    assert(known,'Unknown replay stream in bookmark')
+  end
+  for _,field in ipairs(streamFields) do
+    local offset=bookmark.positions[field]
+    assert((opened[field]~=nil)==(offset~=nil),'Replay bookmark stream set differs')
+    if offset~=nil then integer(offset,0,1073741824,'stream position') end
+  end
+end
+
+function Streams:restoreBookmark(bookmark)
+  assert(self.mode=='play','Bookmark restoration requires playback')
+  Streams.validateBookmark(bookmark,self)
+  for _,field in ipairs(streamFields) do
+    if self[field] then
+      assert(self[field]:seek('set',bookmark.positions[field])==bookmark.positions[field],
+        'Cannot restore replay stream position')
+    end
+  end
+  self.nextCommand=bookmark.nextCommand; self.nextWork=bookmark.nextWork; self.workEnded=bookmark.workEnded
 end
 
 function Streams:reset()
@@ -48,7 +88,7 @@ function Streams:openFiles(mode)
     end
     for _,key in ipairs(keys) do
       local path=self[key..'FileName']
-      opened[key..'File']=assert(io.open(path,mode),'Cannot open recording: '..path)
+      opened[key..'File']=assert(io.open(path,mode..'b'),'Cannot open recording: '..path)
       if mode=='w' then created[#created+1]=path end
     end
   end)

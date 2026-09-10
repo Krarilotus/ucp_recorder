@@ -1,5 +1,6 @@
 -- UTF-8 in-game labels. Format arguments follow the English key.
 return {
+ ["Seeking to tick %d"]="Ugrás a(z) %d. ütemhez",
  [" (+%d more)"]=" (+%d további)",
  ["%d commands; %d uncovered network events."]="%d parancs; %d nem kezelt hálózati esemény.",
  ["%d exact extension versions verified"]="%d pontos bővítményverzió ellenőrizve",

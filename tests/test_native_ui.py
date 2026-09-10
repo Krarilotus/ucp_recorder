@@ -5,6 +5,24 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_overlay_click_offsets_share_native_rectangles_at_every_window_size(self):
+        self.check('''
+local callbacks={}; local serial=1000; local clicked
+utils.createLuaFunctionWrapper=function(fn) serial=serial+1; callbacks[serial]=fn; return serial end
+local item={x=-410,y=12,width=96,height=18,action=function(x,y) clicked={x,y} end}
+ui.overlays={[7000]={visible=function() return true end,items={item}}}
+for _,width in ipairs({800,1280,1920,2560}) do
+ memory[ui:windowAddress()+0x18]=width
+ local overlay=ui:updateOverlay(7000)
+ for _,x in ipairs({0,47,95}) do
+  memory[overlay.menu+0x1c]=memory[overlay.array+4]+x
+  memory[overlay.menu+0x20]=memory[overlay.array+8]+9
+  callbacks[memory[overlay.array+20]]({})
+  assert(clicked[1]==x and clicked[2]==9 and overlay.consumed)
+ end
+end
+''')
+
     def test_progress_uses_native_fill_and_keeps_inclusive_bounds_inside_its_track(self):
         self.check('''
 local calls={}

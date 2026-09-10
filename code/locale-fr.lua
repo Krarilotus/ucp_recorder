@@ -1,5 +1,6 @@
 -- UTF-8 in-game labels. Format arguments follow the English key.
 return {
+ ["Seeking to tick %d"]="Avance vers le tick %d",
  [" (+%d more)"]=" (+%d autres)",
  ["%d commands; %d uncovered network events."]="%d ordres ; %d événements réseau non pris en charge.",
  ["%d exact extension versions verified"]="%d versions exactes vérifiées",

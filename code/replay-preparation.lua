@@ -28,6 +28,15 @@ function M.prepare(id,engine,worlds,progress)
   assert(hash==snapshotHash,'Starting save is damaged')
   local rng=store.read(path..'/rng.bin')
   assert(#rng==0x9c50 and digest.sha256(rng)==manifest.rngHash,'Starting RNG state is damaged')
-  return {manifest=manifest,snapshotPath=snapshotPath,rng=rng,worlds=worlds,info=environment.display}
+  return {manifest=manifest,snapshotPath=snapshotPath,snapshotHash=snapshotHash,rng=rng,worlds=worlds,info=environment.display}
+end
+
+-- A seek can happen long after initial preparation. Check the starting file
+-- again before releasing the active world; prepared metadata is not a file lock.
+function M.checkStartingState(ready)
+  local expected=ready.snapshotHash or ready.manifest.snapshotHash
+  assert(digest.file(ready.snapshotPath,1024*1024*1024)==expected,'Starting save is damaged')
+  assert(#ready.rng==0x9c50 and digest.sha256(ready.rng)==ready.manifest.rngHash,
+    'Starting RNG state is damaged')
 end
 return M
