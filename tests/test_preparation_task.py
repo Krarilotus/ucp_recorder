@@ -45,3 +45,19 @@ for _,cancel in ipairs({false,true}) do
  assert(started==not cancel)
 end
 ''')
+
+    def test_fast_progress_does_not_create_artificial_frame_delays(self):
+        self.check('''
+local Task=require('code/preparation-task'); local now=0; local checked=0
+local task=Task.new(function(progress)
+ for i=1,30000 do
+  checked=checked+1
+  if i%3000==0 then now=now+1 end
+  progress('Checking')
+ end
+ return {checked=checked}
+end,function() return now end)
+task:step()
+assert(task.status=='ready' and task.result.checked==30000)
+assert(task.workMs==10 and task.elapsedMs==10)
+''')

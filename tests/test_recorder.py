@@ -56,6 +56,8 @@ end
 os.remove=function(path) files[path]=nil; return true end
 realNative = require('code/native')
 realNative.profile={addresses=setmetatable({}, {__index=function(_,a) return a end})}
+-- Session/dispatch fixtures replace the OS hashing boundary; native-hash has its own real API tests.
+require('code/native-hash').sha256=function(data) return sha.sha256(data) end
 Recorder = require('code/replay-streams')
 function fixture(name)
   local r=Recorder:new({name=name,rngLogMethod='trace'})

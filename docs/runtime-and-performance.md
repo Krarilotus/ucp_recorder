@@ -16,8 +16,8 @@ verification; it does not implement a second game simulation.
   preparation. Removing that read requires preserving those values at their owning
   boundary; simply skipping it would reintroduce restoration differences.
 - Recording retains the latest RNG and resource state so a quit/results transition
-  can save the actual ending boundary. Checkpoint hashing happens every 64 ticks;
-  optional detailed RNG attribution is omitted from release builds.
+  can save the actual ending boundary. Release verification happens every 1,024
+  ticks; diagnostic builds retain detailed 64-tick observations.
 - Settings restart is separate from loading a replay with already matching
   settings. Its helper is not invoked by the simulation tick loop.
 
@@ -33,6 +33,40 @@ A local decoder-only comparison with modeled memory reads (five samples of
 recorder overhead, startup latency or Wine/Proton performance. Whole-game claims
 require matched scenarios and separate measurements of preparation, native load,
 and simulation throughput.
+
+## 0.49.0: keep inputs, reduce evidence
+
+The verification profile is recorded in the manifest, independently of the
+simulation profile. `state-digest-v1` stores the tick, four RNG counters, and one
+SHA-256 of the fixed native RNG block followed by all eight resource blocks.
+The absent profile means the existing detailed 64-tick format; older recordings
+are still read without rewriting them. Unknown profiles and missing checkpoints
+are rejected before native loading. Release fingerprints can detect a mismatch
+later (up to the next 1,024-tick boundary) and cannot identify an individual
+resource; diagnostic builds retain that detail. These checks sample RNG/resources,
+not the entire simulation state, and do not prove all game state is identical.
+
+Recorded resources stay as 800 native bytes at each observed tick. Capture decodes
+the 200 integers only for the initial/final manifest or detailed diagnostics.
+Multiplayer command records omit resource snapshots in Release; executed payloads,
+before/after RNG inputs, every native tick boundary and recovery records remain.
+SHA-256 of RNG data uses the existing native hashing service, not the framework's
+Lua SHA implementation. Preparation yields when its time budget expires, rather
+than imposing a fixed quota of progress notifications per menu frame.
+
+An offline benchmark used the 1,865,453-tick match's original command/maintenance
+streams and the real UCP Lua 5.4 JSON parser. Sparse rows used its original times
+and counters with placeholder fixed-length digests: this is a performance fixture,
+not a converted playable replay. Across three runs, median stream preflight work
+fell from 7,611 ms to 67 ms. Verification data fell from 16,516,612 bytes / 29,147
+rows to 228,798 bytes / 1,821 rows (98.6% fewer bytes). The OS hashing boundary was
+modeled with hashlib; these numbers exclude settings/asset verification, native
+world loading, disk-cache variation and game simulation. Existing recordings keep
+their detailed data and do not receive this size reduction automatically.
+
+No replacement binary checkpoint format, extra runtime dependency or new game
+simulation path was needed. The native world reload and asset scan still need
+separate measurement; a 100 ms complete replay start is not established.
 
 ## Platform status
 

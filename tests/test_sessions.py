@@ -6,6 +6,55 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_release_keeps_sparse_fingerprints_and_decodes_only_on_save(self):
+        self.check('''
+require('code/build-profile').diagnostics=false
+local r=session(); r:startRecording(); r:activateRecording()
+assert(r.manifest.verificationProfile=='state-digest-v1')
+local reads,hashes,writes=0,0,0
+r.rngFile.write=function() writes=writes+1; return true end
+engine.resourceState=function(_,data)
+ assert(data==string.rep('r',800),'Must decode the retained boundary'); reads=reads+1
+ return resourceState(7)
+end
+package.loaded['code/native-hash'].sha256=function(data)
+ hashes=hashes+1
+ assert(#data==0x9c50+800 or #data==0x9c50)
+ return string.rep('a',64)
+end
+for tick=1,2049 do now=tick; r:onTick() end
+assert(reads==0 and hashes==2 and writes==2)
+assert(lastEncoded.time==2048 and lastEncoded.stateHash and not lastEncoded.resources and not lastEncoded.rngHash)
+engine.resourceData=function() error('Must not resample after exit') end
+engine.rngData=function() error('Must not resample after exit') end
+r:reset()
+assert(reads==1 and hashes==3 and savedManifest.finalResources[200]==7)
+assert(not r.finalResourceData and not r.finalRngData)
+''')
+
+    def test_compact_playback_observes_without_writing_state_and_stops_on_mismatch(self):
+        self.lua.globals().hash_string = lambda value: hashlib.sha256(value.encode()).hexdigest()
+        self.check('''
+sha.sha256=hash_string
+local verification=require('code/replay-verification')
+local expected=verification.capture(engine,verification.COMPACT,1024)
+for _,mutation in ipairs({'none','resources','rng'}) do
+ engine.resourceData=function() return string.rep('r',800) end
+ engine.rngData=function() return string.rep('x',0x9c50) end
+ local r=session(); r.mode='play'; r.status='playing'; r.active=true
+ r.manifest={id='test',lastTick=2048,verificationProfile=verification.COMPACT}
+ local reads=0
+ r.rngFile={read=function() reads=reads+1; return expected end}
+ now=64; r:onTick(); assert(reads==0)
+ if mutation=='resources' then engine.resourceData=function() return 's'..string.rep('r',799) end end
+ if mutation=='rng' then engine.rngData=function() return 'y'..string.rep('x',0x9c50-1) end end
+ now=1024; local ok=pcall(r.onTick,r)
+ assert(ok==(mutation=='none') and reads==1)
+ if not ok then assert(r.firstDesync.kind=='state' and r.firstDesync.time==1024) end
+ assert(not memory[engine.rng] and not memory[engine.rng+0x9c4c])
+end
+''')
+
     def test_starting_save_is_hashed_without_loading_it_into_lua(self):
         self.check('''
 local store=require('code/sessions'); local read=store.read
@@ -31,7 +80,8 @@ store.write=function(path,data)
  if path:find('/rng.bin',1,true) then assert(data==sample); written=written+1 end
 end
 store.read=function() error('Activation must not read its RNG file back') end
-sha.sha256=function(data) assert(data==sample); return string.rep('c',64) end
+sha.sha256=function() error('RNG hashing must not run in the interpreter') end
+package.loaded['code/native-hash'].sha256=function(data) assert(data==sample); return string.rep('c',64) end
 local r=session(); r:startRecording(); r:activateRecording()
 assert(reads==1 and written==1 and r.manifest.rngHash==string.rep('c',64))
 local messages=#printed
@@ -258,7 +308,8 @@ assert(savedManifest.finalRngHash==expected and not r.finalRngData)
         self.check('''
 json.encode=function(_,value) lastEncoded=value; return 'json' end
 sha={sha256=function(value) return string.rep('a',64) end}
-package.loaded['code/native-hash']={file=function() return string.rep('a',64) end}
+package.loaded['code/native-hash']={file=function() return string.rep('a',64) end,
+ sha256=function(data) return sha.sha256(data) end}
 savedManifest=nil
 package.loaded['code/sessions']={
   new=function() return {id='test',variant='SHC',commandCount=0,lastTick=0} end,
@@ -271,6 +322,7 @@ Session=require('code/session-recorder')
 now=0; snapshots=0; space=true
 engine={rng=0x1a279c0,
  rngData=function() return string.rep('x',0x9c50) end,
+ resourceData=function() return string.rep('r',800) end,
  resourceState=function() return resourceState() end,
  resetCommands=function(self) self.journal={executed=0} end,
  journal={executed=0},

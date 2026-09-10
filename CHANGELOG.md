@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.49.0
+
+- Separate replay inputs from verification evidence. Release records one compact
+  RNG/resource fingerprint per 1,024 ticks; diagnostics retain detailed 64-tick
+  checkpoints. Old recordings remain readable, with their original checking cadence.
+- Keep ending resources as native bytes; decode only when saving or diagnosing.
+  Omit redundant multiplayer command resource snapshots in Release, while keeping
+  all command/RNG inputs, tick boundaries, recovery data and ending verification.
+- Use the existing native SHA-256 service for RNG buffers and a time budget for
+  cooperative preparation. No new runtime language or checkpoint binary format.
+- Offline preflight on a representative long-match fixture drops from 7.6 seconds
+  to 67 ms and verification bytes by 98.6%; this is not a live loading-time claim.
+  Release detects divergence less precisely; see `docs/runtime-and-performance.md`.
+
 ## 0.48.7
 
 - Read player resource blocks without intermediate byte tables, using the built-in

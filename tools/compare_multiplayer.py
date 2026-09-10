@@ -18,6 +18,12 @@ def hash_value(value):
         raise ValueError('Missing or invalid SHA256 evidence')
 
 
+def checkpoint_interval(profile):
+    if profile not in (None, 'state-digest-v1'):
+        raise ValueError('Unsupported replay verification profile')
+    return 1024 if profile else 64
+
+
 def network_state(header):
     state = header.get('network')
     if not isinstance(state, dict) or state.get('mode') not in (1, 2) or state.get('syncStatus') != 0:
@@ -89,7 +95,8 @@ def peer_pair(ah, bh):
         if header['format'] >= 3:
             hash_value(header.get('environmentHash'))
         integer(header.get('firstTick', 0), 0, 2147483647)
-    if any(ah.get(key) != bh.get(key) for key in ('variant', 'executable', 'format', 'firstTick')):
+        checkpoint_interval(header.get('verificationProfile'))
+    if any(ah.get(key) != bh.get(key) for key in ('variant', 'executable', 'format', 'firstTick', 'verificationProfile')):
         raise ValueError('Traces require the same executable, variant, format and starting boundary')
     if ah['localPlayer'] == bh['localPlayer']:
         raise ValueError('Select traces from two different players')
@@ -105,11 +112,12 @@ def peer_pair(ah, bh):
     return an, bn, aw
 
 
-def evidence(records, format_version, first_tick=0, network=None, window=None):
+def evidence(records, format_version, first_tick=0, network=None, window=None, profile=None):
     count, command_count = 0, 0
     integer(first_tick, 0, 2147483647)
     previous_tick = first_tick
-    next_checkpoint = (first_tick + 63) // 64 * 64
+    interval = checkpoint_interval(profile)
+    next_checkpoint = (first_tick + interval - 1) // interval * interval
     for record in records:
         if record.get('kind') == 'gap':
             raise ValueError(f'Uncovered network event at tick {record.get("time")}: {record.get("reason")}')
@@ -156,10 +164,10 @@ def evidence(records, format_version, first_tick=0, network=None, window=None):
         elif record['time'] != next_checkpoint:
             raise ValueError('Missing, repeated or invalid checkpoint boundary')
         else:
-            next_checkpoint += 64
+            next_checkpoint += interval
             if format_version >= 3:
-                hash_value(record.get('rngHash'))
-        for key, length in [('rng', 4), ('resources', 200)]:
+                hash_value(record.get('stateHash' if profile else 'rngHash'))
+        for key, length in ([('rng', 4)] if profile else [('rng', 4), ('resources', 200)]):
             values = record.get(key)
             if not isinstance(values, list) or len(values) != length:
                 raise ValueError(f'Missing {key} evidence')
@@ -177,8 +185,9 @@ def compare(left, right):
             ar, br = rows(a), rows(b)
             ah, bh = next(ar), next(br)
             an, bn, window = peer_pair(ah, bh)
-            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0), an, window),
-                                               evidence(br, bh['format'], bh.get('firstTick', 0), bn, window)):
+            profile = ah.get('verificationProfile')
+            for av, bv in itertools.zip_longest(evidence(ar, ah['format'], ah.get('firstTick', 0), an, window, profile),
+                                               evidence(br, bh['format'], bh.get('firstTick', 0), bn, window, profile)):
                 count += 1
                 if difference:
                     continue  # Still validate both complete streams before reporting.
@@ -189,8 +198,8 @@ def compare(left, right):
                 if av['kind'] == bv['kind'] == 'command':
                     fields += ('scheduledTime', 'player', 'category', 'size', 'data')
                 elif av['kind'] == bv['kind'] == 'checkpoint' and ah['format'] >= 3:
-                    fields += ('rngHash',)
-                for key in fields + ('rng', 'resources'):
+                    fields += ('stateHash' if profile else 'rngHash',)
+                for key in fields + (('rng',) if profile else ('rng', 'resources')):
                     if av[key] == bv[key]:
                         continue
                     difference = dict(sequence=count, time=av['time'], field=key)
@@ -210,6 +219,7 @@ def compare(left, right):
 def inspect_trace(path):
     """Summarize evidence past coverage gaps; never returns a validation pass."""
     result = {'commands': 0, 'checkpoints': 0, 'gaps': 0, 'lastCheckpoint': None}
+    compact = False
     commands, resources = hashlib.sha256(), hashlib.sha256()
     rng_streams = [hashlib.sha256(), hashlib.sha256()]
     callers, categories, gaps = Counter(), Counter(), Counter()
@@ -222,6 +232,7 @@ def inspect_trace(path):
             header = next(records)
             if header.get('kind') != 'header':
                 raise ValueError('Missing header')
+            compact = checkpoint_interval(header.get('verificationProfile')) == 1024
             result['localPlayer'] = header.get('localPlayer')
             result['rngAttribution'] = header.get('rngAttribution', False)
             ended = False
@@ -237,7 +248,7 @@ def inspect_trace(path):
                 elif kind == 'checkpoint':
                     result['checkpoints'] += 1
                     result['lastCheckpoint'] = record['time']
-                    digest(resources, [record['time'], record['resources']])
+                    digest(resources, [record['time'], record.get('resources', record.get('stateHash'))])
                     rng = record['rng']
                     if not isinstance(rng, list) or len(rng) != 4:
                         raise ValueError('Invalid RNG state')
@@ -258,7 +269,7 @@ def inspect_trace(path):
     except (OSError, ValueError, TypeError, KeyError, StopIteration, AttributeError) as error:
         result['inspectionError'] = str(error) or 'Empty trace'
     result['timedCommandDigest'] = commands.hexdigest()
-    result['resourceCheckpointDigest'] = resources.hexdigest()
+    result['stateCheckpointDigest' if compact else 'resourceCheckpointDigest'] = resources.hexdigest()
     result['rngStreamDigests'] = [s.hexdigest() for s in rng_streams]
     result['commandCategories'] = [dict(player=p, category=c, count=n) for (p, c), n in sorted(categories.items())]
     result['gapCategories'] = [dict(reason=r, category=c, count=n) for (r, c), n in gaps.items()]
@@ -369,6 +380,8 @@ def rng_call_counts(entries):
 
 def rng_checkpoints(records, header, require_attribution=True):
     """Validate interval boundaries even when timed-replay coverage has gaps."""
+    if header.get('verificationProfile'):
+        raise ValueError('Detailed interval inspection requires the diagnostic build; release retains sparse state fingerprints')
     if header['format'] < 5 or (require_attribution and header.get('rngAttribution') is not True):
         raise ValueError('RNG interval inspection requires caller attribution (0.20.0+)')
     window = capture_window(header)

@@ -17,7 +17,8 @@ end
 function M.seal(capture)
   local path=capture.path
   local manifest={format=store.FORMAT,id=capture.id,variant=capture.variant,executable=capture.executable,
-    simulationProfile=M.PROFILE,multiplayer=capture.initialNetwork,created=capture.created,savedAt=capture.savedAt,
+    simulationProfile=M.PROFILE,verificationProfile=capture.verificationProfile,
+    multiplayer=capture.initialNetwork,created=capture.created,savedAt=capture.savedAt,
     displayName=capture.displayName,sourceId=capture.sourceId,status='failed',battle=capture.battle,
     nextReplay=capture.nextReplay,previousReplay=capture.previousReplay,
     settingsHash=capture.settingsHash,environmentHash=capture.environmentHash,
@@ -73,7 +74,7 @@ function M.seal(capture)
           manifest.commandCount=manifest.commandCount+1
         elseif event.kind=='checkpoint' and event.time<=manifest.lastTick then
           assert(checkpoints:write(json:encode({time=event.time,rng=event.rng,rngHash=event.rngHash,
-            resources=event.resources})..'\n'))
+            resources=event.resources,stateHash=event.stateHash})..'\n'))
         elseif event.kind=='gap' then
           assert(M.presentationOrTransport(event),'Uncovered multiplayer event: '..tostring(event.reason))
         else assert(event.kind=='command','Untracked multiplayer command or event') end
@@ -82,7 +83,8 @@ function M.seal(capture)
         assert(not header and sequence==0 and event.format==5
           and event.variant==manifest.variant and event.executable==manifest.executable
           and event.environmentHash==manifest.environmentHash and event.firstTick==manifest.startTick
-          and event.localPlayer==manifest.player,'Multiplayer journal identity differs')
+          and event.localPlayer==manifest.player and event.verificationProfile==manifest.verificationProfile,
+          'Multiplayer journal identity differs')
         header=true
       elseif event.kind=='end' then
         assert(header and event.events==sequence and event.commands==commandCount,

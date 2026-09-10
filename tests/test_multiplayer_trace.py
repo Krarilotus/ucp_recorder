@@ -493,6 +493,22 @@ assert(recorder.mode=='none' and not recorder.error)
 
 
 class CompareTraceTests(unittest.TestCase):
+    def test_compact_peer_fingerprints_compare_without_detailed_resources(self):
+        a = self.full_trace()
+        a[0].update(firstTick=1, verificationProfile='state-digest-v1')
+        a[1] = dict(kind='checkpoint', sequence=1, time=1024, rng=[1,2,3,4], stateHash='b'*64)
+        b = self.other_peer(a)
+        self.assertEqual(self.compare(a,b)['status'], 'matched')
+        b[1]['stateHash'] = 'c'*64
+        self.assertEqual(self.compare(a,b)['firstDifference']['field'], 'stateHash')
+        report = self.module.inspect_trace(self.root/'a.jsonl')
+        self.assertNotIn('inspectionError', report)
+        self.assertIn('stateCheckpointDigest', report)
+        b[1]['time'] = 2048
+        self.assertEqual(self.compare(a,b)['status'], 'incomplete')
+        b[0]['verificationProfile'] = 'unknown'
+        self.assertEqual(self.compare(a,b)['status'], 'incomplete')
+
     def sync_pair(self):
         import struct
         a, b = self.network_trace(), self.network_trace(2)

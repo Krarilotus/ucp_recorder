@@ -108,16 +108,22 @@ function M:rngData()
   return data
 end
 
-function M:resourceState()
-  local values={}
+function M:resourceData()
+  local blocks={}
   for player=1,8 do
     -- Read each native block once without allocating an intermediate byte table.
     local data=core.readString(self.sites.playerResources+player*0x39f4,100)
     assert(type(data)=='string' and #data==100,'Incomplete native resource state')
-    for offset=1,100,4 do
-      values[#values+1]=unpackResource('<i4',data,offset)
-    end
+    blocks[player]=data
   end
+  return table.concat(blocks)
+end
+
+function M:resourceState(data)
+  data=data or self:resourceData()
+  assert(type(data)=='string' and #data==800,'Incomplete native resource state')
+  local values={}
+  for offset=1,800,4 do values[#values+1]=unpackResource('<i4',data,offset) end
   return values
 end
 

@@ -1,6 +1,6 @@
 name: recorder
 display-name: UCP-Recorder
-version: 0.48.7
+version: 0.49.0
 type: module
 author: Corax
 dependencies:

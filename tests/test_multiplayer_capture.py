@@ -4,6 +4,7 @@ import json
 import hashlib
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 import test_session_files
 
 spec = importlib.util.spec_from_file_location('capture_inspector', Path(__file__).resolve().parents[1]/'tools/inspect_replay.py')
@@ -12,6 +13,45 @@ spec.loader.exec_module(inspector)
 
 
 class MultiplayerCaptureTests(unittest.TestCase):
+    def test_release_host_and_client_preserve_inputs_without_command_resource_snapshots(self):
+        self.valid_world()
+        self.lua.execute('''
+require('code/build-profile').diagnostics=false
+for player=1,2 do
+ network.localPlayer=player; trace=Capture.new(engine,{})
+ for time=1,2050 do
+  tick(time)
+  if time==50 then command() end
+ end
+ local copy=trace:saveCopy('Release prefix')
+ trace:observe('stop','match exit')
+ local manifest=store.load(trace.lastCapture.id,profile)
+ assert(manifest.verificationProfile=='state-digest-v1' and manifest.commandCount==1)
+ store.preflight(manifest); store.preflight(store.load(copy.id,profile))
+ assert(#store.read(trace.lastCapture.path..'/ticks.bin')==2050*28)
+ local checkpoints,commands=0,0
+ for line in io.lines(trace.lastCapture.path..'/commands.jsonl') do
+  local event=json:decode(line)
+  if event.kind=='checkpoint' then
+   checkpoints=checkpoints+1; assert(event.stateHash and not event.resources and not event.rngHash)
+  elseif event.kind=='command' then
+   commands=commands+1; assert(event.beforeRng and event.rng and not event.resources)
+  end
+ end
+ assert(checkpoints==2 and commands==1)
+end
+assert(nativeWrites==0)
+''')
+        # This fixture models world construction; inspect the real journal and
+        # sidecars without mistaking its placeholder world bytes for a native save.
+        with patch.object(inspector, 'world_capture', return_value={'status': 'fixture'}):
+            result = inspector.multiplayer_capture(self.path())
+        self.assertEqual(result['journalFraming'], 'sealed', result)
+
+    def test_release_recovery_and_named_copy_keep_all_simulation_boundaries(self):
+        self.lua.execute("require('code/build-profile').diagnostics=false; trace=Capture.new(engine,{})")
+        self.test_recovery_links_and_named_copy_keep_both_worlds_independent()
+
     def test_tick_preflight_streams_split_frames_and_rejects_corrupt_tail(self):
         self.valid_world()
         self.lua.execute('''
@@ -53,6 +93,7 @@ engine={base=1000,rng=2000,sites={actorOffset=32},
  singlePlayer=function() return single end,
  networkState=function() return json:decode(json:encode(network)) end,
  rngData=function() return string.rep('a',0x9c50) end,
+ resourceData=function() return string.rep('r',800) end,
  rngState=function() return {1,2,3,4} end,resourceState=function() return resourceState() end}
 store.settings=function()
  local raw='settings'; local env='environment'; local restart='resolved launch settings'

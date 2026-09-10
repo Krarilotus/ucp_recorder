@@ -409,6 +409,11 @@ for _,sites in pairs(require('code/engine-sites')) do
  assert(e:resourceState()[16]==-123 and state[16]==1015)
  resource(1,0,-2147483648); resource(8,24,2147483647)
  local limits=e:resourceState(); assert(limits[1]==-2147483648 and limits[200]==2147483647)
+ local data=e:resourceData(); assert(#data==800)
+ resource(1,0,123)
+ local retained=e:resourceState(data)
+ assert(retained[1]==-2147483648 and retained[200]==2147483647 and e:resourceState()[1]==123)
+ assert(not pcall(e.resourceState,e,data:sub(2)))
 end
 core.readString=function() return string.rep('x',99) end
 assert(not pcall(engine.resourceState,engine),'Short native reads must fail')

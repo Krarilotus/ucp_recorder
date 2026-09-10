@@ -63,6 +63,7 @@ end
 
 function M.manifest(value)
   assert(type(value)=='table','Invalid replay manifest')
+  require('code/replay-verification').interval(value.verificationProfile)
   if value.phaseProfile~=nil then
     assert(value.phaseProfile==require('code/maintenance-journal').PROFILE and not value.multiplayer,
       'Unsupported recorded unclocked work profile')
