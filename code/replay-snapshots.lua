@@ -25,6 +25,7 @@ function M.new(session,ready)
 end
 
 function Snapshots:close()
+  if self.pending then self.pending:cancel(); self.pending=nil end
   for _,entry in ipairs(self.entries) do
     local ok,reason=storage.remove(entry.path)
     if not ok then print('[recorder] Cannot remove local snapshot: '..tostring(reason)) end
@@ -34,7 +35,7 @@ end
 
 function Snapshots:observe()
   local r=self.session
-  if self.disabled or r.status~='playing' and r.status~='recording' then return end
+  if self.disabled or self.pending or r.status~='playing' and r.status~='recording' then return end
   local month=r.engine:calendarMonth()
   if not self.cadence:due(month) then return end
   -- The same deadline can be encountered again after rewinding. Keep the
@@ -74,21 +75,25 @@ function Snapshots:observe()
     self.disabled=true; print('[recorder] Optional snapshot directory unavailable: '..tostring(path)); return
   end
   local commands=r.mode=='record' and r.manifest.commandCount or r.playedCommands
-  local point,reason=storage.capture(r.engine,path,month,commands,r:bookmark())
-  if not point then
+  local manifest=r.manifest
+  local job,reason=require('code/snapshot-jobs').start(r.engine,path,month,commands,r:bookmark(),function(point,err)
+    self.pending=nil
+    if not point then self.disabled=true; print('[recorder] Optional snapshot failed: '..tostring(err)); return end
+    if r.mode=='record' then
+      manifest.snapshots=manifest.snapshots or {}; manifest.snapshots[#manifest.snapshots+1]=point
+    else
+      self.entries[#self.entries+1]={point=point,path=path,id=manifest.id}
+      self.bytes=self.bytes+point.bytes+0x9c50
+    end
+  end)
+  if not job then
+    if reason=='busy' then return end
     self.disabled=true
     print('[recorder] Optional snapshot capture disabled: '..tostring(reason))
     return
   end
+  self.pending=job
   self.cadence:commit(month)
-  if r.mode=='record' then
-    r.manifest.snapshots=r.manifest.snapshots or {}
-    r.manifest.snapshots[#r.manifest.snapshots+1]=point
-  else
-    local cost=point.bytes+0x9c50
-    self.entries[#self.entries+1]={point=point,path=path,id=r.manifest.id}
-    self.bytes=self.bytes+cost
-  end
 end
 
 function Snapshots:nearest(tick,manifest)
@@ -156,6 +161,7 @@ end
 
 function Snapshots:load(ready,cached)
   local r=self.session
+  if self.pending then self.pending:cancel(); self.pending=nil end
   r.snapshots=nil -- preserve this cache across the internal reset/load
   local ok,reason=xpcall(function()
     r:reset()

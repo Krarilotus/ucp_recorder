@@ -44,11 +44,18 @@ for _,file in ipairs({'stream-commands.json','stream-rng-sync.json','stream-infs
  write(folder..'/recording/'..file,'data\\n')
 end
 path=folder..'/point'
+function createPoint()
+ local point={profile=snapshot.PROFILE,tick=100,month=12000,commands=4,bookmark=r:bookmark(),
+  rngHash=hash_string(random),stateHash=hash_string(random..resources)}
+ local data=string.rep('w',2000); write(path..'.sav.tmp',data)
+ snapshot.publish(path,point,random,{bytes=#data,sha256=hash_string(data)})
+ return point
+end
 ''')
 
-    def test_capture_and_prepare_verify_files_and_leave_world_unchanged(self):
+    def test_publish_and_prepare_verify_files_and_leave_world_unchanged(self):
         self.lua.execute('''
-point=assert(snapshot.capture(engine,path,12000,4,r:bookmark()))
+point=assert(createPoint())
 assert(point.bytes==2000 and point.commands==4 and point.tick==100)
 local ready=snapshot.prepare(manifest,point,path)
 assert(ready.rng==random and ready.snapshotPath==path..'.sav')
@@ -58,7 +65,7 @@ assert(not io.open(path..'.sav','rb') and not io.open(path..'.rng','rb'))
 ''')
 
     def test_corrupt_world_oversized_rng_and_bad_stream_offset_are_rejected(self):
-        self.lua.execute('point=assert(snapshot.capture(engine,path,12000,4,r:bookmark()))')
+        self.lua.execute('point=assert(createPoint())')
         world=self.path/'point.sav'; original=world.read_bytes()
         world.write_bytes(b'z'+original[1:])
         self.lua.execute('assert(not pcall(snapshot.prepare,manifest,point,path))')
@@ -71,31 +78,9 @@ point.bookmark.positions.commandsFile=999
 assert(not pcall(snapshot.prepare,manifest,point,path))
 ''')
 
-    def test_write_failure_cleans_partial_files_without_invalidating_original_replay(self):
-        self.lua.execute('''
-local replace=require('code/platform').replace
-require('code/platform').replace=function(from,to)
- if to:match('%.rng$') then error('disk failure') end
- return replace(from,to)
-end
-local point,reason=snapshot.capture(engine,path,12000,4,r:bookmark())
-assert(not point and reason:find('disk failure',1,true))
-assert(not io.open(path..'.sav','rb') and not io.open(path..'.rng.tmp','rb'))
-assert(manifest.commandCount==4 and engine:tick()==100)
-''')
-
-    def test_world_mutation_is_not_hidden_as_an_optional_cache_failure(self):
-        self.lua.execute('''
-local save=engine.saveSnapshot
-engine.saveSnapshot=function(...) save(...); tick=tick+1 end
-local ok,reason=pcall(snapshot.capture,engine,path,12000,4,r:bookmark())
-assert(not ok and reason:find('changed simulation state',1,true))
-assert(not io.open(path..'.sav','rb'))
-''')
-
     def test_missing_optional_restore_point_does_not_prevent_named_replay_copy(self):
         self.lua.execute('''
-point=assert(snapshot.capture(engine,path,12000,4,r:bookmark()))
+point=assert(createPoint())
 manifest.snapshots={point}
 local target={id='copy',startTick=1,lastTick=500,commandCount=4}
 -- The capture is deliberately not in the embedded source directory.

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.50.1 (asynchronous seeking preview)
+
+- Replace blocking yearly saves with a frozen copy of the checked native world
+  and a single native compression worker. The worker runs the original PKWARE
+  codec on private buffers, without Lua, game-state access or transport calls.
+  Freeze and final publication remain on the game thread and are timed separately.
+- Bound in-flight work to one world, poll without waiting, and defer cancellation
+  cleanup until the thread exits. Leaving or seeking never frees live worker memory.
+- Reuse the green mission-progress sprites and alpha-masked frame at native size,
+  beside the persistent counter. Preserve clipping and each renderer's surface.
+- Remove the obsolete synchronous periodic-save implementation. Native save/load
+  still owns the initial singleplayer recording and ordinary world restoration.
+- Live 0.50.0 measurements showed 547–922 ms yearly save stalls, up to 1062 ms
+  for the recording point. Updated freeze/publication timings need live comparison.
+
 ## 0.50.0 (seeking preview)
 
 - Click the persistent progress bar to seek, including backwards after playback

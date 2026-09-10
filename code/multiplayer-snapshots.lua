@@ -20,7 +20,7 @@ end
 
 function Recording:observe()
   local trace=self.trace
-  if self.disabled then return end
+  if self.disabled or self.pending then return end
   local month=trace.engine:calendarMonth()
   if not self.cadence:due(month) then return end
   if trace.recoveryPending or trace.network.syncStatus~=0 or trace.executing or trace.pendingTick
@@ -30,16 +30,28 @@ function Recording:observe()
   local root=trace.path..'/snapshots'
   local ok,reason=pcall(platform.mkdir,root)
   if not ok then self.disabled=true; print('[recorder] Optional MP snapshots disabled: '..tostring(reason)); return end
-  local point,reason=storage.capture(trace.engine,root..'/'..trace.engine:tick(),month,trace.count,nil,
-    function(filename) return require('code/world-capture').writeSnapshot(filename,trace.engine) end)
-  if not point then self.disabled=true; print('[recorder] Optional MP snapshots disabled: '..tostring(reason)); return end
-  point.traceSequence=trace.events
-  capture.snapshots=capture.snapshots or {}; capture.snapshots[#capture.snapshots+1]=point
-  self.cadence:commit(month)
-  local published,err=pcall(require('code/capture-files').save,capture)
-  if not published then
-    self.disabled=true; print('[recorder] MP snapshot metadata deferred until sealing: '..tostring(err))
+  local sequence=trace.events
+  local job,reason=require('code/snapshot-jobs').start(trace.engine,root..'/'..trace.engine:tick(),month,trace.count,nil,
+    function(point,err)
+      self.pending=nil
+      if not point then self.disabled=true; print('[recorder] Optional MP snapshot failed: '..tostring(err)); return end
+      point.traceSequence=sequence
+      capture.snapshots=capture.snapshots or {}; capture.snapshots[#capture.snapshots+1]=point
+      local published,err=pcall(require('code/capture-files').save,capture)
+      if not published then
+        self.disabled=true; print('[recorder] MP snapshot metadata deferred until sealing: '..tostring(err))
+      end
+    end)
+  if not job then
+    if reason~='busy' then self.disabled=true; print('[recorder] Optional MP snapshots disabled: '..tostring(reason)) end
+    return
   end
+  self.pending=job
+  self.cadence:commit(month)
+end
+
+function Recording:close()
+  if self.pending then self.pending:cancel(); self.pending=nil end
 end
 
 local function eligible(capture)

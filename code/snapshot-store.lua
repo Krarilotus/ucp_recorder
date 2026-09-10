@@ -40,6 +40,16 @@ function M.cachePath()
   return require('code/snapshot-cache').allocate()
 end
 
+-- The compression owner already checked the container hash and length. Publish
+-- both immutable sidecars atomically before making their metadata discoverable.
+function M.publish(path,point,random,encoded)
+  point.bytes=validation.integer(encoded.bytes,1001,M.MAX_WORLD,'snapshot size')
+  validation.hash(encoded.sha256,'snapshot world hash'); point.worldHash=encoded.sha256
+  store.write(rng(path)..'.tmp',random)
+  platform.replace(world(path)..'.tmp',world(path))
+  platform.replace(rng(path)..'.tmp',rng(path))
+end
+
 function M.remove(path)
   -- Only exact paths retained by the cache owner are removed, never enumeration
   -- of a replay folder or recursive deletion of user-supplied content.
@@ -49,46 +59,6 @@ function M.remove(path)
     if not removed and code~=2 then failed=failed or reason end -- ENOENT is already removed.
   end
   return not failed,failed
-end
-
----@param commands integer Already executed command count at the capture boundary.
----@param bookmark table|nil Multiplayer converts its trace position when sealing.
----@param writeWorld function|nil Synchronous read-only provider for live multiplayer.
-function M.capture(engine,path,month,commands,bookmark,writeWorld)
-  assert(not engine.executing and not engine:commandsPending(),
-    'Restore point requires an idle command/tick boundary')
-  local tick=engine:tick()
-  local started=platform.milliseconds()
-  local random,resources=engine:rngData(),engine:resourceData()
-  local point={profile=M.PROFILE,tick=tick,month=month,
-    commands=commands,bookmark=bookmark,rngHash=digest.sha256(random),stateHash=digest.sha256(random..resources)}
-  local ok,reason=xpcall(function()
-    local encoded
-    if writeWorld then encoded=writeWorld(world(path)..'.tmp')
-    else engine:saveSnapshot(world(path)..'.tmp') end
-    point.saveMilliseconds=(platform.milliseconds()-started)%4294967296
-    if encoded then
-      point.bytes=validation.integer(encoded.bytes,1001,M.MAX_WORLD,'snapshot size')
-      validation.hash(encoded.sha256,'snapshot world hash'); point.worldHash=encoded.sha256
-    else
-      point.bytes=0
-      point.worldHash=digest.file(world(path)..'.tmp',M.MAX_WORLD,nil,function(count) point.bytes=count end)
-    end
-    store.write(rng(path)..'.tmp',random)
-    assert(engine:tick()==tick and engine:rngData()==random and engine:resourceData()==resources,
-      'Snapshot capture changed simulation state')
-    platform.replace(world(path)..'.tmp',world(path))
-    platform.replace(rng(path)..'.tmp',rng(path))
-  end,debug.traceback)
-  if not ok then os.remove(world(path)..'.tmp'); os.remove(rng(path)..'.tmp'); M.remove(path) end
-  -- A disk/cache failure is optional. A changed world cannot be ignored.
-  assert(engine:tick()==tick and engine:rngData()==random and engine:resourceData()==resources,
-    'Snapshot capture changed simulation state')
-  if not ok then return nil,reason end
-  print(string.format('[recorder] Snapshot at tick %d: %d bytes; native save %d ms; total %d ms',
-    tick,point.bytes,point.saveMilliseconds,(platform.milliseconds()-started)%4294967296))
-  point.saveMilliseconds=nil -- Timing is diagnostic output, not saved replay state.
-  return point
 end
 
 function M.prepare(manifest,point,path)

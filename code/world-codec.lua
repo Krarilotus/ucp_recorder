@@ -22,9 +22,11 @@ local function prepare()
   check({address=sites.implode,bytes={0x83,0xec,0x34,0x55,0x56,0x57}},'Native world compressor conflicts')
   check({address=sites.explode,bytes={0x83,0xec,0x34,0x53,0x56}},'Native world decompressor conflicts')
   binary.prepare()
-  functions={implode=core.exposeCode(sites.implode,6,1),explode=core.exposeCode(sites.explode,6,1)}
+  functions={implode=core.exposeCode(sites.implode,6,1),explode=core.exposeCode(sites.explode,6,1),address=sites.implode}
   return functions
 end
+
+function M.compressorAddress() return prepare().address end
 
 -- nil means store the original section without compression. The native primitive
 -- limits its output to the input size and reports allocation/overflow failures;

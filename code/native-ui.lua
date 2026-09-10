@@ -21,7 +21,9 @@ function M.new(sites,onError)
   o.widthNative=core.exposeCode(sites.textWidth.address,3,1)
   o.headerNative=core.exposeCode(sites.header.address,5,1)
   o.borderNative=core.exposeCode(sites.border.address,6,1)
-  o.fillNative=core.exposeCode(sites.fill.address,6,1)
+  o.spriteClipNative=core.exposeCode(sites.spriteClip.address,5,1)
+  o.clippedSpriteNative=core.exposeCode(sites.clippedSprite.address,5,1)
+  o.maskedSpriteNative=core.exposeCode(sites.maskedSprite.address,8,1)
   o.buttonNative=core.exposeCode(sites.basicButton.address,3,1)
   o.menuConstructor=core.exposeCode(sites.menuConstructor.address,2,1)
   o.modalConstructor=core.exposeCode(sites.modalConstructor.address,10,1)
@@ -68,17 +70,24 @@ function M:attachOverlay(menuIDs,items,visible,screenInput)
   end
 end
 
--- Same Pencil fill and palette entry as the game's loading bar. Its complete
--- loader renderer has fixed screen coordinates/blits, so only reuse the drawing
--- primitive here; overlay ownership supplies the correct gameplay surface.
-function M:progressBar(x,y,width,height,fraction)
-  self.fillNative(self.sites.pencil.value,x,y,x+width-1,y+height-1,0)
-  local pixels=math.floor((width-4)*math.max(0,math.min(1,fraction)))
+-- Mission objectives use interface_slider_bar.gm1 (group164): the 250x12
+-- empty/green strips and the 254x16 frame with its alpha mask. Keep native size.
+function M:progressBar(x,y,fraction)
+  local rendering=modules.ui:access().game.Rendering
+  local texture=self.sites.missionBar.value
+  rendering.renderGMWithBlending(rendering.textureRenderCore,164,2,x+2,y+2,24)
+  local pixels=math.floor(250*math.max(0,math.min(1,fraction)))
   if pixels>0 then
-    local color=core.readSmallInteger(self.sites.loadingColor.value)%65536
-    self.fillNative(self.sites.pencil.value,x+2,y+2,x+pixels+1,y+height-3,color)
+    local clip=texture+0x16c854
+    local saved={}; for i=0,3 do saved[i]=core.readInteger(clip+i*4) end
+    local ok,reason=pcall(function()
+      self.spriteClipNative(texture,x+2,y+2,x+2+pixels,y+14)
+      self.clippedSpriteNative(texture,164,4,x+2,y+2)
+    end)
+    for i=0,3 do core.writeInteger(clip+i*4,saved[i]) end
+    assert(ok,reason)
   end
-  self:border(x,y,width-1,height-1)
+  self.maskedSpriteNative(texture,164,1,x,y,164,3,0)
 end
 
 function M:renderOverlayItem(item)
@@ -117,7 +126,13 @@ function M:renderOverlay(overlay,render)
   local cursor=core.readInteger(text)
   local left,right=core.readInteger(text+8),core.readInteger(text+12)
   local textSurface=core.readInteger(text+28)
+  -- Pencil has its own surface selector; the texture/text selectors above do
+  -- not affect fills or frames. Restore its cached pointer and stride as well.
+  local pencil=self.sites.pencil.value
+  local pencilBuffer,pencilStride,pencilSurface=core.readInteger(pencil+4),
+    core.readInteger(pencil+8),core.readInteger(pencil+12)
   target[0]=surface
+  core.writeInteger(pencil+12,surface)
   core.writeInteger(text+28,surface)
   core.writeInteger(text+8,x)
   core.writeInteger(text+12,x+core.readInteger(self:windowAddress()+0x18))
@@ -125,6 +140,8 @@ function M:renderOverlay(overlay,render)
   core.writeInteger(text,cursor)
   core.writeInteger(text+8,left); core.writeInteger(text+12,right)
   core.writeInteger(text+28,textSurface)
+  core.writeInteger(pencil+4,pencilBuffer); core.writeInteger(pencil+8,pencilStride)
+  core.writeInteger(pencil+12,pencilSurface)
   target[0]=previous
   self.overlayOriginX,self.overlayOriginY=oldX,oldY
   assert(ok,reason)

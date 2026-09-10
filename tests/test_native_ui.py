@@ -23,24 +23,33 @@ for _,width in ipairs({800,1280,1920,2560}) do
 end
 ''')
 
-    def test_progress_uses_native_fill_and_keeps_inclusive_bounds_inside_its_track(self):
+    def test_progress_reuses_mission_sprites_and_restores_clip_on_failure(self):
         self.check('''
-local calls={}
-ui.fillNative=function(...) calls[#calls+1]={...} end
-ui.border=function(_,x,y,w,h) assert(x==20 and y==30 and w==95 and h==9) end
-memory[sites.loadingColor.value]=-1
-for _,fraction in ipairs({-1,0,0.5,1,2}) do
- calls={}; ui:progressBar(20,30,96,10,fraction)
- local track=calls[1]
- assert(track[1]==sites.pencil.value and track[2]==20 and track[3]==30)
- assert(track[4]==115 and track[5]==39 and track[6]==0)
- if fraction<=0 then assert(#calls==1)
- else
-  local fill=calls[2]; local pixels=math.floor(92*math.min(fraction,1))
-  assert(fill[1]==sites.pencil.value and fill[2]==22 and fill[3]==32)
-  assert(fill[4]==21+pixels and fill[5]==37 and fill[6]==65535)
- end
+local calls={}; local texture=sites.missionBar.value; local clip=texture+0x16c854
+for i=0,3 do memory[clip+i*4]=100+i end
+modules={ui={access=function() return {game={Rendering={textureRenderCore=texture,
+ renderGMWithBlending=function(t,gm,id,x,y,blend)
+  assert(t==texture and gm==164 and id==2 and x==22 and y==32 and blend==24)
+ end}}} end}}
+ui.spriteClipNative=function(t,x,y,right,bottom)
+ assert(t==texture and x==22 and y==32 and bottom==44)
+ calls[#calls+1]=right; for i=0,3 do memory[clip+i*4]=0 end
 end
+ui.clippedSpriteNative=function(t,gm,id,x,y)
+ assert(t==texture and gm==164 and id==4 and x==22 and y==32)
+ if broken then error('sprite failure') end
+end
+ui.maskedSpriteNative=function(t,gm,id,x,y,mask,maskId,blend)
+ assert(t==texture and gm==164 and id==1 and x==20 and y==30 and mask==164 and maskId==3 and blend==0)
+end
+for _,fraction in ipairs({-1,0,0.5,1,2}) do
+ calls={}; ui:progressBar(20,30,fraction)
+ assert(#calls==(fraction>0 and 1 or 0))
+ if fraction>0 then assert(calls[1]==22+math.floor(250*math.min(fraction,1))) end
+ for i=0,3 do assert(memory[clip+i*4]==100+i) end
+end
+broken=true; assert(not pcall(ui.progressBar,ui,20,30,.5))
+for i=0,3 do assert(memory[clip+i*4]==100+i) end
 ''')
 
     def test_loaded_text_manager_marker_and_codepage_share_the_native_font_path(self):
@@ -123,6 +132,8 @@ local hook; local target={[0]=2}; local fail=false; local frontEnd=false
 modules={ui={access=function() return {game={Rendering={pDrawBufferChoiceValue=target}}} end}}
 ui.updateOverlay=function(_,parent) return {menu=0x6000,items={{frontEnd=frontEnd}}} end
 local text=sites.textManager.value
+local pencil=sites.pencil.value
+memory[pencil+4]=101; memory[pencil+8]=202; memory[pencil+12]=2
 memory[text]=31; memory[text+8]=560; memory[text+12]=1360; memory[text+28]=2
 memory[ui:windowAddress()+0x18]=1920
 memory[sites.mapViewport.value]=181; memory[sites.mapViewport.value+4]=24
@@ -132,6 +143,8 @@ core.hookCode=function(callback)
  return function(parent,action)
   if parent==0x6000 then
    assert(action==1)
+   assert(memory[pencil+12]==(frontEnd and 0 or 1))
+   memory[pencil+4]=303; memory[pencil+8]=404
    ui:renderOverlayItem({frontEnd=frontEnd,render=function(x,y)
     assert(target[0]==(frontEnd and 0 or 1))
     local origin=frontEnd and 0 or 181
@@ -147,9 +160,11 @@ memory[0x8000+0x4c]=0x7000; memory[0x8000+20]=123
 memory[0x7000]=0x9000; memory[0x9000]=0x66
 ui:trackVisibility({0x8000},function() return true end)
 hook(0x7000,3); assert(target[0]==2)
+assert(memory[pencil+4]==101 and memory[pencil+8]==202 and memory[pencil+12]==2)
 assert(memory[text]==31 and memory[text+8]==560 and memory[text+12]==1360 and memory[text+28]==2)
 frontEnd=true; hook(0x7000,1); assert(target[0]==2)
 fail=true; assert(not pcall(hook,0x7000,1) and target[0]==2)
+assert(memory[pencil+4]==101 and memory[pencil+8]==202 and memory[pencil+12]==2)
 assert(memory[text]==31 and memory[text+8]==560 and memory[text+12]==1360 and memory[text+28]==2)
 assert(ui.overlayOriginX==nil and ui.overlayOriginY==nil)
 ''')

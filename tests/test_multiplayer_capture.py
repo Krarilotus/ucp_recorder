@@ -17,10 +17,10 @@ class MultiplayerCaptureTests(unittest.TestCase):
         self.valid_world()
         self.lua.execute('''
 local storage=require('code/snapshot-store'); local saved=0; local month=12000
-require('code/platform').milliseconds=function() return 0 end
+require('code/platform').milliseconds=function() return now*100 end
 engine.calendarMonth=function() return month end
 engine.saveSnapshot=function() error('Native multiplayer save is prohibited') end
-require('code/world-capture').writeSnapshot=function(path,actual)
+require('code/world-capture').writeFrozenFixture=function(path,actual)
  assert(actual==engine and not trace.pendingTick and not trace.executing)
  saved=saved+1; local data=string.rep('world',400); store.write(path,data)
  return {bytes=#data,sha256=sha.sha256(data)}
@@ -96,8 +96,8 @@ assert(nativeWrites==0)
         self.lua.execute('''
 local month=12000; local saved=0
 engine.calendarMonth=function() return month end
-require('code/platform').milliseconds=function() return 0 end
-require('code/world-capture').writeSnapshot=function(path)
+require('code/platform').milliseconds=function() return now*100 end
+require('code/world-capture').writeFrozenFixture=function(path)
  saved=saved+1; local data=string.rep(tostring(saved),2000); store.write(path,data)
  return {bytes=#data,sha256=sha.sha256(data)}
 end
@@ -133,8 +133,8 @@ assert(nativeWrites==0)
         self.lua.execute('''
 local month=12000; local attempted=0
 engine.calendarMonth=function() return month end
-require('code/platform').milliseconds=function() return 0 end
-require('code/world-capture').writeSnapshot=function() attempted=attempted+1; error('disk full') end
+require('code/platform').milliseconds=function() return now*100 end
+require('code/world-capture').writeFrozenFixture=function() attempted=attempted+1; error('disk full') end
 for time=1,130 do
  now=time
  if time==64 then month=12300 end
@@ -204,6 +204,11 @@ trace=Capture.new(engine,{multiplayerDiagnosticsEndTick=128,multiplayerDiagnosti
 function tick(t)
  now=t; trace:observe('onTick'); assert(not trace.failed,trace.failureReason)
  now=t+1; trace:observe('afterTick'); now=t; assert(not trace.failed,trace.failureReason)
+ require('code/snapshot-jobs').poll()
+end
+require('code/world-capture').freeze=function(actual)
+ return {ready=function() return true end,cancel=function() end,close=function() end,
+  write=function(_,path) return require('code/world-capture').writeFrozenFixture(path,actual) end}
 end
 function command()
  reads[engine.base+0x2d824]=0; reads[engine.base+32]=network.localPlayer
@@ -228,10 +233,10 @@ core.readByte=function() return 34 end
 engine.rngData=function()
  return string.char(1,0,2,0,123,0,0,0)..string.rep('a',40000)..string.char(3,0,0,0,4,0,0,0)
 end
-package.loaded['code/world-capture']={capture=function(path)
+require('code/world-capture').capture=function(path)
  for _,name in ipairs({'world.json','world.bin','world-layout.bin','world-header.bin'}) do store.write(path..'/'..name,'world') end
  return {status='complete',header=true,hash=sha.sha256('world')}
-end}
+end
 ''')
 
     def test_native_boundaries_seal_host_and_client_into_the_shared_replay_library(self):

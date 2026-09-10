@@ -44,8 +44,11 @@ Metadata supplied alongside a recording is not a conversion proof. A fresh game
 launch rebuilds the derived save; repeated loads in that process can reuse it.
 Every reuse verifies the source sections and prepared file digest. Missing or
 damaged derived saves are rebuilt; damaged
-original recordings are rejected. Conversion still round-trips the original
-native compressor, and files are published only after complete writes.
+original recordings are rejected. Diagnostic conversion round-trips the original
+native compressor; release conversion retains native status, bounds and checksum
+validation. The background snapshot worker uses the original compressor in both
+profiles, with independent native round-trip coverage in the offline suite.
+Files are published only after complete writes.
 
 These changes reduce unnecessary work; they do not promise a 100 ms cold load.
 Measure recorder startup, replay preparation, and the native world-load phase

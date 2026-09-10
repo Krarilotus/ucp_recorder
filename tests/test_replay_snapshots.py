@@ -21,6 +21,14 @@ package.loaded['code/snapshot-store']={MAX_POINTS=512,MAX_WORLD=100,
  end,
  prepare=function(_,point,path) prepared=prepared+1; return {point=point,path=path} end}
 require('code/platform').mkdir=function() end
+local completion
+package.loaded['code/snapshot-jobs']={start=function(engine,path,date,commands,bookmark,done)
+ local point,reason=require('code/snapshot-store').capture(engine,path,date)
+ if not point then return nil,reason end
+ completion=function() done(point) end
+ return {cancel=function() completion=nil end}
+end}
+function finishSnapshots() local done=completion; completion=nil; if done then done() end end
 package.loaded['code/replay-preparation']={checkStartingState=function() end}
 local engine={calendarMonth=function() return month end,tick=function() return tick end,
  commandsPending=function() return pending or false end,
@@ -35,12 +43,12 @@ s=Snapshots.new(r,ready); r.snapshots=s
 
     def test_yearly_cache_and_25_year_recording_have_separate_ownership(self):
         self.check('''
-s:observe(); assert(captured==0)
-month=12012; tick=200; s:observe(); s:observe()
+s:observe(); finishSnapshots(); assert(captured==0)
+month=12012; tick=200; s:observe(); finishSnapshots(); s:observe(); finishSnapshots()
 assert(captured==1 and #s.entries==1 and not r.manifest.snapshots)
 r.mode='record'; r.status='recording'; local embedded=Snapshots.new(r)
-month=12299; embedded:observe(); assert(captured==1)
-month=12300; tick=900; embedded:observe()
+month=12299; embedded:observe(); finishSnapshots(); assert(captured==1)
+month=12300; tick=900; embedded:observe(); finishSnapshots()
 assert(captured==2 and #r.manifest.snapshots==1 and #embedded.entries==0)
 embedded:close(); assert(#removed==0)
 s:close(); assert(#removed==1 and r.manifest.snapshots[1].tick==900)
@@ -49,17 +57,17 @@ s:close(); assert(#removed==1 and r.manifest.snapshots[1].tick==900)
     def test_nearest_point_combines_embedded_and_bounded_local_cache(self):
         self.check('''
 Snapshots.MAX_CACHE_BYTES=2*(100+0x9c50)
-for i=1,3 do month=12000+12*i; tick=100+i*100; s:observe() end
+for i=1,3 do month=12000+12*i; tick=100+i*100; s:observe(); finishSnapshots() end
 assert(#s.entries==2 and #removed==1)
 r.manifest.snapshots={{tick=150},{tick=900}}
 assert(s:nearest(140)==nil and s:nearest(200).point.tick==150)
 assert(s:nearest(350).point.tick==300 and s:nearest(950).point.tick==900)
-month=12012; s:observe(); assert(captured==3)
+month=12012; s:observe(); finishSnapshots(); assert(captured==3)
 ''')
 
     def test_restore_after_finished_preserves_cache_and_stops_before_pending_tick(self):
         self.check('''
-month=12012; tick=550; s:observe(); r.status='finished'; paused=true
+month=12012; tick=550; s:observe(); finishSnapshots(); r.status='finished'; paused=true
 local original=r.manifest
 r.reset=function(self) assert(not self.snapshots); self.mode='none' end
 r.startPlayback=function(self,id,_,actual,cached)
@@ -76,7 +84,7 @@ assert(not s:afterTick() and not s:atBoundary(550))
 
     def test_cache_failure_falls_back_to_normal_start_without_silently_loading_bad_data(self):
         self.check('''
-month=12012; tick=400; s:observe(); tick=800
+month=12012; tick=400; s:observe(); finishSnapshots(); tick=800
 require('code/snapshot-store').prepare=function() error('damaged cache') end
 r.reset=function(self) self.mode='none' end
 r.startPlayback=function(self,id,_,actual,cached)
@@ -89,9 +97,9 @@ assert(not s.target and not paused)
 
     def test_capture_waits_for_empty_command_ring_and_disables_only_cache_on_io_failure(self):
         self.check('''
-month=12012; pending=true; s:observe(); assert(captured==0)
+month=12012; pending=true; s:observe(); finishSnapshots(); assert(captured==0)
 pending=false; require('code/snapshot-store').capture=function() return nil,'disk full' end
-s:observe(); assert(s.disabled and r.status=='playing' and #s.entries==0)
+s:observe(); finishSnapshots(); assert(s.disabled and r.status=='playing' and #s.entries==0)
 ''')
 
     def test_damaged_starting_save_does_not_drop_running_world(self):
@@ -117,9 +125,9 @@ assert(not s:atBoundary(549) and s:atBoundary(550) and paused)
     def test_locked_cache_disables_new_writes_before_exceeding_budget(self):
         self.check('''
 Snapshots.MAX_CACHE_BYTES=100+0x9c50
-month=12012; tick=200; s:observe()
+month=12012; tick=200; s:observe(); finishSnapshots()
 require('code/snapshot-store').remove=function() return false,'file locked' end
-month=12024; tick=300; s:observe()
+month=12024; tick=300; s:observe(); finishSnapshots()
 assert(s.disabled and captured==1 and #s.entries==1 and s.bytes==Snapshots.MAX_CACHE_BYTES)
 assert(r.status=='playing')
 ''')
@@ -133,7 +141,7 @@ ready.worlds={test={manifest=first},recovered={manifest=second}}
 local recovered={manifest=second,worlds=ready.worlds}
 require('code/replay-preparation').segment=function(first,id) assert(first==ready and id=='recovered'); return recovered end
 s=Snapshots.new(r,ready); r.snapshots=s
-month=12012; tick=400; s:observe()
+month=12012; tick=400; s:observe(); finishSnapshots()
 r.reset=function(self) assert(not self.snapshots); self.mode='none' end
 r.startPlayback=function(self,id,_,actual,cached)
  self.mode='play'; self.status='playing'; self.manifest=actual.manifest

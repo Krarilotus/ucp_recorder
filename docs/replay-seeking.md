@@ -1,4 +1,4 @@
-# Replay seeking (0.50.0 preview)
+# Replay seeking (0.50.1 preview)
 
 This branch adds a clickable progress bar beside the persistent tick counter.
 It is not the published 0.49.4 build. Native restoration and capture latency
@@ -65,23 +65,29 @@ and retains the active replay. Commands and determinism checks remain enabled
 after restoration. Stopping at a paused target happens before consuming its
 multiplayer tick frame, so unpausing cannot leave an unmatched pending frame.
 
-The native save writer updates presentation duration and, in multiplayer mode,
-periodically calls transport synchronization. Capture restores duration; the
-scoped offline save gate suppresses the transport call without changing actual
-simulation mode. Original SHC and Extreme branch/ABI tests cover that guard.
-Live multiplayer saving remains prohibited by this provider.
-
-Live multiplayer uses `world-capture.writeSnapshot` instead: it reads the existing
-122-section world layout and registered extension state into the same native
-container encoder used for the starting world. It neither calls the native save
-writer nor yields between sections. Capture waits during synchronization and
-pending command execution. `multiplayer-snapshots` converts trace positions into
+Periodic snapshots in both singleplayer and multiplayer use `world-capture.freeze`:
+it copies the checked 122-section world and registered extension state at one
+simulation boundary. `codec-worker` runs the original PKWARE compressor in one
+native thread against those private buffers. It never calls Lua, reads live game
+state, or invokes native save/transport routines. `snapshot-jobs` polls completion
+without waiting, then publishes the native container and RNG sidecar. Capture
+waits during synchronization and pending command execution. `multiplayer-snapshots` converts trace positions into
 replay byte bookmarks during the existing journal scan, and preserves the
 25-year cadence through recovery. Named prefixes copy only included points.
 
+Only one world may be in flight per game process: approximately 28 MiB for SHC or
+50 MiB for Extreme, in addition to the disk cache budget. Closing or seeking
+cancels that optional point; memory is released only after the worker exits.
+Pending points are not included in a named copy or a sealed recording. The next
+job waits rather than building an unbounded queue. Freeze and final container
+publication still run on the game thread; separate timings expose their cost.
+Measured 0.50.0 native yearly saves blocked Extreme playback for 547–922 ms.
+The new path needs live timing and restore-equivalence acceptance before release.
+
 The release encoder retains native status, bounds and checksum handling, but
-omits the diagnostic build's immediate decode-and-compare pass. Native tests
-independently decode both build profiles. Preparing a recovery chain validates
+omits the diagnostic conversion's immediate decode-and-compare pass. Background
+snapshot compression uses the original codec in both profiles. Native tests
+independently decode both build profiles and frozen snapshots. Preparing a recovery chain validates
 each segment once and retains its small RNG block; subsequent transitions reuse
 that admission instead of rescanning all commands and assets. Native starting
 files are still hash-checked before replacing an active world.

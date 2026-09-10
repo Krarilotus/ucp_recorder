@@ -130,6 +130,7 @@ function M.createButtons(recorder,sites)
     return M.hud:key(message,key) or (historyKey and historyKey(message,key))
   end
   ui.onMenuUpdated=function()
+    require('code/snapshot-jobs').poll()
     if recorder.snapshots and recorder.snapshots.requested then
       recorder:guard(function() recorder.snapshots:advance() end)
     else M.history:advance() end

@@ -145,6 +145,7 @@ function M:sealBoundary()
 end
 
 function M:captureFailure(reason)
+  if self.snapshots then self.snapshots:close() end
   if not self.capture then return end
   self.capture.status='interrupted'; self.capture.reason=reason
   self.capture.bytes=self.bytes; self.capture.lastObservedTick=self.observedTick
@@ -167,6 +168,7 @@ function M:saveCopy(name)
 end
 
 function M:stop(reason)
+  if self.snapshots then self.snapshots:close() end
   local capture=self.capture
   local hadFile=self.file~=nil
   local wasFailed=self.failed

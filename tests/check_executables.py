@@ -143,8 +143,8 @@ def check(folder):
         check_report_pause(reader,lua,root,name)
         from check_header_native import check_header
         check_header(reader,lua,root,name)
-        from check_fill_native import check_fill
-        check_fill(reader,lua,root,name)
+        from check_mission_bar_native import check_mission_bar
+        check_mission_bar(reader,lua,root,name)
         from check_save_pacing_native import check_save_pacing
         check_save_pacing(reader,lua,root,name)
         from check_dispatch_native import check_dispatch

@@ -87,19 +87,27 @@ local ui={activeDialog=function() return -1 end,attachOverlay=function(_,ids,ite
  assert(ids[1]==14 and ids[2]==16 and screenInput); controls=items; visible=predicate end,
  hudText=function(_,label,x,y,alignment) texts[#texts+1]={label,x,y,alignment} end,
  avatarNative=function(slot,x,y) assert(slot==3 and x==10 and y==152) end,
- border=function() end,progressBar=function(_,x,y,width,height,fraction)
-  assert(x==390 and y==16 and width==96 and height==10 and fraction==1)
+ border=function() end,progressBar=function(_,x,y,fraction)
+  assert(x==240 and y==12 and fraction==1)
  end}
 hud:install(ui); assert(visible())
 assert(controls[1].width==72 and controls[1].height==72)
 assert(controls[1].visible() and controls[2].visible() and not controls[3].visible())
 controls[2].action(); assert(chosen==3); controls[2].render(10,152)
 for _,item in ipairs(controls) do assert(not item.frontEnd) end
-controls[9].render(390,12)
-controls[15].render(390,12)
+controls[9].render(240,12)
+controls[15].render(240,12)
 assert(texts[1][1]=='Replay: 100 / 100 ticks')
 for _,text in ipairs(texts) do assert(text[4]==-1 and text[2]==788) end
 assert(not controls[10].visible()); hud:key(0x100,114); assert(controls[10].visible())
-controls[10].render(54,12); assert(texts[4][1]=='SHC 1.41')
+for _,height in ipairs({600,720,768,1080,1440}) do
+ local x,y=controls[10].position(800,height)
+ assert(y>=104 and x+controls[10].width<=800)
+ for index=1,#view:players() do
+  local px,py=controls[index].position(800,height)
+  assert(x>=px+controls[index].width)
+ end
+end
+controls[10].render(90,112); assert(texts[4][1]=='SHC 1.41')
 available=false; assert(not visible())
 ''')

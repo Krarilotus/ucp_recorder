@@ -76,22 +76,6 @@ container=require('code/world-container')
         self.assertFalse(metadata['playable']); self.assertEqual(metadata['sections'],122)
         self.assertEqual(metadata['bytes'],len(data))
 
-    def test_live_reader_uses_same_container_without_disk_world_or_native_save(self):
-        self.prepare()
-        self.lua.execute('container.prepare(virtual_path,engine)')
-        expected=(self.root/'world-native.sav').read_bytes()
-        (self.root/'world.bin').unlink()
-        self.lua.execute('''
-engine.networkState=function() return {syncStatus=0} end
-engine.singlePlayer=function() return false end
-core.readInteger=function() error('Must not inspect or change lobby state') end
-engine.saveSnapshot=function() error('Native multiplayer save must never run') end
-local result=world.writeSnapshot(virtual_path..'/periodic.sav',engine)
-assert(result.bytes>1000)
-''')
-        self.assertEqual((self.root/'periodic.sav').read_bytes(),expected)
-        self.assertFalse((self.root/'world.bin').exists())
-
     def test_payload_limit_preserves_previous_prepared_file(self):
         self.prepare(); target=self.root/'world-native.sav'; target.write_bytes(b'previous')
         self.lua.execute('container.MAX_PAYLOAD=50')

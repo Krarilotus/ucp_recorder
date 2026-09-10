@@ -86,26 +86,51 @@ function M.capture(path,engine)
   return {status='complete',hash=sha.sha256(encoded),bytes=profile.total,
     automarket=manifest.automarket~=nil,extensions=manifest.extensions~=nil,header=true}
 end
--- Called synchronously at a quiescent multiplayer simulation boundary. Unlike
--- capture(), this writes compressed sections directly: no raw world copy on disk
--- and no later compression job on match exit or replay startup.
-function M.writeSnapshot(filename,engine)
-  assert(engine:networkState().syncStatus==0,'Cannot snapshot a synchronizing world')
-  local tick=engine:tick()
-  local entries=M.layout()
+-- Freeze once on the simulation thread; compression only sees private memory.
+-- This is the same checked section/header/extension source used by MP capture.
+function M.freeze(engine)
+  assert(not engine.executing and not engine:commandsPending(),'Snapshot requires an idle command boundary')
+  local entries,profile=M.layout()
   local header,descriptor=require('code/world-header').read()
   local _,_,extensions=M.extensionState()
-  local reader={entries=entries,header=header,manifest={header=descriptor},extensions=extensions}
+  local bytes=profile.total+(extensions and #extensions or 0)
+  assert(bytes<=require('code/codec-worker').MAX_BYTES,'Frozen world exceeds memory budget')
+  local memory=core.allocate(bytes+1,true) -- a binary bridge may append a trailing NUL
+  assert(memory and memory~=0,'Cannot allocate frozen world')
+  local reader={entries=entries,header=header,manifest={header=descriptor},extensions=extensions,
+    precompressed=true,memory=memory}
+  local ok,reason=pcall(function()
+    local inputs,offset={},0
+    for _,entry in ipairs(entries) do
+      core.copyMemory(memory+offset,entry.address,entry.size)
+      inputs[#inputs+1]={address=memory+offset,size=entry.size,compress=entry.compressed~=0}
+      offset=offset+entry.size
+    end
+    if extensions then
+      require('code/binary-memory').write(memory+offset,extensions)
+      inputs[#inputs+1]={address=memory+offset,size=#extensions,compress=true}
+    end
+    reader.inputs=inputs
+    reader.worker=require('code/codec-worker').new(inputs,require('code/world-codec').compressorAddress())
+  end)
+  if not ok then core.deallocate(memory); error(reason) end
+  function reader:ready() return self.worker:ready() end
+  function reader:cancel() self.worker:cancel() end
   function reader:eachSection(consume)
-    for _,entry in ipairs(self.entries) do
-      local data=core.readString(entry.address,entry.size)
-      assert(type(data)=='string' and #data==entry.size,'Short native world read')
-      consume(entry,data)
+    for i,entry in ipairs(self.entries) do
+      local packed=self.worker:packed(i)
+      local raw=not packed and core.readString(self.inputs[i].address,entry.size) or nil
+      consume(entry,raw,packed)
     end
   end
-  -- No progress callback: yielding would allow a different world between sections.
-  local result=require('code/world-container').write(filename,reader)
-  assert(engine:tick()==tick,'Simulation advanced during world capture')
-  return result
+  function reader:write(filename)
+    assert(self:ready(),'Snapshot compression is still running')
+    if self.extensions then self.packedExtensions=self.worker:packed(#self.inputs) end
+    return require('code/world-container').write(filename,self)
+  end
+  function reader:close()
+    self.worker:close(); core.deallocate(self.memory); self.memory=nil
+  end
+  return reader
 end
 return M

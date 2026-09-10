@@ -221,21 +221,47 @@ prepared=require('code/world-container').prepare(virtual_path,engine)
 ''')
         assert not allocations
         container=(folder/'world-native.sav').read_bytes()
+        # Execute the actual native worker entry with the original compressor.
+        # Thread scheduling is simulated; game memory is poisoned after freeze.
+        pending_worker=[]
+        def create_thread(_, stack_size, entry, job, flags, thread_id):
+            pending_worker.append((entry,job)); return 99
+        def wait_thread(handle,timeout):
+            assert handle==99 and timeout==0
+            if pending_worker:
+                entry,job=pending_worker.pop(); call(entry,job)
+            return 0
+        lua.globals().create_thread=create_thread
+        lua.globals().wait_thread=wait_thread
+        lua.globals().copy_memory=lambda target,source,size:machine.mem_write(target,bytes(machine.mem_read(source,size)))
+        lua.execute('''
+core.allocateCode=function() return 0x3de0000 end; core.writeCode=writeBytes; core.copyMemory=copy_memory
+require('code/platform').stdcall=function(_,name)
+ if name=='CreateThread' then return create_thread end
+ if name=='WaitForSingleObject' then return wait_thread end
+ return function() return 1 end
+end
+engine.commandsPending=function() return false end
+engine.singlePlayer=function() return false end
+engine.networkState=function() return {mode=1,syncStatus=0} end
+require('code/build-profile').diagnostics=false
+frozen=require('code/world-capture').freeze(engine)
+''')
+        first=lua.eval('frozen.entries[1]')
+        address,size=first.address,first.size
+        before=bytes(machine.mem_read(address,size))
+        machine.mem_write(address,b'\xa5'*size)
         game_writes=[]
         hook=machine.hook_add(UC_HOOK_MEM_WRITE,
             lambda uc,access,address,size,value,user:game_writes.append((address,size)) if address<heap else None)
         try:
-            lua.execute('''
-engine.networkState=function() return {mode=1,syncStatus=0} end
-engine.singlePlayer=function() return false end
-require('code/build-profile').diagnostics=false
-require('code/world-capture').writeSnapshot(virtual_path..'/periodic.sav',engine)
-''')
-        finally:machine.hook_del(hook)
+            lua.execute("assert(frozen:ready()); frozen:write(virtual_path..'/frozen.sav'); frozen:close()")
+        finally:
+            machine.hook_del(hook); machine.mem_write(address,before)
         assert not game_writes,game_writes[:10]
-        assert (folder/'periodic.sav').read_bytes()==container
         assert not allocations
-        print(f'PASS: {variant} live-source release container equals disk-source container; no emulated game-memory writes',flush=True)
+        assert (folder/'frozen.sav').read_bytes()==container
+        print(f'PASS: {variant} native worker restores identical container from frozen memory after original section mutation',flush=True)
         def decode_block(block):
             length,compressed,crc=struct.unpack_from('<3I',block)
             assert compressed==len(block)-12 and 0<length<=32*1024*1024
