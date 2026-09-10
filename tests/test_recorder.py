@@ -26,6 +26,10 @@ core = {
   readSmallInteger = function(a) return memory[a] or 0 end,
   writeSmallInteger = function(a,v) memory[a]=v end,
   readBytes = function(a,n) local t={}; for i=1,n do t[i]=bytes[a+i-1] or 0 end; return t end,
+  readString = function(a,n)
+    local t={}; for i=1,n do t[i]=string.char(bytes[a+i-1] or 0) end
+    return table.concat(t)
+  end,
   writeBytes = function(a,t) for i,v in ipairs(t) do bytes[a+i-1]=v end end,
   writeCode = function() end, copyMemory = function() end,
   AssemblyLambda = function(s,vars) return {assembly=s, variables=vars} end,

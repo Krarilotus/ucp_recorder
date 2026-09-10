@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.48.7
+
+- Read player resource blocks without intermediate byte tables, using the built-in
+  signed integer decoder on Lua 5.4 and an equivalent LuaJIT-compatible fallback.
+- Reuse the captured RNG bytes when hashing the initial recording state, and reuse
+  the current tick's RNG counters when writing a checkpoint. No replay-format,
+  native scheduling or simulation changes; all integrity checks remain.
+- These remove redundant capture work. Overall game-speed and loading-time gains
+  still require measurements in the game; Linux/Wine acceptance remains open.
+
 ## 0.48.6
 
 - Remove Python from the extension-store build. Use the existing PowerShell/.NET

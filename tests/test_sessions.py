@@ -22,6 +22,22 @@ local r=session(); r:startRecording(); r:activateRecording()
 assert(hashed and r.active and r.manifest.snapshotHash==string.rep('b',64))
 ''')
 
+    def test_initial_rng_is_sampled_once_and_hashed_from_the_written_bytes(self):
+        self.check('''
+local store=require('code/sessions'); local written,reads=0,0
+local sample=string.rep('r',0x9c50)
+engine.rngData=function() reads=reads+1; return sample end
+store.write=function(path,data)
+ if path:find('/rng.bin',1,true) then assert(data==sample); written=written+1 end
+end
+store.read=function() error('Activation must not read its RNG file back') end
+sha.sha256=function(data) assert(data==sample); return string.rep('c',64) end
+local r=session(); r:startRecording(); r:activateRecording()
+assert(reads==1 and written==1 and r.manifest.rngHash==string.rep('c',64))
+local messages=#printed
+r:activateRecording(); assert(reads==1 and #printed==messages)
+''')
+
     def test_results_timer_hold_survives_completion_and_failure_until_exit(self):
         self.check('''
 for _,fail in ipairs({false,true}) do

@@ -116,9 +116,10 @@ function Session:activateRecording()
   if self.mode~='record' or self.status~='armed' then return end
   local path=store.path(self.manifest.id)
   self.engine:saveSnapshot(path..'/start.sav')
-  store.write(path..'/rng.bin',self.engine:rngData())
+  local rng=self.engine:rngData()
+  store.write(path..'/rng.bin',rng)
   self.manifest.snapshotHash=require('code/native-hash').file(path..'/start.sav',1024*1024*1024)
-  self.manifest.rngHash=sha.sha256(store.read(path..'/rng.bin'))
+  self.manifest.rngHash=sha.sha256(rng)
   self.manifest.player=self.engine:player()
   self.manifest.startTick=self.engine:tick()
   self.manifest.lastTick=self.manifest.startTick
@@ -266,7 +267,7 @@ function Session:onTick()
     self.finalRngData=self.engine:rngData()
     self.observedTick=true
     if now%64==0 then
-      local line=json:encode({time=now,rng=self.engine:rngState(),resources=self.manifest.finalResources,
+      local line=json:encode({time=now,rng=self.manifest.finalRng,resources=self.manifest.finalResources,
         rngHash=sha.sha256(self.finalRngData)})
       assert(self.rngFile:write(line..'\n')); assert(self.rngFile:flush())
     end

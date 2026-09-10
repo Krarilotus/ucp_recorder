@@ -1,6 +1,13 @@
 local native = require('code/native')
 local allSites = require('code/engine-sites')
 local M = {}
+-- Lua 5.4 decodes directly in C; the LuaJIT-compatible path retains the same
+-- signed little-endian representation without building intermediate tables.
+local unpackResource=string.unpack or function(_,data,offset)
+  local a,b,c,d=data:byte(offset,offset+3)
+  local value=a+b*256+c*65536+d*16777216
+  return value>=2147483648 and value-4294967296 or value
+end
 
 function M.verify()
   local sites = assert(allSites[native.profile.name])
@@ -104,11 +111,11 @@ end
 function M:resourceState()
   local values={}
   for player=1,8 do
-    local bytes=core.readBytes(self.sites.playerResources+player*0x39f4,100)
-    for resource=0,24 do
-      local i=resource*4+1
-      local value=bytes[i]+bytes[i+1]*256+bytes[i+2]*65536+bytes[i+3]*16777216
-      values[#values+1]=value>=2147483648 and value-4294967296 or value
+    -- Read each native block once without allocating an intermediate byte table.
+    local data=core.readString(self.sites.playerResources+player*0x39f4,100)
+    assert(type(data)=='string' and #data==100,'Incomplete native resource state')
+    for offset=1,100,4 do
+      values[#values+1]=unpackResource('<i4',data,offset)
     end
   end
   return values

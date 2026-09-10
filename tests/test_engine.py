@@ -1,4 +1,6 @@
 import unittest
+from unittest.mock import patch
+from lupa.lua54 import LuaRuntime as FrameworkLuaRuntime
 import test_recorder as fixture
 
 
@@ -381,8 +383,14 @@ assert(not ok and tostring(reason):find('after protocol',1,true))
 bytes[engine.sites.execute.address+8]=0xE9; assert(Engine.verify())
 ''')
 
+    def test_resource_snapshot_uses_framework_lua54_decoder(self):
+        with patch.object(fixture, 'LuaRuntime', FrameworkLuaRuntime):
+            self.setUp()
+        self.test_resource_snapshot_covers_eight_players_and_ignores_ui_slot_zero()
+
     def test_resource_snapshot_covers_eight_players_and_ignores_ui_slot_zero(self):
         self.check('''
+core.readBytes=function() error('Resource snapshots must not create byte tables') end
 for _,sites in pairs(require('code/engine-sites')) do
  local e=Engine.new(sites)
  local function resource(player,index,value)
@@ -399,5 +407,9 @@ for _,sites in pairs(require('code/engine-sites')) do
  end
  resource(1,15,-123)
  assert(e:resourceState()[16]==-123 and state[16]==1015)
+ resource(1,0,-2147483648); resource(8,24,2147483647)
+ local limits=e:resourceState(); assert(limits[1]==-2147483648 and limits[200]==2147483647)
 end
+core.readString=function() return string.rep('x',99) end
+assert(not pcall(engine.resourceState,engine),'Short native reads must fail')
 ''')
