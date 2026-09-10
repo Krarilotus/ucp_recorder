@@ -72,17 +72,35 @@ for _,case in ipairs({'disabled','not skirmish','multiplayer'}) do
 end
 ''')
 
-    def test_game_gate_checks_world_type_and_completed_menu_transition(self):
+    def test_game_gate_checks_world_type_and_requested_view(self):
         self.prepare()
         self.check('''
 engine.sites.gameCore=0x2000
 local loaded=require('code/engine').loadedSkirmish
-for _,mode in ipairs({0,1,2,3}) do
- for _,view in ipairs({14,16,20,33}) do
-  memory[0x2068]=mode; memory[0x200c]=view
-  assert(loaded(engine)==(mode==3 and view==14))
+for _,current in ipairs({14,41}) do
+ for _,mode in ipairs({0,1,2,3}) do
+  for _,requested in ipairs({14,16,20,33,41}) do
+   memory[0x2068]=mode; memory[0x200c]=current; memory[0x2018]=requested
+   assert(loaded(engine)==(mode==3 and requested==14))
+  end
  end
 end
 engine.singlePlayer=function() return false end
-memory[0x2068]=3; memory[0x200c]=14; assert(not loaded(engine))
+memory[0x2068]=3; memory[0x2018]=14; assert(not loaded(engine))
+''')
+
+    def test_completed_load_arms_while_load_dialog_is_still_displayed(self):
+        self.prepare()
+        self.check('''
+engine.sites.gameCore=0x2000
+engine.loadedSkirmish=require('code/engine').loadedSkirmish
+lifecycle:begin(); now=94548
+memory[0x2068]=3; memory[0x200c]=41; memory[0x2018]=14
+lifecycle:readComplete(0x1000); lifecycle:finish()
+assert(r.status=='armed' and r.capturePending and snapshots==0)
+assert(r.manifest.origin=='loaded-save')
+memory[0x200c]=14; r:onTick()
+assert(r.active and snapshots==1 and r.manifest.startTick==94548)
+now=100258; r:onTick(); r:onMenuView(61)
+assert(savedManifest.status=='complete' and savedManifest.lastTick==100258)
 ''')

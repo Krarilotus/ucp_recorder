@@ -12,6 +12,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_native_metadata_hashing_keeps_identity_and_rejects_modified_files(self):
+        self.lua.execute('''
+local m=recording(); store.finish(m)
+local path=store.path(m.id)
+-- Admission must not fall back to the framework's interpreter hash.
+sha.sha256=function() error('Unexpected Lua metadata hashing') end
+assert(store.load(m.id,profile).environmentHash==m.environmentHash)
+for _,file in ipairs({'ucp-config.yml','environment.json'}) do
+ local filename=path..'/'..file; local original=store.read(filename)
+ store.write(filename,original..'changed')
+ assert(not pcall(store.load,m.id,profile))
+ store.write(filename,original)
+ assert(store.load(m.id,profile).id==m.id)
+end
+''')
+
     def test_named_snapshot_and_sealing_never_read_whole_large_payloads(self):
         self.lua.execute('''
 local m=recording(); local p=store.path(m.id)

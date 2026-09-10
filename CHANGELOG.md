@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.49.3
+
+- Fix automatic recording after loading a saved skirmish: check the native
+  requested game view, which is set before the load dialog disappears. Keep
+  snapshot capture at the first simulation boundary and preserve loaded RNG.
+- Use the existing native SHA-256 service for settings metadata and starting RNG
+  checks, preserving hashes and corruption rejection.
+- Yield during replay asset directory enumeration, allowing preparation to be
+  cancelled before hashing. Keep asset membership and integrity verification.
+- Correct native load-test menu semantics and cover the observed load-dialog
+  transition. Only skip the package symlink test for missing Windows privilege.
+
 ## 0.49.2
 
 - Remove 35 obsolete labels from each translation catalog and load German lazily,

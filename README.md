@@ -15,7 +15,7 @@ recovery and broader testing remain. See the [remaining work](docs/roadmap.md).
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.49.2.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.49.3.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -47,7 +47,7 @@ See the [in-game previews](docs/replay-menus.md#in-game-previews) for native his
 player portraits and playback information.
 
 The `3.0.7` extension-store integration is being prepared for wider testing. Once
-published there, choose **UCP-Recorder 0.49.2** through the store; the store build
+published there, choose **UCP-Recorder 0.49.3** through the store; the store build
 uses the same release file selection and includes all nine UCP languages. Its
 signed ZIP may have a different archive fingerprint from a PR download. Keep the
 exact package used for each recording; do not substitute it during playback.

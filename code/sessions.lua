@@ -45,8 +45,9 @@ function M.captureSettings()
   local environment=canonical({extensions=extensions,config=resolved,
     assets=require('code/replay-assets').capture(allActiveExtensions,resolved),
     framework=framework,display=require('code/playback-info').capture(allActiveExtensions,framework)})
-  activeSettings={raw=raw,hash=sha.sha256(raw),environment=environment,environmentHash=sha.sha256(environment),
-    settingsCapture='resolved-v1',restartSettings=restartSettings,restartSettingsHash=sha.sha256(restartSettings)}
+  local digest=require('code/native-hash')
+  activeSettings={raw=raw,hash=digest.sha256(raw),environment=environment,environmentHash=digest.sha256(environment),
+    settingsCapture='resolved-v1',restartSettings=restartSettings,restartSettingsHash=digest.sha256(restartSettings)}
 end
 
 function M.settings()
@@ -165,12 +166,12 @@ function M.copy(source,name,finalRngHash)
       copyFile(original..'/'..file,path..'/'..file)
     end
     assert(digest.file(path..'/start.sav',1024*1024*1024)==copy.snapshotHash,'Starting save is damaged')
-    assert(sha.sha256(read(path..'/rng.bin'))==copy.rngHash,'Starting RNG state is damaged')
-    assert(sha.sha256(read(path..'/ucp-config.yml'))==copy.settingsHash,'Recorded settings are damaged')
-    assert(sha.sha256(read(path..'/environment.json'))==copy.environmentHash,'Recorded environment is damaged')
+    assert(digest.sha256(read(path..'/rng.bin'))==copy.rngHash,'Starting RNG state is damaged')
+    assert(digest.sha256(read(path..'/ucp-config.yml'))==copy.settingsHash,'Recorded settings are damaged')
+    assert(digest.sha256(read(path..'/environment.json'))==copy.environmentHash,'Recorded environment is damaged')
     if copy.restartSettingsHash then
       write(path..'/replay-config.yml',read(original..'/replay-config.yml'))
-      assert(sha.sha256(read(path..'/replay-config.yml'))==copy.restartSettingsHash,'Recorded launch settings are damaged')
+      assert(digest.sha256(read(path..'/replay-config.yml'))==copy.restartSettingsHash,'Recorded launch settings are damaged')
     end
     M.finish(copy)
   end,debug.traceback)
@@ -204,10 +205,11 @@ function M.load(id, profile)
     'Replay uses a different simulation profile')
   assert(manifest.status=='complete', manifest.reason or 'Recording was not completed')
   validation.manifest(manifest)
-  assert(sha.sha256(read(M.path(id)..'/ucp-config.yml'))==manifest.settingsHash, 'Recorded settings are damaged')
-  assert(sha.sha256(read(M.path(id)..'/environment.json'))==manifest.environmentHash,'Recorded environment is damaged')
+  local digest=require('code/native-hash')
+  assert(digest.sha256(read(M.path(id)..'/ucp-config.yml'))==manifest.settingsHash, 'Recorded settings are damaged')
+  assert(digest.sha256(read(M.path(id)..'/environment.json'))==manifest.environmentHash,'Recorded environment is damaged')
   if manifest.restartSettingsHash then
-    assert(sha.sha256(read(M.path(id)..'/replay-config.yml'))==manifest.restartSettingsHash,'Recorded launch settings are damaged')
+    assert(digest.sha256(read(M.path(id)..'/replay-config.yml'))==manifest.restartSettingsHash,'Recorded launch settings are damaged')
   end
   return manifest
 end

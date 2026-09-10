@@ -1,4 +1,5 @@
 import hashlib
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -36,7 +37,7 @@ class ModulePackageTests(unittest.TestCase):
                     self.assertNotIn(b'multiplayerDiagnostics',production.read('options.yml'))
                     self.assertIn(b'recorder.autoRecord',production.read('options.yml'))
                     self.assertIn(b'recorder.singleplayerRngDiagnostics',diagnostic.read('options.yml'))
-    def test_release_contains_translations_and_tools_without_running_source(self):
+    def test_legacy_package_contains_translations_and_tools_without_running_source(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / 'source'
@@ -84,6 +85,8 @@ class ModulePackageTests(unittest.TestCase):
             try:
                 (source / 'definition.yml').symlink_to(root / 'outside.yml')
             except OSError as error:
-                self.skipTest('Symlink creation unavailable: ' + str(error))
+                if os.name == 'nt' and error.winerror == 1314:
+                    self.skipTest('Windows symlink privilege unavailable; exercised by Linux CI')
+                raise
             with self.assertRaisesRegex(ValueError, 'outside'):
                 build_module(source, root / 'out')

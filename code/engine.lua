@@ -63,7 +63,9 @@ function M:singlePlayer()
 end
 function M:localSession() return self.offline~=nil or self:singlePlayer() end
 function M:loadedSkirmish()
-  return self:singlePlayer() and core.readInteger(self.sites.gameCore+0xc)==14
+  -- The load handler requests the game view before returning. currentView (+0xc)
+  -- remains the load dialog until the menu loop commits requestedView (+0x18).
+  return self:singlePlayer() and core.readInteger(self.sites.gameCore+0x18)==14
     and core.readInteger(self.sites.gameCore+0x68)==3
 end
 function M:setScope(active)

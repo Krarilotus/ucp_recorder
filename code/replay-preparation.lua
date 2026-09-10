@@ -2,6 +2,7 @@
 -- until the session consumes the completed result. Progress may yield to the UI.
 local store=require('code/sessions')
 local native=require('code/native')
+local digest=require('code/native-hash')
 local M={}
 function M.prepare(id,engine,worlds,progress)
   if progress then progress('Checking replay data...') end
@@ -21,12 +22,12 @@ function M.prepare(id,engine,worlds,progress)
     local world=assert(worlds[id],'Recovery world was not prepared')
     snapshotPath,snapshotHash=world.path,world.hash
   end
-  local hash=require('code/native-hash').file(snapshotPath,1024*1024*1024,progress and function()
+  local hash=digest.file(snapshotPath,1024*1024*1024,progress and function()
     progress('Checking starting state...')
   end)
   assert(hash==snapshotHash,'Starting save is damaged')
   local rng=store.read(path..'/rng.bin')
-  assert(#rng==0x9c50 and sha.sha256(rng)==manifest.rngHash,'Starting RNG state is damaged')
+  assert(#rng==0x9c50 and digest.sha256(rng)==manifest.rngHash,'Starting RNG state is damaged')
   return {manifest=manifest,snapshotPath=snapshotPath,rng=rng,worlds=worlds,info=environment.display}
 end
 return M

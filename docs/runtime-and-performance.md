@@ -68,6 +68,39 @@ No replacement binary checkpoint format, extra runtime dependency or new game
 simulation path was needed. The native world reload and asset scan still need
 separate measurement; a 100 ms complete replay start is not established.
 
+## 0.49.3 load review
+
+A Windows measurement with the shipped Lua 5.4/RPS runtime and production native
+SHA-256 measured these medians over three runs:
+
+| Isolated operation | Time |
+| --- | ---: |
+| Hash three settings metadata buffers in Lua / native | 48.90 / 12.26 ms |
+| Hash the starting RNG buffer in Lua / native | 8.73 / 2.57 ms |
+| Hash 644 configured files (303,744,585 bytes) natively | 373.25 ms |
+| Preflight the older detailed 1,865,453-tick recording | 8,121.79 ms |
+| Preflight the synthetic sparse equivalent | 92.12 ms |
+
+Lua and native metadata/RNG hashes matched exactly. The physical-file benchmark
+uses CRT reads instead of UCP's virtual-file opener; cache state was uncontrolled.
+The sparse fixture contains placeholder digests and is not playable. These are
+operation measurements, not end-to-end replay loading or simulation timings.
+Older detailed recordings retain their larger validation cost.
+
+The installed 0.49.2 test configuration spent 1,734 ms CPU in Recorder startup,
+including 1,547 ms capturing recorded settings (about 1,749 ms wall time from
+module enable to its startup report). A sub-100-ms startup overhead is therefore
+not established. Native metadata hashing reduces one measured cost; it does not
+eliminate directory enumeration, asset hashing or native world restoration.
+
+The live save-load test exposed a separate correctness defect: at completion of
+the native load handler, currentView (+0xc) still held 41, the load dialog. Native
+switchMenu writes requestedView (+0x18); the presentation loop commits it later.
+Recording admission now checks requestedView 14, the loaded skirmish type and
+singleplayer mode after a successful reader completion. The starting snapshot
+still waits for the first simulation boundary. No menu-loop or simulation patch
+is needed for this correction.
+
 ## Platform status
 
 The 0.49.2 presentation review removed 35 unused labels from each of ten catalogs

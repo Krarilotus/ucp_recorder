@@ -9,7 +9,7 @@ end
 
 -- One traversal policy for capture and preflight. Hashing only the old file
 -- list would miss newly added scripts/assets that change directory lookup.
-local function walker(add)
+local function walker(add,progress)
   local visited,count={},0
   local function directory(path,depth)
     path=normalized(path)
@@ -17,6 +17,7 @@ local function walker(add)
     assert(depth<=16,'Replay asset directory nesting is too deep')
     count=count+1; assert(count<=M.MAX_FILES,'Too many replay asset directories')
     visited[path]=true
+    if progress then progress('Checking recorded settings...') end
     local present={}
     for _,file in ipairs(ucp.internal.io.files(path..'/')) do
       file=normalized(file)
@@ -86,13 +87,15 @@ function M.verify(snapshot,progress)
     'Unsupported replay asset inventory')
   local count=0
   for root,layout in pairs(snapshot.layouts or {}) do
+    if progress then progress('Checking recorded settings...') end
     local unpacked=#ucp.internal.io.files(normalized(root)..'/')>0
     assert(layout==(unpacked and 'folder' or 'archive'),'Recorded extension layout changed: '..root)
     assert(layout~='folder' or snapshot.roots[root]==true,'Missing recorded extension directory: '..root)
   end
   local walk=walker(function(path)
+    if progress then progress('Checking recorded settings...') end
     assert(snapshot.files[path],'New asset in a recorded directory: '..path)
-  end)
+  end,progress)
   for root,value in pairs(snapshot.roots) do
     assert(value==true and normalized(root)==root,'Invalid recorded asset directory')
     walk(root)
