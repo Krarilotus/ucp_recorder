@@ -1,4 +1,4 @@
-# Replay seeking (0.50.1 preview)
+# Replay seeking (0.50.2 preview)
 
 This branch adds a clickable progress bar beside the persistent tick counter.
 It is not the published 0.49.4 build. Native restoration and capture latency
@@ -83,6 +83,12 @@ job waits rather than building an unbounded queue. Freeze and final container
 publication still run on the game thread; separate timings expose their cost.
 Measured 0.50.0 native yearly saves blocked Extreme playback for 547–922 ms.
 The new path needs live timing and restore-equivalence acceptance before release.
+
+The first 0.50.1 Extreme playback produced six yearly points: freeze took
+31–78 ms and final publication 15–63 ms, while total background completion was
+829–1032 ms. Its broken bar input prevented seeking acceptance. 0.50.2 fixes the
+native HUD dispatch and clipped fill; restored-versus-continuous playback remains
+the next live gate.
 
 The release encoder retains native status, bounds and checksum handling, but
 omits the diagnostic conversion's immediate decode-and-compare pass. Background

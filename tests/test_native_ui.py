@@ -15,8 +15,9 @@ for _,width in ipairs({800,1280,1920,2560}) do
  memory[ui:windowAddress()+0x18]=width
  local overlay=ui:updateOverlay(7000)
  for _,x in ipairs({0,47,95}) do
-  memory[overlay.menu+0x1c]=memory[overlay.array+4]+x
-  memory[overlay.menu+0x20]=memory[overlay.array+8]+9
+  memory[overlay.menu+0x1c]=-1000; memory[overlay.menu+0x20]=-1000 -- tooltip anchors
+  memory[sites.mouse.value+0x10]=memory[overlay.array+4]+x
+  memory[sites.mouse.value+0x14]=memory[overlay.array+8]+9
   callbacks[memory[overlay.array+20]]({})
   assert(clicked[1]==x and clicked[2]==9 and overlay.consumed)
  end
@@ -26,6 +27,7 @@ end
     def test_progress_reuses_mission_sprites_and_restores_clip_on_failure(self):
         self.check('''
 local calls={}; local texture=sites.missionBar.value; local clip=texture+0x16c854
+memory[texture+4]=1; memory[texture+8]=0; memory[texture+12]=123
 for i=0,3 do memory[clip+i*4]=100+i end
 modules={ui={access=function() return {game={Rendering={textureRenderCore=texture,
  renderGMWithBlending=function(t,gm,id,x,y,blend)
@@ -36,7 +38,8 @@ ui.spriteClipNative=function(t,x,y,right,bottom)
  calls[#calls+1]=right; for i=0,3 do memory[clip+i*4]=0 end
 end
 ui.clippedSpriteNative=function(t,gm,id,x,y)
- assert(t==texture and gm==164 and id==4 and x==22 and y==32)
+  assert(t==texture and gm==164 and id==4 and x==22 and y==32)
+  assert(memory[t+8]==1); memory[t+12]=456
  if broken then error('sprite failure') end
 end
 ui.maskedSpriteNative=function(t,gm,id,x,y,mask,maskId,blend)
@@ -47,9 +50,11 @@ for _,fraction in ipairs({-1,0,0.5,1,2}) do
  assert(#calls==(fraction>0 and 1 or 0))
  if fraction>0 then assert(calls[1]==22+math.floor(250*math.min(fraction,1))) end
  for i=0,3 do assert(memory[clip+i*4]==100+i) end
+ assert(memory[texture+8]==0 and memory[texture+12]==123)
 end
 broken=true; assert(not pcall(ui.progressBar,ui,20,30,.5))
 for i=0,3 do assert(memory[clip+i*4]==100+i) end
+assert(memory[texture+8]==0 and memory[texture+12]==123)
 ''')
 
     def test_loaded_text_manager_marker_and_codepage_share_the_native_font_path(self):
@@ -76,16 +81,18 @@ ui:header(l.text('Replays'),10,20,400)
 assert(drawn[7]==15 and measured==15 and drawn[5]==1)
 ''')
 
-    def test_gameplay_overlay_input_uses_root_view_when_native_dispatches_a_subtab(self):
+    def test_decorative_overlay_rows_have_no_native_hitbox_and_subtabs_do_not_recurse(self):
         self.check('''
 local visible=true
-ui.overlays={[7000]={visible=function() return visible end,items={{x=10,y=160,width=72,height=72}}}}
+ui.overlays={[7000]={visible=function() return visible end,items={{x=10,y=160,width=72,height=72,enabled=false}}}}
 ui.inputOverlays={[14]=7000,[16]=7000}
 memory[0x1fe7d1c]=14; memory[ui:windowAddress()+0x18]=1920
 assert(not ui:updateOverlay(7100,1)) -- unrelated subtab rendering stays native
-local overlay=ui:updateOverlay(7100,0)
+assert(not ui:updateOverlay(7100,0)) -- routing belongs to the complete input step
+local overlay=ui:updateOverlay(7000,0)
 assert(overlay==ui.overlays[7000] and memory[overlay.array+12]==72)
-memory[0x1fe7d1c]=16; assert(ui:updateOverlay(7200,0)==overlay)
+assert(memory[overlay.array]==0) -- render normally, skip hit testing
+memory[0x1fe7d1c]=16; assert(not ui:updateOverlay(7200,0))
 visible=false; assert(not ui:updateOverlay(7200,0)) -- modal/ordinary play excluded
 visible=true; memory[0x1fe7d1c]=58; assert(not ui:updateOverlay(7200,0))
 ''')

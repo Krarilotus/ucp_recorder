@@ -1,5 +1,11 @@
 # Replay menus and player views
 
+HUD input runs through the game's complete menu update, using its native hit flag
+to reserve hover and the whole mouse gesture for replay controls. Decorative text
+does not take hits; bar positions use current MouseState coordinates. Clipped TGX
+drawing has a separate surface selector from ordinary sprites, and both must match
+the overlay's target. Native SHC/Extreme pixel and dispatch checks cover these paths.
+
 Recordings appear beside existing results in the native single-player Skirmish
 battle history. The default ordering is newest saved time first: a named
 snapshot uses its save time, and a full recording uses the match-end save time.

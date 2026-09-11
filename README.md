@@ -15,7 +15,7 @@ recovery and broader testing remain. See the [remaining work](docs/roadmap.md).
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.50.1.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.50.2.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -37,7 +37,7 @@ recovery and broader testing remain. See the [remaining work](docs/roadmap.md).
    policy, including UCP2-Legacy's extended limits. At completion, **Statistics**
    leaves the world and opens this recording's native history statistics.
 
-The 0.50.1 preview adds [clickable seeking](docs/replay-seeking.md), compressed
+The 0.50.2 preview adds [clickable seeking](docs/replay-seeking.md), compressed
 restore points every 25 game years, and a bounded yearly cache during playback.
 These new restoration paths still need live acceptance testing. Earlier completed
 replays above do not certify seeking or its capture latency.
@@ -52,7 +52,7 @@ See the [in-game previews](docs/replay-menus.md#in-game-previews) for native his
 player portraits and playback information.
 
 The `3.0.7` extension-store integration is being prepared for wider testing. Once
-published there, choose **UCP-Recorder 0.50.1** through the store; the store build
+published there, choose **UCP-Recorder 0.50.2** through the store; the store build
 uses the same release file selection and includes all nine UCP languages. Its
 signed ZIP may have a different archive fingerprint from a PR download. Keep the
 exact package used for each recording; do not substitute it during playback.

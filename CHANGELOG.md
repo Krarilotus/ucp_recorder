@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.50.2 (replay HUD input correction)
+
+- Route HUD input through the complete native menu update. Use the native hit
+  flag to keep hover, press, drag and release away from the underlying map;
+  physical mouse state and ordinary gameplay input remain owned by the game.
+- Decorative labels no longer stop the native click scan. Seeking reads current
+  MouseState coordinates instead of the menu's stored tooltip anchors.
+- Scope the clipped TGX renderer's independent surface selector as well as its
+  clipping rectangle, so the green fill is drawn beside its frame on the map.
+- Original SHC/Extreme raster and button-dispatch checks cover these regressions.
+  Live seeking acceptance is still pending; 0.50.1 clicks did not reach the bar.
+
 ## 0.50.1 (asynchronous seeking preview)
 
 - Replace blocking yearly saves with a frozen copy of the checked native world

@@ -62,11 +62,15 @@ function M:attachOverlay(menuIDs,items,visible,screenInput)
   for _,id in ipairs(menuIDs) do
     local pointer=manager.lookupMenu(id)
     local menu=assert(ffi.tonumber(ffi.cast('unsigned long',pointer)))
-    self.overlays[menu]={items=items,visible=visible}
+    self.overlays[menu]={items=items,visible=visible,screenInput=screenInput}
     if screenInput then
       self.inputOverlays=self.inputOverlays or {}
       self.inputOverlays[id]=menu
     end
+  end
+  if screenInput and not self.overlayInputInstalled then
+    require('code/overlay-input').install(self)
+    self.overlayInputInstalled=true
   end
 end
 
@@ -79,12 +83,16 @@ function M:progressBar(x,y,fraction)
   local pixels=math.floor(250*math.max(0,math.min(1,fraction)))
   if pixels>0 then
     local clip=texture+0x16c854
+    local surface,buffer=core.readInteger(texture+8),core.readInteger(texture+12)
     local saved={}; for i=0,3 do saved[i]=core.readInteger(clip+i*4) end
     local ok,reason=pcall(function()
+      -- Clipped TGX uses +8, unlike ordinary sprites' +4 selector.
+      core.writeInteger(texture+8,core.readInteger(texture+4))
       self.spriteClipNative(texture,x+2,y+2,x+2+pixels,y+14)
       self.clippedSpriteNative(texture,164,4,x+2,y+2)
     end)
     for i=0,3 do core.writeInteger(clip+i*4,saved[i]) end
+    core.writeInteger(texture+8,surface); core.writeInteger(texture+12,buffer)
     assert(ok,reason)
   end
   self.maskedSpriteNative(texture,164,1,x,y,164,3,0)
@@ -148,12 +156,6 @@ function M:renderOverlay(overlay,render)
 end
 
 function M:updateOverlay(menu,action)
-  -- Gameplay renders the root view, but sends input to its selected build/book
-  -- tab. Resolve screen-wide controls from that root before native tab input;
-  -- attaching them only to the root renderer never receives gameplay clicks.
-  if action==0 and self.inputOverlays then
-    menu=self.inputOverlays[core.readInteger(native.addr(0x1fe7d1c))] or menu
-  end
   local overlay=self.overlays and self.overlays[menu]
   if not overlay or not overlay.visible() then return end
   if not overlay.array then
@@ -164,8 +166,9 @@ function M:updateOverlay(menu,action)
       self:button(address,item.x,item.y,item.width,item.height,item.label or '',function()
         overlay.consumed=true
         if item.action then
-          item.action(core.readInteger(overlay.menu+0x1c)-core.readInteger(address+4),
-            core.readInteger(overlay.menu+0x20)-core.readInteger(address+8))
+          local mouse=self.sites.mouse.value
+          item.action(core.readInteger(mouse+0x10)-core.readInteger(address+4),
+            core.readInteger(mouse+0x14)-core.readInteger(address+8))
         end
       end,nil,nil,item.enabled==false and function() return false end or item.enabled)
       core.writeInteger(address+0x4c,overlay.menu)
@@ -187,7 +190,9 @@ function M:updateOverlay(menu,action)
   local frontY=core.readInteger(window+0x24)
   for index,item in ipairs(overlay.items) do
     local address=overlay.array+(index-1)*self.ITEM_SIZE
-    local kind=(not item.visible or item.visible()) and 3 or -2147483645
+    -- Type zero renders normally without a hitbox, so decorative labels cannot
+    -- terminate the native click scan before an overlapping control.
+    local kind=(not item.visible or item.visible()) and (item.enabled==false and 0 or 3) or -2147483645
     local x,y=item.x,item.y
     if item.position then x,y=item.position(width,height) end
     if x<0 then x=width+x end
@@ -417,6 +422,7 @@ function M:trackVisibility(referenceItems,predicate)
   local original
   original=core.hookCode(function(this,action)
     local overlay=self:updateOverlay(this,action)
+    if overlay and action==0 and overlay.screenInput then overlay=nil end
     for _,group in ipairs(self.visibilityGroups) do
       if this==core.readInteger(group.items[1]+0x4c) then
         local ok,reason=pcall(function()
@@ -443,7 +449,7 @@ function M:trackVisibility(referenceItems,predicate)
       original(overlay.menu,action)
     end
     if overlay and action==0 and overlay.consumed then
-      -- A portrait/history action owns this click; never also activate the
+      -- A history action owns this click; never also activate the
       -- native control underneath it (particularly the results Next arrow).
     elseif self.renderScope and (action==1 or action==3) then
       result=self.renderScope(function() return original(this,action) end)
@@ -455,9 +461,6 @@ function M:trackVisibility(referenceItems,predicate)
         self:renderOverlay(overlay,function() original(overlay.menu,1) end)
       else original(overlay.menu,action) end
     end
-    -- Input dispatch has unwound: same game-thread boundary as a native Play
-    -- action, outside rendering and outside every simulation tick.
-    if action==0 and self.onMenuUpdated then self.onMenuUpdated() end
     return result
   end,self.sites.handleMenu.address,2,1,#self.sites.handleMenu.bytes)
 end
