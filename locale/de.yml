@@ -12,5 +12,8 @@
   "start_header": "Starttick des Diagnosefensters",
   "start_text": "Auf beiden PCs dasselbe Vielfache von 64 verwenden. Wird bei Endtick null ignoriert. Die automatische Aufnahme erfasst immer die gesamte Partie.",
   "end_header": "Endtick des Diagnosefensters",
-  "end_text": "Null protokolliert bis zum Verlassen der Mission. Sonst ein späteres Vielfaches von 64 auf beiden PCs einstellen. Das Diagnoseende stoppt weder die Partie noch die automatische Aufnahme."
+  "end_text": "Null protokolliert bis zum Verlassen der Mission. Sonst ein späteres Vielfaches von 64 auf beiden PCs einstellen. Das Diagnoseende stoppt weder die Partie noch die automatische Aufnahme.",
+  "tags.replay": "Wiederholungen",
+  "tags.multiplayer": "Mehrspieler",
+  "tags.tools": "Werkzeuge"
 }

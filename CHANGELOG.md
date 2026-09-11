@@ -2,6 +2,11 @@
 
 ## 0.50.3 (recording boundary efficiency)
 
+- Leave the replay bar's unfilled interior transparent while retaining its native
+  green fill and frame. Refresh the progress cache immediately after restoring
+  a world, without increasing its normal four-updates-per-second cadence.
+- Add the GUI discovery proposal's replay, multiplayer and tools tags with
+  labels in all nine launcher languages. Recorder remains an independent package.
 - Retain the exact last observed RNG and resource state in a reusable native
   buffer. Singleplayer and multiplayer share one copy routine; Lua strings and
   counter tables are created only for verification or publication. Native game

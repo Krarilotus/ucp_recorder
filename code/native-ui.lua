@@ -74,14 +74,11 @@ function M:attachOverlay(menuIDs,items,visible,screenInput)
   end
 end
 
--- Mission objectives use interface_slider_bar.gm1 (group164): the 250x12
--- empty/green strips and the 254x16 frame with its alpha mask. Keep native size.
+-- Reuse the mission's green strip and masked frame at native size. Leave the
+-- unfilled interior transparent: repeatedly blending its empty sprite into the
+-- retained map surface would accumulate opacity between map refreshes.
 function M:progressBar(x,y,fraction)
-  local rendering=modules.ui:access().game.Rendering
   local texture=self.sites.missionBar.value
-  -- The map is not repainted beneath this strip on every HUD pass. An opaque
-  -- empty strip avoids repeatedly accumulating the mission panel's translucency.
-  rendering.renderGMWithBlending(rendering.textureRenderCore,164,2,x+2,y+2,0)
   local pixels=math.floor(250*math.max(0,math.min(1,fraction)))
   if pixels>0 then
     local clip=texture+0x16c854

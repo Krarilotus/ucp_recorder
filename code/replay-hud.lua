@@ -25,7 +25,9 @@ end
 function M:progress()
   local r=self.recorder
   local now=require('code/platform').milliseconds()
-  if self.progressManifest~=r.manifest or self.progressStatus~=r.status
+  -- Loading a restore point replaces the native command journal even when the
+  -- manifest/status stay the same. Never paint a cached pre-seek fill on it.
+  if self.progressManifest~=r.manifest or self.progressStatus~=r.status or self.progressWorld~=r.engine.journal
     or not self.progressAt or (now-self.progressAt)%4294967296>=250 then
     local first,last=r.manifest.startTick,r.manifest.lastTick
     local elapsed=math.max(0,math.min(r.engine:tick(),last)-first)
@@ -34,6 +36,7 @@ function M:progress()
     self.progressLabel=tr('Replay: %d / %d ticks',elapsed,total)
     self.progressFraction=total>0 and elapsed/total or (r.status=='finished' and 1 or 0)
     self.progressAt=now; self.progressManifest=r.manifest; self.progressStatus=r.status
+    self.progressWorld=r.engine.journal
   end
   return self.progressLabel,self.progressFraction
 end

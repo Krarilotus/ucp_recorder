@@ -31,7 +31,7 @@ memory[texture+4]=1; memory[texture+8]=0; memory[texture+12]=123
 for i=0,3 do memory[clip+i*4]=100+i end
 modules={ui={access=function() return {game={Rendering={textureRenderCore=texture,
  renderGMWithBlending=function(t,gm,id,x,y,blend)
-  assert(t==texture and gm==164 and id==2 and x==22 and y==32 and blend==0)
+  error('Unfilled progress must not repaint or blend into the retained terrain')
  end}}} end}}
 ui.spriteClipNative=function(t,x,y,right,bottom)
  assert(t==texture and x==22 and y==32 and bottom==44)

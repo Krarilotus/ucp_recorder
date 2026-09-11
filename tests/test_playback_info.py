@@ -18,8 +18,11 @@ local hud=require('code/replay-hud').new(r,{})
 local label,fraction=hud:progress(); assert(fraction==0 and reads==1)
 clock=249; tick=51; label,fraction=hud:progress(); assert(fraction==0 and reads==1)
 clock=250; label,fraction=hud:progress(); assert(fraction==0.5 and reads==2)
+-- Same manifest/status, restored world: update before the 250 ms deadline.
+tick=11; r.engine.journal={}; label,fraction=hud:progress()
+assert(fraction==0.1 and reads==3)
 tick=102; r.status='finished'; label,fraction=hud:progress()
-assert(fraction==1 and label=='Replay: 100 / 100 ticks' and reads==3)
+assert(fraction==1 and label=='Replay: 100 / 100 ticks' and reads==4)
 r.manifest={startTick=51,lastTick=51}; tick=51
 label,fraction=hud:progress(); assert(fraction==1)
 r.status='playing'; label,fraction=hud:progress(); assert(fraction==0)
