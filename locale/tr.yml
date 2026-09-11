@@ -12,5 +12,8 @@
   "start_header": "Tanılama başlangıç tiki",
   "start_text": "İki bilgisayarda da 64’ün aynı katını kullan. Bitiş tiki sıfırsa yok sayılır. Otomatik kayıt her zaman maçın tamamını kaydeder.",
   "end_header": "Tanılama bitiş tiki",
-  "end_text": "Sıfır, görevden çıkılana kadar kaydeder. Aksi halde iki bilgisayarda da 64’ün aynı, daha sonraki katını kullan. Tanılamanın bitmesi maçı veya otomatik kaydı durdurmaz."
+  "end_text": "Sıfır, görevden çıkılana kadar kaydeder. Aksi halde iki bilgisayarda da 64’ün aynı, daha sonraki katını kullan. Tanılamanın bitmesi maçı veya otomatik kaydı durdurmaz.",
+  "tags.replay": "Tekrarlar",
+  "tags.multiplayer": "Çok oyunculu",
+  "tags.tools": "Araçlar"
 }

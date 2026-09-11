@@ -12,5 +12,8 @@
   "start_header": "A diagnosztika kezdő tickje",
   "start_text": "Mindkét gépen ugyanazt a 64-gyel osztható értéket használd. Nulla záróértéknél figyelmen kívül marad. Az automatikus felvétel mindig a teljes mérkőzést rögzíti.",
   "end_header": "A diagnosztika záró tickje",
-  "end_text": "Nulla esetén naplózás a küldetés elhagyásáig. Egyébként egy későbbi, 64-gyel osztható érték kell, mindkét gépen azonos. A diagnosztika vége nem állítja le a mérkőzést vagy az automatikus felvételt."
+  "end_text": "Nulla esetén naplózás a küldetés elhagyásáig. Egyébként egy későbbi, 64-gyel osztható érték kell, mindkét gépen azonos. A diagnosztika vége nem állítja le a mérkőzést vagy az automatikus felvételt.",
+  "tags.replay": "Visszajátszások",
+  "tags.multiplayer": "Többjátékos",
+  "tags.tools": "Eszközök"
 }
