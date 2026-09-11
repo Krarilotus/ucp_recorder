@@ -12,5 +12,8 @@
   "start_header": "Tick inicial del diagnóstico",
   "start_text": "Usar el mismo múltiplo de 64 en ambos PC. Se ignora si el tick final es cero. La captura automática siempre registra toda la partida.",
   "end_header": "Tick final del diagnóstico",
-  "end_text": "Cero registra hasta salir de la misión. De lo contrario, usar un múltiplo de 64 posterior e idéntico en ambos PC. Finalizar el diagnóstico no detiene la partida ni la captura automática."
+  "end_text": "Cero registra hasta salir de la misión. De lo contrario, usar un múltiplo de 64 posterior e idéntico en ambos PC. Finalizar el diagnóstico no detiene la partida ni la captura automática.",
+  "tags.replay": "Repeticiones",
+  "tags.multiplayer": "Multijugador",
+  "tags.tools": "Herramientas"
 }

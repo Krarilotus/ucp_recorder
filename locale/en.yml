@@ -12,5 +12,8 @@
   "start_header": "Diagnostic window start tick",
   "start_text": "Use the same multiple of 64 on both PCs. Ignored when the end tick is zero. Automatic capture always records the full match.",
   "end_header": "Diagnostic window end tick",
-  "end_text": "Zero logs until mission exit. Otherwise use a later multiple of 64, identical on both PCs. Ending diagnostics does not stop the match or automatic capture."
+  "end_text": "Zero logs until mission exit. Otherwise use a later multiple of 64, identical on both PCs. Ending diagnostics does not stop the match or automatic capture.",
+  "tags.replay": "Replays",
+  "tags.multiplayer": "Multiplayer",
+  "tags.tools": "Tools"
 }
