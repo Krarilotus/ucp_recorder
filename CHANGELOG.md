@@ -9,6 +9,8 @@
   MouseState coordinates instead of the menu's stored tooltip anchors.
 - Scope the clipped TGX renderer's independent surface selector as well as its
   clipping rectangle, so the green fill is drawn beside its frame on the map.
+  Draw the empty native strip opaquely to avoid accumulating translucent passes
+  between map refreshes.
 - Original SHC/Extreme raster and button-dispatch checks cover these regressions.
   Live seeking acceptance is still pending; 0.50.1 clicks did not reach the bar.
 

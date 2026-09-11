@@ -79,7 +79,9 @@ end
 function M:progressBar(x,y,fraction)
   local rendering=modules.ui:access().game.Rendering
   local texture=self.sites.missionBar.value
-  rendering.renderGMWithBlending(rendering.textureRenderCore,164,2,x+2,y+2,24)
+  -- The map is not repainted beneath this strip on every HUD pass. An opaque
+  -- empty strip avoids repeatedly accumulating the mission panel's translucency.
+  rendering.renderGMWithBlending(rendering.textureRenderCore,164,2,x+2,y+2,0)
   local pixels=math.floor(250*math.max(0,math.min(1,fraction)))
   if pixels>0 then
     local clip=texture+0x16c854
