@@ -47,7 +47,7 @@ engine.resourceData=function() error('Must not resample after exit') end
 engine.rngData=function() error('Must not resample after exit') end
 r:reset()
 assert(reads==1 and hashes==3 and savedManifest.finalResources[200]==7)
-assert(not r.finalResourceData and not r.finalRngData)
+assert(not r.boundary.valid)
 ''')
 
     def test_compact_playback_observes_without_writing_state_and_stops_on_mismatch(self):
@@ -347,8 +347,9 @@ sha.sha256=hash_string
 local r=session(); r:startRecording(); r:activateRecording(); now=65; r:onTick()
 local expected=sha.sha256(engine:rngData())
 engine.rngData=function() error('Must not read game state after leaving match') end
+engine.rngState=function() error('Ending counters also belong to the retained boundary') end
 r:reset()
-assert(savedManifest.finalRngHash==expected and not r.finalRngData)
+assert(savedManifest.finalRngHash==expected and savedManifest.finalRng[4]==4 and not r.boundary.valid)
 ''')
 
     def setUp(self):
@@ -389,6 +390,7 @@ engine={rng=0x1a279c0,
  scheduleCommand=function(_,c) scheduled=scheduled+1 end,
 }
 core.readString=function() return string.rep('x',0x9c50) end
+engine.newRecordingBoundary=require('tests/recording_boundary_fixture')
 function session()
  local r=Session:new(engine)
  r.openFiles=function(self)

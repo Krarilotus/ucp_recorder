@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.50.3 (recording boundary efficiency)
+
+- Retain the exact last observed RNG and resource state in a reusable native
+  buffer. Singleplayer and multiplayer share one copy routine; Lua strings and
+  counter tables are created only for verification or publication. Native game
+  state, journal inputs, checkpoint intervals and replay formats are unchanged.
+- Verify emitted x86 memory bounds, preserved registers/flags, boundary lifetime,
+  post-exit sealing and the real Lua 5.4/RPS byte emitter. An isolated shipped-
+  runtime benchmark reduced median retention from 6.05 to 0.94 microseconds per
+  tick. This does not establish a whole-game speed improvement or explain the
+  reported high-speed ceiling; see `docs/runtime-and-performance.md`.
+
 ## 0.50.2 (replay HUD input correction)
 
 - Route HUD input through the complete native menu update. Use the native hit

@@ -21,6 +21,40 @@ verification; it does not implement a second game simulation.
 - Settings restart is separate from loading a replay with already matching
   settings. Its helper is not invoked by the simulation tick loop.
 
+## 0.50.3: retain the boundary without per-tick Lua allocation
+
+`recording-boundary.lua` owns a private 40,817-byte buffer per recording owner,
+reused across matches. One emitted x86 call copies the 40,016-byte RNG block and
+eight 100-byte resource blocks from their checked engine addresses. It preserves
+registers and flags, writes only its buffer, and calls no game functions. Capture
+stays synchronous at the existing simulation boundary; it must not sample mutable
+world memory on a background thread. Lua materializes the retained bytes/counters
+only at the existing verification intervals or when saving/sealing a recording.
+Singleplayer and multiplayer use the same implementation. Their journal inputs,
+verification intervals and saved formats do not change.
+
+The former path allocated RNG/resource strings, resource tables and RNG counter
+tables each tick. `tools/benchmark_recording_boundary.lua` compares it with the
+new path using the shipped 32-bit Lua 5.4/RPS and actual emitted x86, on private
+changing-state buffers. Five runs of 20,000 observations measured median costs
+of **6.05 microseconds before / 0.94 microseconds after**. Each run checked that
+retained bytes/counters were identical. Both timings include an identical source
+mutation; neither includes game simulation, callbacks, verification or disk I/O.
+
+A separate six-second read-only live sample on 0.50.2 observed speed setting
+1100, approximately 386 ticks/second and 1.04 process CPU core equivalents.
+This is not a controlled recorder-on/off comparison. At that rate, the measured
+retention saving alone corresponds to roughly two milliseconds per second, so
+it cannot plausibly explain the reported speed ceiling by itself. No whole-game
+speed gain or sub-100-ms startup claim follows from the isolated benchmark.
+
+The next performance gate is a matched saved position/configuration with and
+without capture, measuring simulation ticks per wall second and separating
+native simulation, recorder callbacks, verification, rendering and snapshot work.
+Keep the tested input/control corrections intact during that comparison. Initial
+singleplayer native saving is still synchronous; the periodic private-world
+compression worker does not yet replace that starting-save path.
+
 In 0.48.7, resource snapshots avoid eight intermediate byte tables per sample.
 Lua 5.4 uses its built-in signed integer decoder; LuaJIT uses equivalent scalar
 byte decoding. Initial RNG hashing uses the bytes just written, and checkpoint

@@ -1,4 +1,4 @@
-# Replay seeking (0.50.2 preview)
+# Replay seeking (0.50.3 preview)
 
 This branch adds a clickable progress bar beside the persistent tick counter.
 It is not the published 0.49.4 build. Native restoration and capture latency

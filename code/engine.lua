@@ -114,6 +114,10 @@ function M:rngData()
   return data
 end
 
+function M:newRecordingBoundary()
+  return require('code/recording-boundary').new(self)
+end
+
 function M:resourceData()
   local blocks={}
   for player=1,8 do

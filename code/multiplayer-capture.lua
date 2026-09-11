@@ -30,7 +30,8 @@ function M:open(snapshotOrigin)
   self.lastNamedCopy=nil
   self.clock=nil
   self.pendingTick=nil; self.tickBytes=0
-  self.finalRngData=nil; self.finalResourceData=nil
+  self.boundary=self.boundary or self.engine:newRecordingBoundary()
+  self.boundary:clear()
   self.recoveryPending=nil; self.boundaryEvents=nil
   Trace.open(self)
   self.capture=files.begin(self.path,self.engine,store.settings())
@@ -74,17 +75,16 @@ function M:onTick()
   assert(not self.pendingTick,'Native simulation tick did not return to the game loop')
   self.snapshots:observe()
   self.pendingTick={time=self.observedTick,before=require('code/tick-journal').state(self.engine)}
-  self.capture.finalRng=self.engine:rngState()
-  self.finalResourceData=self.engine:resourceData()
   if self.engine.battle then self.engine.battle:observe() end
-  self.finalRngData=self.engine:rngData()
+  self.boundary:capture()
   Trace.onTick(self,true)
   self.boundaryEvents=self.events
 end
 
 function M:checkpoint(now)
+  local rng,resources=self.boundary:read()
   return verification.capture(self.engine,self.verificationProfile,now,
-    self.capture.finalRng,self.finalRngData,self.finalResourceData)
+    self.boundary:rngState(),rng,resources)
 end
 
 function M:gap(reason,details)
@@ -136,8 +136,12 @@ function M:sealBoundary()
   if self.tickFile then assert(self.tickFile:flush()) end
   self.capture.tickBytes=self.tickBytes
   if self.recoveryPending then self.capture.replayEvents=self.boundaryEvents or 0 end
-  if self.finalRngData then self.capture.finalRngHash=require('code/native-hash').sha256(self.finalRngData) end
-  if self.finalResourceData then self.capture.finalResources=self.engine:resourceState(self.finalResourceData) end
+  if self.boundary and self.boundary.valid then
+    local rng,resources=self.boundary:read()
+    self.capture.finalRng=self.boundary:rngState()
+    self.capture.finalRngHash=require('code/native-hash').sha256(rng)
+    self.capture.finalResources=self.engine:resourceState(resources)
+  end
   if self.engine.battle and self.observedTick then
     self.capture.lastObservedTick=self.observedTick
     self.engine.battle:write(self.capture)
@@ -188,7 +192,8 @@ function M:stop(reason)
     self.lastReplay=files.seal(capture)
     self.lastCapture=capture
   end
-  self.capture=nil; self.snapshots=nil; self.observedTick=nil; self.pendingTick=nil; self.finalRngData=nil; self.finalResourceData=nil
+  self.capture=nil; self.snapshots=nil; self.observedTick=nil; self.pendingTick=nil
+  if self.boundary then self.boundary:clear() end
   assert(ok,err)
 end
 

@@ -40,7 +40,6 @@ function Session:saveCopy(name)
   assert(self.engine:singlePlayer() and self.mode=='record' and self.status=='recording'
     and self.active and self.observedTick,'No active recording to save yet')
   for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do assert(self[key]:flush()) end
-  assert(self.finalRngData,'Missing ending RNG state')
   if self.engine.battle then self.engine.battle:write(self.manifest) end
   self:sealBoundary()
   return store.copy(self.manifest,name,self.manifest.finalRngHash)
@@ -49,8 +48,10 @@ end
 -- Decode the retained ending boundary only when publishing a replay. Native
 -- menu transitions may already have changed the world, so never resample it.
 function Session:sealBoundary()
-  self.manifest.finalResources=self.engine:resourceState(assert(self.finalResourceData,'Missing ending resource state'))
-  self.manifest.finalRngHash=require('code/native-hash').sha256(assert(self.finalRngData,'Missing ending RNG state'))
+  local rng,resources=self.boundary:read()
+  self.manifest.finalRng=self.boundary:rngState()
+  self.manifest.finalResources=self.engine:resourceState(resources)
+  self.manifest.finalRngHash=require('code/native-hash').sha256(rng)
 end
 
 function Session:guard(callback)
@@ -114,8 +115,8 @@ function Session:startRecording()
   self.mode='record'; self.status='armed'; self.active=false
   self.error=nil; self.observedTick=false
   self.firstDesync=nil
-  self.finalRngData=nil
-  self.finalResourceData=nil
+  self.boundary=self.boundary or self.engine:newRecordingBoundary()
+  self.boundary:clear()
   self.executedTick=nil; self.executedBatchSize=0
   self.engine:resetCommands()
   self.engine:setScope(true)
@@ -285,15 +286,13 @@ function Session:onTick()
   if self.status=='recording' then
     if self.engine.battle then self.engine.battle:observe() end
     self.manifest.lastTick=now
-    self.manifest.finalRng=self.engine:rngState()
-    self.finalResourceData=self.engine:resourceData()
     -- Keep the exact last observed boundary; quitting may already change native state.
-    -- Hash only checkpoints and completion, not every simulation tick.
-    self.finalRngData=self.engine:rngData()
+    self.boundary:capture()
     self.observedTick=true
     if now%verification.interval(self.manifest.verificationProfile)==0 then
+      local rng,resources=self.boundary:read()
       local line=json:encode(verification.capture(self.engine,self.manifest.verificationProfile,
-        now,self.manifest.finalRng,self.finalRngData,self.finalResourceData))
+        now,self.boundary:rngState(),rng,resources))
       assert(self.rngFile:write(line..'\n')); assert(self.rngFile:flush())
     end
   elseif self.status=='playing' then
@@ -441,8 +440,7 @@ function Session:reset()
   assert(closed,reason)
   self.status='idle'; self.manifest=nil
   self.observedTick=false; self.error=nil
-  self.finalRngData=nil
-  self.finalResourceData=nil
+  if self.boundary then self.boundary:clear() end
   core.writeInteger(self.halt,0)
   assert(reportOk,reportError)
 end

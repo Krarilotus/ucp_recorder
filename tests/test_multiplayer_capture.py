@@ -13,6 +13,20 @@ spec.loader.exec_module(inspector)
 
 
 class MultiplayerCaptureTests(unittest.TestCase):
+    def test_ending_state_is_retained_after_native_world_changes(self):
+        self.valid_world()
+        self.lua.execute('''
+tick(1)
+local expected=sha.sha256(engine:rngData())
+engine.rngData=function() error('Cannot resample after the match') end
+engine.rngState=function() error('Cannot resample ending counters') end
+engine.resourceData=function() error('Cannot resample ending resources') end
+trace:observe('stop','match exit')
+assert(not trace.failed,trace.failureReason)
+assert(trace.lastCapture.finalRngHash==expected and trace.lastCapture.finalRng[4]==4)
+assert(not trace.boundary.valid)
+''')
+
     def test_periodic_host_and_client_snapshots_survive_named_prefix_and_bookmark_conversion(self):
         self.valid_world()
         self.lua.execute('''
@@ -195,6 +209,7 @@ engine={base=1000,rng=2000,sites={actorOffset=32},
  rngData=function() return string.rep('a',0x9c50) end,
  resourceData=function() return string.rep('r',800) end,
  rngState=function() return {1,2,3,4} end,resourceState=function() return resourceState() end}
+engine.newRecordingBoundary=require('tests/recording_boundary_fixture')
 store.settings=function()
  local raw='settings'; local env='environment'; local restart='resolved launch settings'
  return {raw=raw,hash=sha.sha256(raw),environment=env,environmentHash=sha.sha256(env),settingsCapture='resolved-v1',
