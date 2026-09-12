@@ -1,6 +1,6 @@
 # Install a recorder test release
 
-The current binding-correction branch is source version **0.50.26**. It requires
+The current binding-correction branch is source version **0.50.27**. It requires
 Protocol **1.1.4**, Map Extensions **1.1.1**, Files **1.4.0**, UI **1.0.2** and
 WinProc Handler **1.0.0**. Its dependency PRs and native/live acceptance are still
 in progress; this branch has not published a new test ZIP.

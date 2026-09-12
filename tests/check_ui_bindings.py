@@ -96,7 +96,7 @@ modules={cffi={cffi=function() return ffi end}}
         try:
             resolver.resolve(g.api, g.ffi)
         except Exception as error:
-            assert 'cannot resolve' in str(error), str(error)
+            assert 'native context not found' in str(error), str(error)
             negatives += 1
         else:
             raise AssertionError('accepted occupied '+pattern)
@@ -122,7 +122,7 @@ modules={cffi={cffi=function() return ffi end}}
         try:
             resolver.resolve(g.api, g.ffi)
         except Exception as error:
-            assert 'modified or occupied '+name in str(error), str(error)
+            assert 'Recorder UI '+name+': modified native context' in str(error), str(error)
             negatives += 1
         else:
             raise AssertionError('accepted occupied owner '+name)

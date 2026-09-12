@@ -45,3 +45,13 @@ assert(hash.sha256('')=='e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991
 assert(hash.sha256(all)=='40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880')
 if arg[3] then assert(byteWrites==0,'Installed CFFI did not provide a binary copy') end
 print('PASS: binary transfer boundaries and native hash startup through installed RPS')
+if arg[4] then
+  -- This console is the running executable. Game-family parsing is covered on
+  -- all reference images separately; here verify the real OS path/hash bridge.
+  data={version={getGameVersionMajor=function() return '1' end,
+    getGameVersionMinor=function() return '41' end,isExtreme=function() return false end}}
+  local native=require('code/native')
+  local profile=native.verify()
+  assert(profile.name=='SHC' and profile.sha256==arg[4])
+  print('PASS: native executable identity matches independent console SHA-256',profile.sha256)
+end

@@ -638,3 +638,42 @@ Original native prologues establish the read-only argument layout: four fire
 cases without callee stubs and one spawn case with `setUnitValues` stubbed.
 The temporary executable identity gate remains to be replaced after the final
 binding inventory. These checks do not establish live game acceptance.
+
+## Framework identity and shared context verification
+
+Recorder 0.50.27 removes the temporary PE-header gate and both hardcoded
+executable hashes. `data.version` supplies the game family and 1.41 version,
+using the actual framework parser available in the module environment. Every
+native capability remains checked by its owner. The existing `platform.identity`
+and `native-hash.file` supply the running executable's SHA-256 for recordings.
+It is no longer selected from reference hashes or used to select addresses.
+The existing recorded-executable comparison remains unchanged.
+
+Inspected framework revision 02a7a6b: `main.lua` includes `data` in `moduleEnv`;
+`data/version.lua` provides `getGameVersionMajor`, `getGameVersionMinor` and
+`isExtreme`. Recorder's existing Windows path/native hash service is reused.
+This adds no scan, hook, DLL service or per-tick hash. UI, save-header and codec
+bindings now share the existing `hook-check.resolve/context` helper, removing
+their duplicated scanner/uniqueness/context implementations without changing
+their native owners, signatures, ABI or discovery counts.
+
+The final production literal-pointer inventory contains no fixed executable
+address or RVA fallback. Remaining large constants are integer limits, encoding
+multipliers, OS flags, colors, sizes and verified structure offsets. Native
+layout schemas retain field sizes and section identity; they obtain pointers
+from Map's runtime descriptors. Reference addresses/hashes remain test evidence.
+This inventory does not substitute for the combined-module architecture and
+installed-game acceptance review.
+
+All six local/official EFIGS/Polish SHC 1.41 and Extreme 1.41.1-E images pass the
+actual framework parser and restricted module environment, plus 29 UI, two codec
+and 18 header bindings with 34/10/33 rejection cases. That parser check substitutes
+the OS path/hash boundary. Separately, the real 32-bit Lua/RPS/CFFI console passed
+the production path/hash bridge against its independently measured executable
+SHA-256, plus existing binary-transfer and SHA-256 checks. Neither test launches
+the game. Combined startup, physical multiplayer, save/replay and measured game
+performance remain outstanding.
+
+The complete portable suite passes: 519 tests, one existing skip and 6411
+subtests. Unsupported framework versions, failed file reads and malformed
+digests clear any previous identity before hook installation.

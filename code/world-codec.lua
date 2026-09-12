@@ -23,19 +23,7 @@ local function prepare()
   if functions then return functions end
   local sites={}
   for name,pattern in pairs(contexts) do
-    local ok,address=pcall(core.AOBScan,pattern)
-    assert(ok and type(address)=='number' and address>0,
-      'Recorder cannot resolve native world codec '..name)
-    local second=core.scanForAOB(pattern,address+1)
-    assert(second==nil or second==0,'Recorder has an ambiguous native world codec '..name)
-    local tokens={}
-    for token in pattern:gmatch('%S+') do tokens[#tokens+1]=token end
-    local bytes=core.readBytes(address,#tokens)
-    for i,token in ipairs(tokens) do
-      assert(token=='?' or bytes[i]==tonumber(token,16),
-        'Recorder has a modified or occupied native world codec '..name)
-    end
-    sites[name]=address
+    sites[name]=require('code/hook-check').resolve(pattern,'Recorder native world codec '..name).address
   end
   binary.prepare()
   functions={implode=core.exposeCode(sites.implode,6,1),explode=core.exposeCode(sites.explode,6,1),address=sites.implode}

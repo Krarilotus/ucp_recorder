@@ -38,23 +38,15 @@ local function resolve()
   if bindings then return bindings end
   local result={}
   for i,group in ipairs(groups) do
-    local ok,address=pcall(core.AOBScan,group.pattern)
-    assert(ok and type(address)=='number' and address>0,'Cannot resolve native save header '..group.name)
-    local second=core.scanForAOB(group.pattern,address+1)
-    assert(second==nil or second==0,'Ambiguous native save header '..group.name)
-    local tokens={}
-    for token in group.pattern:gmatch('%S+') do tokens[#tokens+1]=token end
-    local bytes=core.readBytes(address,#tokens)
-    for j,token in ipairs(tokens) do
-      assert(token=='?' or bytes[j]==tonumber(token,16),'Modified native save header '..group.name)
-    end
+    local site=require('code/hook-check').resolve(group.pattern,'Native save header '..group.name)
+    local address=site.address
     local parts={}
     for j,part in ipairs(group.parts) do
       local pointer=core.readInteger(address+part.operand)
       require('code/validation').integer(pointer,0x10000,0x7fffffff-part.size,'Native save header pointer')
       parts[j]=pointer
     end
-    result[i]={address=address,bytes=bytes,parts=parts}
+    result[i]={address=address,bytes=site.bytes,parts=parts}
   end
   -- These contiguous fields are passed separately by the native writer.
   assert(result[1].parts[2]==result[1].parts[1]+4 and result[1].parts[3]==result[1].parts[1]+8
