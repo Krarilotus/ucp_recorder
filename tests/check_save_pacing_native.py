@@ -4,8 +4,8 @@ from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_ESI, UC_X86_REG_EIP
 
 
-def check_save_pacing(reader,lua,root,variant):
-    site=lua.execute((root/'code/offline-sites.lua').read_text())[variant].savePacing
+def check_save_pacing(reader,lua,root,variant,site=None):
+    site=site or lua.execute((root/'tests/fixtures/offline-sites.lua').read_text())[variant].savePacing
     emitter=lua.execute((root/'code/scoped-code.lua').read_text())
     start=site.address; stop=start+0x27
     source=reader(start,0x27)

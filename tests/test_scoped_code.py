@@ -109,7 +109,7 @@ class ScopedCodeTests(unittest.TestCase):
                                 self.assertEqual(result,original)
 
     def test_offline_boundaries_preserve_live_code_and_callee_stack_contracts(self):
-        profiles=self.lua.execute((ROOT/'code/offline-sites.lua').read_text())
+        profiles=self.lua.execute((ROOT/'tests/fixtures/offline-sites.lua').read_text())
         for variant,sites in profiles.items():
             for name,site in sites.items():
                 for flags in (0x202,0xa83):
