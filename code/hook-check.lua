@@ -17,13 +17,12 @@ function M.verify(site,label,actual,skip)
     end
   end
 end
--- Framework discovery/cache plus explicit uniqueness and current instruction
--- context. Retain these bytes for the existing pre-install conflict check.
+-- Stock UCP 3.0.7 owns cached discovery. Retain the complete current instruction
+-- context for the existing pre-install conflict check; do not rescan the process.
 function M.resolve(pattern,label)
   local ok,address=pcall(core.AOBScan,pattern)
-  assert(ok and type(address)=='number' and address>0,label..': native context not found')
-  local second=core.scanForAOB(pattern,address+1)
-  assert(second==nil or second==0,label..': ambiguous native context')
+  assert(ok and type(address)=='number' and address>0 and address%1==0,
+    label..': native context not found')
   return M.context(address,pattern,label)
 end
 function M.context(address,pattern,label)

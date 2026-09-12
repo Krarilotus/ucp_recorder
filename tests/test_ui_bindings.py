@@ -78,10 +78,10 @@ assert(sites.reportPause.kind=='raw' and sites.reportPause.patch=='equalFlags')
 assert(#sites.reportPause.bytes==7 and #sites.reportPause.guard.bytes>7)
 """)
 
-    def test_missing_ambiguous_owner_and_operand_conflicts_are_rejected(self):
+    def test_missing_framework_error_owner_and_operand_conflicts_are_rejected(self):
         cases = (
             "core.AOBScan=function() return 0 end",
-            "core.scanForAOB=function() return 123 end",
+            "core.AOBScan=function() error([[framework discovery failed]]) end",
             "api.game.UI.Menu=nil",
             "api.manager.getState=function() return {} end",
             "changeByte(expected.activateModal)",

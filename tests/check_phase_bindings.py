@@ -46,7 +46,7 @@ phases=require('code/maintenance-native')
         assert list(result[key].bytes.values())==list(expected[key].bytes.values())
     assert result.world.target==expected.world.target
     for _ in range(100):lua.globals().phases.verify()
-    assert len(scans)==2 and not writes
+    assert len(scans)==1 and not writes
     negative=0
     for pattern,address in list(matches.items()):
         saved=read(address,1);image[address-base]=0xcc
@@ -54,7 +54,8 @@ phases=require('code/maintenance-native')
             bad=fixture((lambda p:address if p==pattern else scan(p)) if stale else scan)
             bad.execute('assert(not pcall(phases.verify))');negative+=1
         image[address-base:address-base+1]=saved
-        bad=fixture(second=lambda p,start:address+100 if p==pattern else scan(p,start))
+        assert scan(pattern,address+1)==0, 'non-unique fixture context'
+        bad=fixture(first=lambda p:0 if p==pattern else scan(p))
         bad.execute('assert(not pcall(phases.verify))');negative+=1
     caller=result.guards[1].address
     for a in (caller+1,caller+11,caller+16,caller+21,result.maintenance.address+1,
@@ -70,4 +71,4 @@ phases=require('code/maintenance-native')
         assert not writes
         image[a-base:a-base+1]=saved
     return dict(variant=variant,sha256=hashlib.sha256(raw).hexdigest(),bindings=4,
-                negativeCases=negative,discoveryCalls=2,liveGame=False)
+                negativeCases=negative,discoveryCalls=1,liveGame=False)

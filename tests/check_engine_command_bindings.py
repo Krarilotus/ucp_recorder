@@ -53,7 +53,7 @@ resolver=require('code/engine-command-sites')
         assert list(result[key].bytes.values())==list(expected[key].bytes.values()),key
     for key in ('selectedOffset','selectedCountOffset','actorOffset'):assert result[key]==expected[key],key
     for _ in range(100):lua.globals().resolver.resolve();lua.globals().resolver.verify()
-    assert len(scans)-before==2 # Only maintenance caller discovery; Protocol entries reused.
+    assert len(scans)-before==1 # Only maintenance caller discovery; Protocol entries reused.
     negative=0
     for key in keys:
         guard=result[key].guard

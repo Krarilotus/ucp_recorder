@@ -45,7 +45,7 @@ rng=require('code/rng-bindings')
         assert result.streams[i].address==expected
         assert bytes(result.streams[i].bytes.values())==read(expected,41 if i==1 else 42)
     for _ in range(100):lua.globals().rng.resolve()
-    assert len(scans)==6
+    assert len(scans)==3
     negative=0
     for pattern,address in list(matches.items()):
         saved=read(address,1);image[address-base]=0xcc
@@ -53,7 +53,8 @@ rng=require('code/rng-bindings')
             bad=fixture((lambda p:address if p==pattern else scan(p)) if stale else scan)
             bad.execute('assert(not pcall(rng.resolve))');negative+=1
         image[address-base:address-base+1]=saved
-        bad=fixture(second=lambda p,start:address+100 if p==pattern else scan(p,start))
+        assert scan(pattern,address+1)==0, 'non-unique fixture context'
+        bad=fixture(first=lambda p:0 if p==pattern else scan(p))
         bad.execute('assert(not pcall(rng.resolve))');negative+=1
     initialization=next(a for p,a in matches.items() if p.startswith('B9 '))
     for offset in (1,6,25,43):
@@ -62,4 +63,4 @@ rng=require('code/rng-bindings')
         bad=fixture();bad.execute('assert(not pcall(rng.resolve))');negative+=1
         image[initialization+offset-base:initialization+offset-base+4]=saved
     return dict(variant=variant,referenceSha256=hashlib.sha256(raw).hexdigest(),
-                bindings=3,negativeCases=negative,discoveryCalls=6,liveGame=False)
+                bindings=3,negativeCases=negative,discoveryCalls=3,liveGame=False)

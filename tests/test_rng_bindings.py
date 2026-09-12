@@ -51,16 +51,16 @@ assert(value.initialization.address==0x10000000 and #value.initialization.bytes=
 for i=1,100 do assert(rng.resolve()==value) end
 require('code/rng-observer').install({engine={rng=value.state}})
 ''')
-                self.assertEqual(len(self.scans),6)
+                self.assertEqual(len(self.scans),3)
                 self.assertEqual(self.hooks,[(0x10001000,6),(0x10002000,6)])
 
     def test_failure_before_binding_or_any_hook(self):
         for runtime in (Lua54,LuaJIT):
-            for case in ('missing','duplicate','modified','state','owner','occupied_after_resolve'):
+            for case in ('missing','error','modified','state','owner','occupied_after_resolve'):
                 with self.subTest(runtime=runtime,case=case):
                     self.prepare(runtime)
                     if case=='missing':self.lua.execute('core.AOBScan=function() return 0 end')
-                    elif case=='duplicate':self.lua.execute('core.scanForAOB=function() return 42 end')
+                    elif case=='error':self.lua.execute('core.AOBScan=function() error([[framework discovery failed]]) end')
                     elif case=='modified':self.memory[0x10002020]=0xcc
                     elif case=='state':self.put(0x10000001,0)
                     elif case=='owner':self.put(0x1000002b,0x32000000)
@@ -75,9 +75,9 @@ require('code/rng-observer').install({engine={rng=value.state}})
                 self.prepare(runtime)
                 self.memory[0x1000300d]=0xcc
                 self.lua.execute('rng.resolve();assert(not pcall(rng.seed))')
-                self.assertEqual(len(self.scans),6)
+                self.assertEqual(len(self.scans),3)
                 self.memory[0x1000300d]=0x89
                 self.lua.execute('assert(rng.seed().address==0x10003000)')
-                self.assertEqual(len(self.scans),6)
+                self.assertEqual(len(self.scans),3)
                 self.memory[0x10003000]=0xcc
                 self.lua.execute('assert(not pcall(rng.seed))')

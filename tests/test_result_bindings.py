@@ -66,7 +66,7 @@ assert(e.resultsTimer.kind=='raw' and e.resultsTimer.patch=='equalFlags')
 assert(e.resultsBranch.address==0x1100001f and e.resourceReset.address==0x12000034 and e.playerResources==0x23000000)
 for i=1,100 do assert(resolver.verify()==b) end
 ''')
-                self.assertEqual(len(self.scans),6)
+                self.assertEqual(len(self.scans),3)
 
     def test_context_conflicts_and_operand_disagreement_fail_before_use(self):
         cases=[('timer',o) for o in (34,42,50,58,70)]+[('resources',o) for o in (21,55)]
@@ -85,8 +85,8 @@ for i=1,100 do assert(resolver.verify()==b) end
                         if late:self.lua.globals().resolver.resolve()
                         self.memory[self.addresses[key]]=0xcc
                         self.lua.execute('assert(not pcall(resolver.verify))')
-            for failure in ('missing','ambiguous'):
+            for failure in ('missing','error'):
                 with self.subTest(runtime=runtime,failure=failure):
                     self.prepare(runtime)
-                    self.lua.execute('core.'+('AOBScan' if failure=='missing' else 'scanForAOB')+'=function() return '+('0' if failure=='missing' else '0x18000000')+' end')
+                    self.lua.execute('core.AOBScan=function() '+('return 0' if failure=='missing' else 'error([[framework discovery failed]])')+' end')
                     self.lua.execute('assert(not pcall(resolver.verify))')

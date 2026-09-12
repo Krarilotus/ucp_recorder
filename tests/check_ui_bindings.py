@@ -84,9 +84,9 @@ modules={cffi={cffi=function() return ffi end}}
             assert list(current.bytes.values()) == list(old.bytes.values()), name
     b = bytes(expected.buildingAndStatus.bytes.values())
     assert sites.window.value == struct.unpack('<I', b[2:6])[0]-0x5c
-    assert len(resolution_scans) == 13*2, len(resolution_scans)
+    assert len(resolution_scans) == 13, len(resolution_scans)
 
-    # Every necessary discovery rejects absent and duplicate sites, including a
+    # Every necessary discovery rejects absent sites and framework errors, including a
     # changed/occupied entry, before any hook or native call is installed.
     discovery = [(p, matches[p]) for p, start, _ in resolution_scans if start is None]
     negatives = 0
@@ -101,19 +101,18 @@ modules={cffi={cffi=function() return ffi end}}
         else:
             raise AssertionError('accepted occupied '+pattern)
         image[address-base] = saved
-        # Force the bounded second scan to report a duplicate, while the first
-        # scan and all bytes still come from the real image.
-        def duplicate(p, start=None, stop=None):
-            return address+0x1000 if p == pattern and start else scan(p, start, stop)
-        g.core.scanForAOB = duplicate
+        # Supported fixture contexts must be unique; stock runtime discovery is
+        # first-match and does not perform an exhaustive duplicate search.
+        assert scan(pattern, address+1) == 0, 'non-unique fixture context'
+        g.core.AOBScan = lua.eval('function() error("fixture discovery error") end')
         try:
             resolver.resolve(g.api, g.ffi)
         except Exception as error:
-            assert 'ambiguous' in str(error), str(error)
+            assert 'native context not found' in str(error), str(error)
             negatives += 1
         else:
-            raise AssertionError('accepted ambiguous '+pattern)
-        g.core.scanForAOB = scan
+            raise AssertionError('accepted framework discovery failure')
+        g.core.AOBScan = aob
 
     for name in ('menuConstructor','modalConstructor','activateModal','text','border','basicButton'):
         address = sites[name].address

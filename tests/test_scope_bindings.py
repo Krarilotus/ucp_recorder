@@ -67,7 +67,7 @@ for _,reference in ipairs(require('tests/fixtures/scoped-sites').SHC) do
 end
 for i=1,100 do assert(resolver.verify(123)==result) end
 ''')
-                self.assertEqual(len(self.scans),32)
+                self.assertEqual(len(self.scans),16)
 
     def test_owner_disagreement_and_occupied_contexts_reject_before_install(self):
         for runtime in (Lua54,LuaJIT):
@@ -88,7 +88,7 @@ for i=1,100 do assert(resolver.verify(123)==result) end
                         if late:self.lua.globals().resolver.resolve(123)
                         self.memory[self.addresses[key]]=0xcc
                         self.lua.execute('assert(not pcall(resolver.verify,123))')
-            for fail in ('AOBScan','scanForAOB'):
+            for fail in ('missing','error'):
                 self.prepare(runtime)
-                self.lua.execute('core.'+fail+'=function() return '+('0' if fail=='AOBScan' else '1')+' end')
+                self.lua.execute('core.AOBScan=function() '+('return 0' if fail=='missing' else 'error("framework discovery failed")')+' end')
                 self.lua.execute('assert(not pcall(resolver.verify,123))')

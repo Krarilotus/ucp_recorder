@@ -77,7 +77,7 @@ sha={sha256=hash_string}
                 self.assertEqual(len(raw),2141); self.assertEqual(len(self.reads),18)
                 self.lua.eval('header.validate')(raw,descriptor)
                 self.lua.eval('header.read')()
-                self.assertEqual(len(self.scans),10)
+                self.assertEqual(len(self.scans),5)
                 descriptor['fields'][2]['offset']=999
                 with self.assertRaisesRegex(Exception,'field differs'):
                     self.lua.eval('header.validate')(raw,descriptor)
@@ -96,11 +96,11 @@ sha={sha256=hash_string}
 
     def test_invalid_discovery_or_operands_prevents_all_data_reads(self):
         for runtime in (LuaRuntime,Lua54):
-            for case in ('missing','duplicate','modified','pointer','layout'):
+            for case in ('missing','error','modified','pointer','layout'):
                 with self.subTest(runtime=runtime,case=case):
                     self.prepare('SHC',runtime)
                     if case=='missing': self.lua.execute('core.AOBScan=function() return 0 end')
-                    elif case=='duplicate': self.lua.execute('core.scanForAOB=function() return 123 end')
+                    elif case=='error': self.lua.execute('core.AOBScan=function() error([[framework discovery failed]]) end')
                     elif case=='modified': self.references[self.sites[-1]+12]=0xcc
                     elif case=='pointer':
                         for i in range(4): self.references[self.sites[-1]+79+i]=0

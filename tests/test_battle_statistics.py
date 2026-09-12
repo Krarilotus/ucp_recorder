@@ -118,7 +118,14 @@ local history=require('code/battle-history').new(sites)
 history:refresh(); assert(#history.items==3) -- same fields are not an identity proof
 replay.nativeBattleHash=sha.sha256(raw)
 history:refresh(); assert(#history.items==2)
-assert(history.items[1].manifest==replay and not history.items[2].manifest)
+-- Native dates use local midnight; replay dates use UTC. Row order depends
+-- on the time zone, but exactly one replay and one native row must remain.
+local replayRows,nativeRows=0,0
+for _,item in ipairs(history.items) do
+ if item.manifest then assert(item.manifest==replay);replayRows=replayRows+1
+ else nativeRows=nativeRows+1 end
+end
+assert(replayRows==1 and nativeRows==1)
 assert(core.readInteger(sites.storedCount)==2)
 assert(core.readString(sites.records,2*stats.SIZE)==raw..raw)
 require('code/sessions').list=function() return {} end

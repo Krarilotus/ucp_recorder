@@ -64,9 +64,9 @@ assert(b.action.address==0x11000030 and b.frame.address==0x12000000 and b.helpTe
 assert(#b.operands==10)
 for i=1,100 do assert(resolver.verify()==b) end
 ''')
-                self.assertEqual(len(self.scans),4)
+                self.assertEqual(len(self.scans),2)
 
-    def test_missing_ambiguous_modified_views_and_disagreeing_fields_fail(self):
+    def test_missing_framework_error_modified_views_and_disagreeing_fields_fail(self):
         cases=[('prepare',o) for o in (1,13,38)]+[('action',o) for o in (12,38,0x63,0x224,0x82,0x8a,0x94,0x1f9,0x20c,0x195,0x19b,0x1a1,0x24d,0x29e,0x133)]
         cases += [('sort',o) for o in (4,0x2f,0x59,0x79,0x92,0xae,0xc0)]
         cases += [('rows',o) for o in (2,11,23)]+[('help',o) for o in (56,69,81)]
@@ -82,8 +82,8 @@ for i=1,100 do assert(resolver.verify()==b) end
                         if late:self.lua.globals().resolver.resolve()
                         self.memory[self.addresses[key]]=0xcc
                         self.lua.execute('assert(not pcall(resolver.verify))')
-            for failure in ('missing','ambiguous'):
+            for failure in ('missing','error'):
                 with self.subTest(runtime=runtime,failure=failure):
                     self.prepare(runtime)
-                    self.lua.execute('core.'+('AOBScan' if failure=='missing' else 'scanForAOB')+'=function() return '+('0' if failure=='missing' else '1')+' end')
+                    self.lua.execute('core.AOBScan=function() '+('return 0' if failure=='missing' else 'error("framework discovery failed")')+' end')
                     self.lua.execute('assert(not pcall(resolver.verify))')

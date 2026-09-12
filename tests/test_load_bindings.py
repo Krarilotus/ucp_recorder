@@ -75,17 +75,17 @@ assert(b.resetMatch.address==0x16000035 and b.loadWorldComplete.address==0x13000
 assert(b.mapName.address==0x17000000 and b.fileName.address==0x18000000 and b.resources==0x25000000)
 local cached=resolver.resolve();for i=1,100 do assert(resolver.resolve()==cached);resolver.verify() end
 ''')
-                self.assertEqual(len(self.scans),8)
+                self.assertEqual(len(self.scans),4)
 
-    def test_missing_ambiguous_owner_mismatch_and_changed_guard_reject(self):
+    def test_missing_framework_error_owner_mismatch_and_changed_guard_reject(self):
         for runtime in (Lua54,LuaJIT):
-            for case in ('missing','ambiguous','ui','uiState','prepare','handler','selection','reset',
+            for case in ('missing','error','ui','uiState','prepare','handler','selection','reset',
                          'menuCall','filename','readComplete','lateRead','lateInit','lateMenu','lateDone'):
                 with self.subTest(runtime=runtime,case=case):
                     self.prepare(runtime)
                     if case.startswith('late'):self.lua.globals().resolver.resolve()
                     if case=='missing':self.lua.execute('core.AOBScan=function() return 0 end')
-                    elif case=='ambiguous':self.lua.execute('core.scanForAOB=function() return 1 end')
+                    elif case=='error':self.lua.execute('core.AOBScan=function() error([[framework discovery failed]]) end')
                     elif case=='ui':self.lua.execute("menu.bytes='' ")
                     elif case=='uiState':self.lua.execute('menu.gameCore=0')
                     else:

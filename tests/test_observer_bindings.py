@@ -58,17 +58,17 @@ assert(hash.address==0x10003024 and #hash.bytes==11)
 for i=1,100 do verify() end
 network.install({});world.install({})
 ''')
-                self.assertEqual(len(self.scans),8)
+                self.assertEqual(len(self.scans),4)
                 self.assertEqual(set(self.hooks),{(0x10000000,5),(0x10001036,7),(0x10002048,8),(0x10003024,11)})
 
     def test_discovery_owner_and_late_conflicts_prevent_hooking(self):
         for runtime in (Lua54,LuaJIT):
-            for case in ('missing','duplicate','modified','owner','late_network','late_world'):
+            for case in ('missing','error','modified','owner','late_network','late_world'):
                 with self.subTest(runtime=runtime,case=case):
                     self.prepare(runtime)
                     action='verify'
                     if case=='missing':self.lua.execute('core.AOBScan=function() return 0 end')
-                    elif case=='duplicate':self.lua.execute('core.scanForAOB=function() return 1 end')
+                    elif case=='error':self.lua.execute('core.AOBScan=function() error([[framework discovery failed]]) end')
                     elif case=='modified':self.memory[0x1000204e]=0xcc
                     elif case=='owner':self.put(0x10001002,0x109e80)
                     else:

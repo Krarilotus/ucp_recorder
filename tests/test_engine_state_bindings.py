@@ -80,17 +80,17 @@ assert(b.calendar.address==0x1400001e and b.calendar.value==0x300519fc)
 assert(b.menuText==0x32000000 and b.navigationCountdown==0x30051a20)
 local cached=resolver.resolve();for i=1,100 do assert(resolver.resolve()==cached);resolver.verify() end
 ''')
-                    self.assertEqual(len(self.scans),2)
+                    self.assertEqual(len(self.scans),1)
 
-    def test_missing_ambiguous_changed_and_inconsistent_bindings_reject(self):
+    def test_missing_framework_error_changed_and_inconsistent_bindings_reject(self):
         for runtime in (Lua54,LuaJIT):
-            for case in ('missing','ambiguous','calendar','rng','clock','pause','queue','menu','countdown',
+            for case in ('missing','error','calendar','rng','clock','pause','queue','menu','countdown',
                          'lateCalendar','latePause','lateCountdown'):
                 with self.subTest(runtime=runtime,case=case):
                     self.prepare(runtime)
                     if case.startswith('late'):self.lua.globals().resolver.resolve()
                     if case=='missing':self.lua.execute('core.AOBScan=function() return 0 end')
-                    elif case=='ambiguous':self.lua.execute('core.scanForAOB=function() return 123 end')
+                    elif case=='error':self.lua.execute('core.AOBScan=function() error([[framework discovery failed]]) end')
                     else:
                         address={'calendar':0x14000008,'rng':0x10000135,'clock':0x1000014a,
                                  'pause':0x10000216,'queue':0x10000094,'menu':0x12000001,
