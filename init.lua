@@ -1,7 +1,17 @@
 local native=require('code/native')
 local Engine=require('code/engine')
 local Session=require('code/session-recorder')
-local module={}
+local module={inputStateVersion=1}
+
+function module:getInputState()
+  if not self.recorder or not self.startup or self.startup.status~='ready' then return nil end
+  return self.recorder.input:read()
+end
+
+function module:observeInputTransitions(callback)
+  assert(self:getInputState(),'Recorder input lifecycle is unavailable')
+  return self.recorder.input:observe(callback)
+end
 
 local function enable(self,config,stage,install)
   local multiplayerCapture=config.autoRecord~=false
