@@ -1,5 +1,6 @@
 """UCP 3.0.7 VFS contracts: unpacked trees, ZIP listings and non-path options."""
 from pathlib import Path
+import os
 import unittest
 from lupa.luajit21 import LuaRuntime
 
@@ -33,8 +34,12 @@ assert(hashes==5)
     def setUp(self):
         self.lua=LuaRuntime(unpack_returned_tuples=True)
         self.lua.globals().source_root=Path(__file__).resolve().parents[1].as_posix()
+        self.lua.globals().files_root=Path(os.environ.get('UCP_FILES_TEST_ROOT',
+            Path(__file__).resolve().parents[2] / 'aic-tactics-files-inventory')).as_posix()
         self.lua.execute('''
 package.path=source_root..'/?.lua;'..package.path
+local walk=dofile(files_root..'/walk.lua')
+modules={files={createFileWalker=function(self,...) return walk.create(...) end}}
 local module='ucp/modules/packed-1.0.0'
 local plugin='ucp/plugins/unpacked-1.0.0'
 contents={[module..'.zip']=string.rep('a',64),[plugin..'/definition.yml']=string.rep('b',64),

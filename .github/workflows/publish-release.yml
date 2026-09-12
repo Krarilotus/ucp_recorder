@@ -57,7 +57,15 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install lupa==2.6 unicorn==2.1.4
+      - uses: actions/checkout@v4
+        with:
+          repository: UnofficialCrusaderPatch/extension-files
+          ref: 981b1becbc01fb282ead0415074f696bfefca07a
+          path: files-reference
+          persist-credentials: false
       - run: python -m unittest discover -s tests -v
+        env:
+          UCP_FILES_TEST_ROOT: files-reference
       - name: Configure recorded-settings framework checks when provided
         if: hashFiles('tests/framework-settings/CMakeLists.txt') != ''
         run: cmake -S tests/framework-settings -B build-framework-settings

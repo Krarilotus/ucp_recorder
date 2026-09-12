@@ -8,8 +8,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: UnofficialCrusaderPatch/extension-files
+          ref: 981b1becbc01fb282ead0415074f696bfefca07a
+          path: files-reference
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: python -m pip install lupa==2.6 unicorn==2.1.4
       - run: python -m unittest discover -s tests -v
+        env:
+          UCP_FILES_TEST_ROOT: files-reference
