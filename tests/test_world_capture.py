@@ -6,7 +6,6 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from lupa.luajit21 import LuaRuntime
 from test_multiplayer_capture import inspector
@@ -88,7 +87,6 @@ frozen:close()
         g.hash_string = lambda v: hashlib.sha256(v.encode('latin-1')).hexdigest()
         g.replace_file = os.replace
         g.make_directory = mkdir
-        g.table_hash = self.digest
         g.total_bytes = self.total
         self.lua.execute('''
 package.path=source_root..'/?.lua;'..package.path
@@ -99,7 +97,8 @@ package.loaded['code/native-hash']={prepare=function() end,sha256=hash_string}
 package.loaded['code/platform']={replace=replace_file,mkdir=make_directory}
 require('code/native').profile={name='SHC',sha256=string.rep('a',64)}
 local profile=require('code/world-sections').SHC
-profile.hash=table_hash; profile.total=total_bytes
+profile.total=total_bytes; profile.entries={}
+for i=1,122 do profile.entries[i]={section=1000+i,size=i==1 and 70001 or 13,compressed=1} end
 package.loaded['code/native-save']={interface=function()
  return {version=1,sections=0xb92a58,sectionCount=122,descriptorSize=16}
 end}
@@ -117,9 +116,6 @@ engine={tick=function() return now end,networkState=function() return {mode=1} e
 settings={raw='settings',environment='environment',hash=sha.sha256('settings'),
  environmentHash=sha.sha256('environment')}
 ''')
-        mapping = patch.dict(inspector.WORLD_TABLES, {'SHC': (self.digest, self.total)})
-        mapping.start()
-        self.addCleanup(mapping.stop)
 
     def capture(self):
         self.lua.execute('capture=files.begin(test_path,engine,settings)')
@@ -224,6 +220,21 @@ modules={automarket={pAutomarketData=0x5000000},
         result = inspector.compare_worlds(self.root,other)
         self.assertEqual(len(result['differences']),1)
         self.assertEqual(result['differences'][0]['firstAddress'],f'0x{0x1000000+66666:08X}')
+
+    def test_offline_inspection_rejects_invalid_descriptors_with_consistent_hashes(self):
+        capture=self.capture()
+        manifest=json.loads((self.root/'world.json').read_text())
+        for offset,fmt,value in ((0,'I',0),(4,'I',1),(8,'I',0x4000000),(12,'H',2),(1952,'I',1)):
+            with self.subTest(offset=offset):
+                changed=bytearray(self.table)
+                struct.pack_into('<'+fmt,changed,offset,value)
+                (self.root/'world-layout.bin').write_bytes(changed)
+                manifest['tableHash']=hashlib.sha256(changed).hexdigest()
+                raw=json.dumps(manifest).encode()
+                (self.root/'world.json').write_bytes(raw)
+                capture['world']['hash']=hashlib.sha256(raw).hexdigest()
+                (self.root/'capture.json').write_text(json.dumps(capture))
+                with self.assertRaises(ValueError): inspector.world_capture(self.root)
 
     def test_tick_advance_is_not_a_complete_world(self):
         self.lua.execute('''

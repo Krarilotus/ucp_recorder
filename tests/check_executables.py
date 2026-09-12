@@ -45,12 +45,13 @@ def check(folder):
             assert reader(site['address'], len(expected)) == expected, f'{name}: {key} phase'
         world=lua.execute((root/'code/world-sections.lua').read_text())[name]
         table=reader(native_save_fixture(name)['sections'],world['bytes'])
-        import hashlib
-        assert hashlib.sha256(table).hexdigest()==world['hash'], f'{name}: native save table'
         assert len(table)==1968 and struct.unpack_from('<I',table,len(table)-16)[0]==0
         entries=list(struct.iter_unpack('<IIIHH',table[:-16]))
         assert len(entries)==122 and all(not skip for _,skip,_,_,_ in entries)
         assert sum(size for _,_,size,_,_ in entries)==world['total']
+        for i,(_,_,size,compressed,section) in enumerate(entries,1):
+            expected=world['entries'][i]
+            assert (size,compressed,section)==(expected['size'],expected['compressed'],expected['section'])
         from test_world_header import check_references
         check_references(reader,name)
         rng = native.addr(0x1a279c0)

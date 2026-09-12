@@ -22,20 +22,22 @@ end
 ---@return table profile
 function M.decode(raw,variant)
   local profile=assert(profiles[variant],'Unsupported world capture executable')
-  assert(type(raw)=='string' and #raw==profile.bytes and sha.sha256(raw)==profile.hash,
+  assert(type(raw)=='string' and #raw==profile.bytes and #profile.entries==122,
     'Native save section table changed')
   local entries,total={},0
-  for offset=0,#raw-17,16 do
+  for index,expected in ipairs(profile.entries) do
+    local offset=(index-1)*16
     local address,skip,size=unsigned(raw,offset,4),unsigned(raw,offset+4,4),unsigned(raw,offset+8,4)
     assert(address>=0x400000 and size>0 and size<=32*1024*1024 and address+size<0x80000000,
       'Invalid native save section range')
-    if skip==0 then
-      entries[#entries+1]={address=address,size=size,section=unsigned(raw,offset+14,2),
-        compressed=unsigned(raw,offset+12,2),offset=total}
-      total=total+size
-    end
+    local section,compressed=unsigned(raw,offset+14,2),unsigned(raw,offset+12,2)
+    assert(skip==0 and size==expected.size and section==expected.section
+      and compressed==expected.compressed,'Native save section schema differs at '..index)
+    entries[#entries+1]={address=address,size=size,section=section,compressed=compressed,offset=total}
+    total=total+size
   end
-  assert(unsigned(raw,#raw-16,4)==0 and total==profile.total,'Invalid native save section ending')
-  return entries,profile
+  assert(raw:sub(-16)==string.rep('\0',16) and total==profile.total,'Invalid native save section ending')
+  -- This is the captured table's integrity hash, not an address whitelist.
+  return entries,{bytes=profile.bytes,total=total,hash=sha.sha256(raw)}
 end
 return M

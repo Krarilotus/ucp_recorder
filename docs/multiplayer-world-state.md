@@ -20,10 +20,14 @@ No replacement of that already implemented OpenSHC function is needed.
 
 ## Captured data
 
-`world-capture.lua` reads the original `MapSectionAddress` table, verifies its
-entire SHA-256, and only then dereferences its entries. Each descriptor has a
+`world-capture.lua` reads the original `MapSectionAddress` table exposed by
+Map Extensions 1.1.1, validates every section against `world-sections.lua`,
+and only then dereferences its entries. Each descriptor has a
 32-bit address, skip field and size, followed by 16-bit compression and section
-fields. Both verified tables contain 122 sections followed by a terminator.
+fields. Both verified tables contain 122 sections followed by a zero terminator.
+The six Extreme size differences are explicit; addresses are discovered by Map,
+not constrained to a private table fingerprint. The addresses below identify
+the research fixtures only.
 
 | Variant | Descriptor table | Table bytes | World bytes |
 | --- | --- | --- | --- |
@@ -82,7 +86,7 @@ python tools/inspect_replay.py multiplayer CAPTURE_FOLDER
 python tools/inspect_replay.py compare-worlds HOST_FOLDER CLIENT_FOLDER
 ```
 
-Inspection checks the original table hash, descriptor-to-manifest agreement,
+Inspection checks the recorded table's integrity hash, bounded descriptors, descriptor-to-manifest agreement,
 exact file length and every section hash. Comparison requires matching variant
 and capture tick and reports each differing section's first byte address.
 These are investigation leads: native sections include presentation state and

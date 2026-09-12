@@ -6,10 +6,10 @@ local digest=require('code/native-hash')
 local M={CHUNK=65536}
 
 function M.layout()
-  local profile=assert(sections[native.profile.name],'Unsupported world capture executable')
+  local schema=assert(sections[native.profile.name],'Unsupported world capture executable')
   local owner=require('code/native-save').interface()
-  local raw=core.readString(owner.sections,profile.bytes)
-  local entries=require('code/world-layout').decode(raw,native.profile.name)
+  local raw=core.readString(owner.sections,schema.bytes)
+  local entries,profile=require('code/world-layout').decode(raw,native.profile.name)
   return entries,profile,raw
 end
 

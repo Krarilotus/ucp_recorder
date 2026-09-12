@@ -217,3 +217,32 @@ Each private SHC/Extreme image captures the independently checked 18 fields
 byte-for-byte, repeats capture without discovery and rejects 33 invalid-binding
 cases. The original-instruction container/restore checks are recorded in the PR;
 neither these checks nor signature presence establishes live-match acceptance.
+
+## World section schema
+
+Recorder's `world-layout.decode` is shared by live capture and the validated
+disk reader. Map 1.1.1 supplies the native table pointer/count/stride; its owner
+does not promise Recorder's complete 122-section replay schema. Inspection of
+both native tables confirms identical IDs/order/flags and six size differences
+for Extreme's larger pools. Keep that format validation in Recorder's existing
+decoder, replacing the two whole-table hash constants with named section
+metadata. This is format validation, not an alternative runtime address resolver.
+
+Every ID, size, skip/compression flag, range and the complete zero terminator
+must validate before live capture follows any table address. The table comes
+only from Map's public interface. A relocated native table is accepted; changed
+pool layouts remain unsupported until verified. The hash retained in a capture
+is calculated from its actual table for file integrity, not compared to a private
+address whitelist. Existing captures keep the same format and validate normally.
+
+The standalone inspector performs bounded descriptor/payload integrity checks
+without dereferencing recorded pointers. It no longer treats two exact table
+hashes as a compatibility decision. Actual conversion still uses the shared Lua
+schema decoder. Other fixed runtime bindings and live acceptance remain work.
+
+Validation: the full portable suite passes 493 tests (one existing skip), plus
+the subsequent inspector regression. Lua 5.4/LuaJIT exercise both schemas,
+relocation and every descriptor field; the two new decoder tests cover 2444
+subtests. Both private native tables match all 122 schema entries, and relocating
+every pointer changes only the captured integrity hash. Original-instruction
+container/restore and CI results are recorded in the PR.
