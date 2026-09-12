@@ -20,6 +20,11 @@ end
 -- Framework discovery/cache plus explicit uniqueness and current instruction
 -- context. Retain these bytes for the existing pre-install conflict check.
 function M.resolve(pattern,label)
+  if type(core.AOBScanUnique)=='function' then
+    local address=core.AOBScanUnique(pattern,label)
+    assert(type(address)=='number' and address>0,label..': native context not found')
+    return M.context(address,pattern,label)
+  end
   local ok,address=pcall(core.AOBScan,pattern)
   assert(ok and type(address)=='number' and address>0,label..': native context not found')
   local second=core.scanForAOB(pattern,address+1)
