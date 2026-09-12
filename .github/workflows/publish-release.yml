@@ -1,16 +1,10 @@
 name: Publish PR releases
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
-  schedule:
-    - cron: '*/5 * * * *'
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       pr:
-        description: PR number to backfill, or empty for all open PRs
-        required: false
+        description: Upstream Corax34/ucp_recorder PR number to publish
+        required: true
         type: string
 permissions:
   contents: read
@@ -35,7 +29,7 @@ jobs:
       - id: prs
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUESTED_PR: ${{ inputs.pr || github.event.pull_request.number }}
+          REQUESTED_PR: ${{ inputs.pr }}
         run: python tools/pr_releases.py discover
   verify:
     needs: discover

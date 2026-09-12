@@ -27,6 +27,12 @@ def discover():
     source = os.environ['SOURCE_REPO']
     publisher = os.environ['GITHUB_REPOSITORY']
     requested = os.environ.get('REQUESTED_PR', '')
+    if os.environ.get('GITHUB_EVENT_NAME') == 'pull_request_target' and publisher != source:
+        # Fork PR numbers belong to the fork, never to the upstream repository.
+        output(builds={'include': []}, tests={'include': []}, count=0)
+        return
+    if os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch' and not requested:
+        raise ValueError('Choose an upstream PR number to publish.')
     if requested:
         assert requested.isdecimal(), 'PR must be a number'
         pulls = [json.loads(gh('api', f'repos/{source}/pulls/{requested}'))]
