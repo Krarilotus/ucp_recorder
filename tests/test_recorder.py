@@ -75,6 +75,11 @@ function commandFixture()
 end
 commandOwner={getNativeCommandInterface=commandFixture}
 modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
+for _,name in ipairs({'network-sites','world-hash-sites'}) do
+ local fixture=require('tests/fixtures/'..name)
+ fixture.resolve=function() return fixture[realNative.profile.name or 'SHC'] end
+ package.loaded['code/'..name]=fixture
+end
 package.loaded['code/rng-bindings']={resolve=function()
  return {state=realNative.profile.name=='Extreme' and 0x24baec0 or 0x1a279c0,streams={
   {address=0x46a800,bytes={139,129,76,156,0,0}},

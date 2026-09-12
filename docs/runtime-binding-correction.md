@@ -306,3 +306,34 @@ passes 600 SP dispatches, 1200 offline replay dispatches and 600 local captures
 per fixture. Emulator callback/memory/OS boundaries are stand-ins, not live
 game or physical multiplayer acceptance. Other native profiles, including
 the optional fire/spawn diagnostic contexts, remain unfinished.
+
+## Network and completed-hash observers
+
+Recorder 0.50.17 replaces the three network observer profiles and completed
+world-hash site with shared SHC/Extreme instruction contexts. Actor/local-player
+and pending-index operands must agree with Protocol 1.1.3's command metadata.
+The hash epilogue additionally verifies its Protocol handler, native 12-dword
+stride, subtotal store and command-12 send context. Observers retain their
+original 5/7/8/11-byte instructions and recheck full preflight guards.
+
+Reuse decision: Protocol `game/hooks.lua` / `game/interface.lua` at 175d7a9 own
+the adjacent command-table dispatch patches and scheduler. They do not expose
+system-message or completed-native-hash observation callbacks. Recorder's
+existing diagnostic callbacks remain the owner of those read-only observations;
+no new hook or competing dispatch service is added. The two immediate contexts
+end before Protocol's seven-byte patches, and neither overlaps Recorder's
+earlier timed-copy/local-capture patches. `hook-check.resolve` shares only the
+framework discovery, uniqueness and captured-byte validation already required
+by those hooks; it adds no scanner, cache or patch manager.
+
+Validation: 500 portable tests pass (one existing skip). Lua 5.4/LuaJIT cover
+relocated contexts, owner disagreement and late conflicts before hooks. Local
+SHC 1.41/Extreme 1.41.1-E and all four official EFIGS/Polish fixtures resolve
+four sites, reject 23 negative cases each and accept adjacent Protocol patches.
+Eight initial discovery calls cover the four contexts; repeated verification
+does not scan. All six fixtures also pass 20 original local/remote immediate
+command cases through the actual observer callbacks, and 48 native world-hash
+observer pairs covering all player slots, all 14 subtotal stores, skip/send
+branches and unchanged registers/writes. Transport, memory helpers, the test
+command handler, hash callee and UCP callback bridge are stand-ins; physical
+transport and live gameplay remain separate acceptance gates.

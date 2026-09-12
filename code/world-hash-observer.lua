@@ -2,8 +2,8 @@
 -- Later peer writes can overwrite the last two subtotals in the native table.
 local M={}
 function M.verify()
-  local site=require('code/world-hash-sites')[require('code/native').profile.name]
-  require('code/hook-check').verify(site,'Native world-hash observer hook conflicts')
+  local site=require('code/world-hash-sites').resolve()
+  require('code/hook-check').verify(site.guard or site,'Native world-hash observer hook conflicts')
   return site
 end
 function M.install(trace)

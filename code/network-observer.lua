@@ -1,9 +1,9 @@
 -- Opt-in diagnostics; detours retain all original instructions/registers.
 local M={}
 function M.verify()
-  local sites=require('code/network-sites')[require('code/native').profile.name]
+  local sites=require('code/network-sites').resolve()
   for name,site in pairs(sites) do
-    require('code/hook-check').verify(site,'Multiplayer observer hook conflicts at '..name)
+    require('code/hook-check').verify(site.guard or site,'Multiplayer observer hook conflicts at '..name)
   end
   return sites
 end
