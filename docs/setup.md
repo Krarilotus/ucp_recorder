@@ -1,7 +1,7 @@
 # Install a recorder test release
 
-The current binding-correction branch is source version **0.50.20**. It requires
-Protocol **1.1.4**, Map Extensions **1.1.1**, Files **1.4.0**, UI **1.0.1** and
+The current binding-correction branch is source version **0.50.21**. It requires
+Protocol **1.1.4**, Map Extensions **1.1.1**, Files **1.4.0**, UI **1.0.2** and
 WinProc Handler **1.0.0**. Its dependency PRs and native/live acceptance are still
 in progress; this branch has not published a new test ZIP.
 
@@ -18,7 +18,8 @@ When **UCP-Recorder 0.49.4** is available in the UCP3 `3.0.7` extension store,
 install it there together with its dependencies. Store publication signs the
 package through UCP's normal pipeline; the unsigned-PR instructions below are
 only for manual preview downloads. If using UCP2-Legacy, select **2.15.2** as
-described below. UI **1.0.1** is a required dependency for this release.
+described below. That older release requires UI **1.0.1**; the current source
+branch requires UI **1.0.2**, as listed above.
 
 Store integration is a testing rollout, not a claim of complete multiplayer
 recovery support. Archive identities can differ between store and PR builds;
@@ -80,15 +81,17 @@ Recorder does not bundle or install them. The combination under investigation is
 | files | 1.4.0 or compatible; required asset traversal owner |
 | winProcHandler | 1.0.0 or compatible; required input owner |
 | ucp2-legacy | 2.15.2 with saved simulation state and its dependencies |
-| ui | 1.0.1 in the prepared Ascension test setup |
+| ui | 1.0.2 or compatible; required native menu owner |
 | steam-multiplayer | 1.2.3 in the prepared test setup |
 
 If the store still offers UCP2-Legacy 2.15.1, use the saved-state
 [2.15.2 test release](https://github.com/Krarilotus/extension-ucp2-legacy/releases/tag/test-fbb634bb2331)
 from [its PR](https://github.com/UnofficialCrusaderPatch/extension-ucp2-legacy/pull/6).
-Likewise, if UI 1.0.1 is absent from the store, install the
-[UI 1.0.1 test release](https://github.com/Krarilotus/ucp-extension-ui/releases/tag/test-d3a807cfee70)
-from [the menu-array fix](https://github.com/gynt/ucp-extension-ui/pull/6).
+The current source branch requires the
+[UI 1.0.2 test ZIP](https://github.com/Krarilotus/ucp-extension-ui/releases/download/test-af31ceb3f49a/ui-1.0.2.zip)
+from [the native menu API prerequisite](https://github.com/Krarilotus/ucp-extension-ui/pull/2).
+Keep it zipped in `ucp/modules`, reload the launcher and select 1.0.2 before
+Recorder. This UI asset alone is not the combined integration bundle.
 
 **Update UCP2-Legacy before recording with 0.45.0.** Version 2.15.1 leaves the AI
 attack target cycle outside saved worlds. This can desync playback even with

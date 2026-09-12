@@ -39,7 +39,8 @@ function M.resolve()
   local commands=modules.protocol:getNativeCommandInterface()
   assert(core.readInteger(entry+25)==commands.handler and core.readInteger(entry+43)==commands.handler,
     'Native RNG initialization has a different command owner')
-  bindings={state=state,streams={sites.stream1,sites.stream2}}
+  bindings={state=state,initialization=sites.initialization,
+    streams={sites.stream1,sites.stream2}}
   return bindings
 end
 return M

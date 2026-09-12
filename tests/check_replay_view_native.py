@@ -115,7 +115,7 @@ def check_book_resources(path, reader, lua, native, root, variant):
     view=lua.globals().nativeView
     commands=native_command_fixture(variant)
     slot=commands['localPlayer']; actor=commands['handler']+engine.actorOffset
-    tab=native.addr(0x1fe7d1c)+4
+    tab=engine.gameCore+0x10
     resolution=struct.unpack('<I',reader(entry+2,4))[0]
     resources=engine.playerResources
     # Identify resource order from the original indexed-read operand instead of

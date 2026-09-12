@@ -441,3 +441,47 @@ cases through these bindings and 600 SP/1200 offline replay dispatches plus
 and the real owner in the binding/dispatch tests. Other native callees, bridges
 and transport remain stand-ins; live gameplay, save/replay and physical
 multiplayer acceptance are still outstanding.
+
+## Loading and match transitions
+
+Recorder 0.50.21 replaces its remaining five fixed lifecycle hooks with named
+bindings. RNG's existing initialization context supplies match start and the
+adjacent preparation tail. UI 1.0.2 `getNativeMenuInterface()` at af31ceb supplies
+the existing transition entry and captured guard; its receiver must agree with
+the resolved GameCore. There is no second menu-transition lookup or dispatcher.
+
+The outer load handler supplies its action branch and completion epilogue by
+relative-target decoding. The reset path must call that same finalization owner
+and UI's transition entry. Its short cleanup sequence was ambiguous, so the
+identifying context includes the preceding menu-action branch. Native resource
+filename access comes from Map 1.1.1's already wrapped reader, with its internal
+call and 1001-byte filename layout verified. The map-name leaf has its own
+complete identifying context. World-read completion must lie inside the Map
+reader and refer to GameCore's saved duration fields.
+
+Map `mapextensions/game.lua` at 9d35dfb calls `afterReadSav` after the native
+reader returns, including its early failure exits; that callback alone does
+not establish a successful read. Recorder retains its existing successful-tail
+observer and outer-load lifecycle instead of treating a failed read as a new
+world. Hook spans and load/filename behavior are unchanged. All guards run
+before engine construction and Recorder's later scope/phase patches. Four
+initial lookups plus uniqueness checks resolve the remaining contexts; repeated
+loads and menu transitions add no scans.
+
+All obsolete `native.addr` mappings and callers are removed. The old layout is
+now only an explicit research fixture. The original header identity gate stays
+temporarily because history/scoped/result profiles still need migration; its
+reference hash is not yet the final executable identity implementation. The
+obsolete switch/parameter-buffer guards are removed: the actual UI and Protocol
+owners now validate those bindings.
+
+Validation: 508 portable tests pass (one existing skip), including relocated
+Lua 5.4/LuaJIT lifecycle/owner and failure checks.
+All six local/official EFIGS/Polish SHC 1.41 and Extreme 1.41.1-E images pass
+11 bindings, 46 rejection cases each and Map's adjacent entry-wrapper case.
+Each also executes 148 original load failure/completion/identity cases through
+the production binding, plus 600 SP/1200 offline replay dispatches and 600 local
+captures. UI/Protocol initialization and framework proxy/extraction are real
+in binding tests; Map ABI metadata, OS/transport, native bridge and selected
+callees are fixtures. Full installed game, save/replay and physical multiplayer
+acceptance are still required.

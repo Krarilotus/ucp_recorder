@@ -47,6 +47,7 @@ modules={protocol={getNativeCommandInterface=function() return {handler=0x310000
                 self.lua.execute('''
 local value=rng.resolve()
 assert(value.state==0x30000000 and value.streams[1].address==0x10001000 and value.streams[2].address==0x10002000)
+assert(value.initialization.address==0x10000000 and #value.initialization.bytes==61)
 for i=1,100 do assert(rng.resolve()==value) end
 require('code/rng-observer').install({engine={rng=value.state}})
 ''')
