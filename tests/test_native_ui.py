@@ -348,7 +348,8 @@ assert(not seen[0] and seen[1] and not seen[2] and seen[3])
     def test_optional_ui_resolves_entries_before_recorder_hooks(self):
         self.check('''
 local accessed=false
-modules={ui={access=function() accessed=true end}}
+modules={ui={access=function() accessed=true end},
+ winProcHandler={cinterface=function() return {RegisterProc=101,CallNextProc=102} end}}
 core.readBytes=function(address,size)
  assert(accessed,'UI callable entries were not resolved before native verification')
  for _,site in pairs(sites) do if site.address==address then return site.bytes end end
@@ -361,44 +362,44 @@ assert(not pcall(NativeUI.verify))
 
     def test_keyboard_is_consumed_only_in_our_singleplayer_dialogs(self):
         self.check('''
-local hook; local forwarded=0; local handled=0; local single=true
-core.hookCode=function(callback,address,count,convention,size)
- assert(address==sites.windowProc.address and count==5 and convention==1 and size==8)
- hook=callback
- return function(ecx,window,message,key,data)
-   assert(ecx==10 and window==20 and data==30); forwarded=forwarded+1; return 42
- end
-end
+local route; local handled=0; local single=true
+local chain=require('code/input-chain')
+chain.interface=function() return {} end
+chain.install=function(_,handler) route=handler; return {priority=100003,nextProc=function() error('unexpected') end} end
 ui.dialogs[300]=true
 ui:installInput(function() return single end,function() handled=handled+1 end)
 memory[sites.modalComposition.value+0x2c]=300
-for _,message in ipairs({0x100,0x101,0x102}) do assert(hook(10,20,message,65,30)==0) end
-assert(handled==3 and forwarded==0)
-assert(hook(10,20,0x200,65,30)==42) -- mouse goes to native buttons
-assert(hook(10,20,0x104,65,30)==42) -- system/Alt messages remain native
-single=false; assert(hook(10,20,0x102,65,30)==42)
+for _,message in ipairs({0x100,0x101,0x102}) do assert(route(20,message,65,30)) end
+assert(handled==3)
+assert(not route(20,0x200,65,30)) -- mouse goes to native buttons
+assert(not route(20,0x104,65,30)) -- system/Alt messages remain native
+single=false; assert(not route(20,0x102,65,30))
 single=true; memory[sites.modalComposition.value+0x2c]=5
-assert(hook(10,20,0x102,65,30)==42)
-assert(handled==3 and forwarded==4)
+assert(not route(20,0x102,65,30))
+assert(handled==3)
+assert(not pcall(function() ui:installInput(function() return true end,function() end) end))
 ''')
 
-    def test_speed_buttons_reuse_native_key_dispatch_without_reentering_overlay(self):
+    def test_speed_buttons_continue_from_actual_priority_without_reentering_overlay(self):
         self.check('''
-local hook,calls,filtered=nil,{},0
-core.hookCode=function(callback)
- hook=callback
- return function(ecx,window,message,key,data)
-  calls[#calls+1]={ecx,window,message,key,data}
- end
+local route,calls,filtered=nil,{},0
+local chain=require('code/input-chain')
+chain.interface=function() return {} end
+chain.install=function(_,handler)
+ route=handler
+ return {priority=100003,nextProc=function(priority,window,message,key,data)
+  calls[#calls+1]={priority,window,message,key,data}
+ end}
 end
 ui.onNativeKey=function() filtered=filtered+1; return true end
 ui:installInput(function() return true end,function() end)
 assert(not pcall(ui.nativeSpeedKey,1))
-hook(0,123,0x200,0,0)
+route(123,0x200,0,0)
 ui.nativeSpeedKey(1); ui.nativeSpeedKey(-1)
 assert(filtered==1 and #calls==2)
-assert(calls[1][2]==123 and calls[1][3]==0x100 and calls[1][4]==107 and calls[1][5]==0)
+assert(calls[1][1]==100003 and calls[1][2]==123 and calls[1][3]==0x100 and calls[1][4]==107 and calls[1][5]==0)
 assert(calls[2][4]==109)
+assert(not pcall(ui.nativeSpeedKey,0))
 ''')
 
     def test_multiple_visibility_groups_install_only_one_native_hook(self):

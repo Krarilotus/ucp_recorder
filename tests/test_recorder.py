@@ -124,8 +124,10 @@ local world=require('code/world-hash-sites').SHC; core.writeBytes(world.address,
 core.hookCode=function() return function() return 0 end end
 core.writeString=function() end
 core.callTo=function() return {} end
+core.calculateCodeSize=function(code) return #code+4 end
 package.loaded['code/sessions']={captureSettings=function() end}
 modules={ui={access=function() return {manager={lookupMenu=function(id) return 0x90000+id*100 end}} end},
+ winProcHandler={cinterface=function() return {RegisterProc=101,CallNextProc=102} end},
  cffi={cffi=function() return {tonumber=tonumber,cast=function(_,v) return v end} end}}
 local module=dofile(source_root..'/init.lua')
 module:enable({rngLogMethod='trace',useFixedSeed=true,fixedSeed=123})
