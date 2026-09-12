@@ -30,7 +30,7 @@ phases=require('code/maintenance-native')
             for i,b in enumerate(struct.pack('<I',v)):self.memory[a+i]=b
         self.put=put
         for a,v in [(0x10000001,0x30000000),(0x10000015,0x30000000),
-                    (0x1000000b,0x31000000),(0x10000010,0x10000-20),
+                    (0x1000000b,0x31000000),(0x10000010,0x10000-20),(0x1000001a,0x30000-30),
                     (0x10010249,0x10020000-(0x10010234+25))]:put(a,v)
         for offset in (1,11,21,53,63):put(0x1001016c+offset,0x32000000)
         def scan(pattern,start=None):
@@ -52,6 +52,7 @@ modules={protocol={getNativeCommandInterface=function() return {handler=0x300000
 profile=phases.verify()
 assert(profile.gameState==0x31000000 and profile.maintenance.address==0x1001016c)
 assert(profile.world.address==0x10010246 and profile.world.target==0x10020000)
+assert(profile.receiveEntry==0x10030000)
 assert(#profile.maintenance.bytes==5 and #profile.world.bytes==7)
 for i=1,100 do assert(phases.verify()==profile) end
 ''')

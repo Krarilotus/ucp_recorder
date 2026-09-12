@@ -33,6 +33,7 @@ function M.resolve()
   require('code/validation').integer(target,0x10000,0x7fffffff-65,'Native world-update entry')
   local targetGuard=check.context(target,worldPattern,'Recorder native world update')
   binding={gameState=gameState,commandDispatcher=caller+10+core.readInteger(caller+6),
+    receiveEntry=caller+30+core.readInteger(caller+26),
     maintenance={address=guards.maintenance.address,bytes=core.readBytes(guards.maintenance.address,5),guard=guards.maintenance},
     world={address=address,bytes=core.readBytes(address,7),target=target,guard=guards.world},
     guards={guards.caller,targetGuard}}

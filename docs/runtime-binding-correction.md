@@ -550,3 +550,31 @@ with writes confined to the temporary entry and stack; only Windows GetLocalTime
 is substituted. These checks do not establish installed GUI interaction or live
 save/replay acceptance. Scoped/offline/optional RNG bindings and the temporary
 identity gate remain unfinished.
+
+## Offline replay transport and pacing
+
+Recorder 0.50.24 removes `offline-sites`' fixed variants and calculated address
+deltas. Map 1.1.1's wrapped writer supplies its internal save-pacing context and
+synchronization worker; that worker supplies both packet/message senders.
+Protocol 1.1.4's queue supplies both validated transmit calls. Recorder's existing
+coordinator binding retains its decoded receive entry before the returned-tick
+hook changes the preceding instruction. The halting-menu guard is reused from
+the existing engine-state owner. Four framework lookups resolve the remaining
+pacing, autosave, polling and lag contexts.
+
+This follows inspection of `mapextensions/game.lua` at 9d35dfb, Protocol
+`game/interface.lua`/common command bindings at 10001be, and Recorder's current
+phase, command and offline consumers. No owner exposes a separate transport
+isolation service; Recorder keeps its existing passive offline gates. Complete
+contexts and repeated clock/mode/queue operands must agree before installation.
+The transport caller context begins after Recorder's timed-command hook, so
+opening a replay later does not mistake Recorder's own patch for a conflict.
+There is no new hook, temporary global mode swap or per-tick scan.
+
+514 portable tests pass (one existing skip). All six local/official EFIGS/Polish SHC 1.41 and Extreme 1.41.1-E images pass ten
+bindings, 36 rejection checks, both prior-Recorder-hook cases, 60 original/passive/
+active instruction-gate cases and 64 original save-pacing branch cases each.
+The save branch suppresses synchronization only while offline, preserving mode.
+Relocated Lua 5.4/LuaJIT checks also cover all owner-field relationships and
+installation failure/idempotence. OS, network, module bridges and selected
+callees remain fixtures; these are not live multiplayer/replay acceptance.

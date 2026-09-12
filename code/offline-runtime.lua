@@ -3,7 +3,6 @@
 -- transport/pacing owners see offline behaviour; no temporary global mode swaps
 -- occur during ticks or command execution.
 local validation=require('code/validation')
-local native=require('code/native')
 local M={}
 
 ---@class OfflineRoster
@@ -42,11 +41,8 @@ end
 
 function M.install(engine)
   if engine.offlineInstalled then return end
-  local sites=require('code/offline-sites')[native.profile.name]
   -- Validate the entire boundary before installing the first passive gate.
-  for name,site in pairs(sites) do
-    require('code/hook-check').verify(site,'Offline replay hook conflicts at '..name)
-  end
+  local sites=require('code/offline-sites').verify()
   local ordered={}
   for _,site in pairs(sites) do ordered[#ordered+1]=site end
   require('code/fixes').install(ordered,engine.offlineFlag)
