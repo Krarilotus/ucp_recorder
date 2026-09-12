@@ -151,4 +151,7 @@ end
 function module:disable()
   if self.recorder then self.recorder:reset() end
 end
-return module
+-- Snapshots contain copied scalar values and can cross the framework's module
+-- proxy directly. Keep the session/engine and observer registry private.
+return module,{public={'inputStateVersion','getInputState'},
+  proxy={ignored={'getInputState'}}}
