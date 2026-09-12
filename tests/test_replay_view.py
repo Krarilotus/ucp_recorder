@@ -10,6 +10,7 @@ class ReplayViewTests(unittest.TestCase):
         self.check('''
 local roster={}; for i=1,8 do roster[i]={kind=i==4 and 'ai' or 'empty'} end
 r={mode='play',active=true,status='playing',manifest={player=1},engine={
+ commands=commandFixture(),
  localSession=function() return not multiplayer end,
  networkState=function() return {roster=roster} end}}
 view=require('code/replay-view').new(r)

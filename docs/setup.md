@@ -1,5 +1,10 @@
 # Install a recorder test release
 
+The current binding-correction branch is source version **0.50.15**. It requires
+Protocol **1.1.3**, Map Extensions **1.1.1**, Files **1.4.0**, UI **1.0.1** and
+WinProc Handler **1.0.0**. Its dependency PRs and native/live acceptance are still
+in progress; this branch has not published a new test ZIP.
+
 Use a separate copy of your installed game and a working UCP3 installation.
 Keep your usual game and replays. This build targets original Crusader HD 1.41
 and Crusader Extreme 1.41, not Definitive Edition. Both variants have code ports;
@@ -70,8 +75,10 @@ Recorder does not bundle or install them. The combination under investigation is
 | recorder | The selected PR release version |
 | Ascension-Multiplayer | 1.0.11 |
 | automarket | 1.1.0; the adapter checks this exact wire format |
-| protocol | 1.0.0 for the Automarket adapter |
-| map-extensions | 1.0.0 for Automarket and UCP2 custom save sections |
+| protocol | 1.1.3 or compatible; required native command owner |
+| map-extensions | 1.1.1 or compatible; required native save owner |
+| files | 1.4.0 or compatible; required asset traversal owner |
+| winProcHandler | 1.0.0 or compatible; required input owner |
 | ucp2-legacy | 2.15.2 with saved simulation state and its dependencies |
 | ui | 1.0.1 in the prepared Ascension test setup |
 | steam-multiplayer | 1.2.3 in the prepared test setup |

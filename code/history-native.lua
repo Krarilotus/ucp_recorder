@@ -31,7 +31,7 @@ function M.new(ui,recorder,browser,rename)
   originalPrepare=core.hookCode(function()
     -- Results return through this same preparation function. Keep the lobby's
     -- mode, rather than saving the temporary results-screen mode on that return.
-    if not o.detail then o.lobbyMode=core.readInteger(native.addr(0x191d768)+0x618) end
+    if not o.detail then o.lobbyMode=core.readInteger(recorder.engine.base+0x618) end
     originalPrepare()
     core.writeInteger(sites.savedMode,o.lobbyMode)
     o.detail=false; o:refresh()

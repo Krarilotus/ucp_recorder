@@ -1,5 +1,6 @@
 """Execute the original player summary; only pixel/number drawing callees are stand-ins."""
 import struct
+from native_command_fixture import native_command_fixture
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
@@ -25,8 +26,9 @@ def check_replay_view(reader, lua, native, root, variant):
     machine.mem_write(start, code)
     machine.mem_write(width, b'\xb8\x08\x00\x00\x00\xc2\x08\x00')
     machine.mem_write(draw, b'\xc2\x1c\x00')
-    slot = native.addr(0x1a275dc)
-    actor = native.addr(0x191d768)+engine.actorOffset
+    commands=native_command_fixture(variant)
+    slot = commands['localPlayer']
+    actor = commands['handler']+engine.actorOffset
     data = engine.playerResources-0x4d0
     stack, stop = 0x4000000, 0x4100000
     def read32(address): return struct.unpack('<i', machine.mem_read(address, 4))[0]
@@ -34,11 +36,13 @@ def check_replay_view(reader, lua, native, root, variant):
     lua.globals().core.readInteger = read32
     lua.globals().core.writeInteger = write32
     lua.globals().replayViewNative = native
+    lua.globals().commandOwnerFixture=lua.table_from(commands)
     lua.execute("package.loaded['code/native']=replayViewNative")
     view_module = lua.execute((root/'code/replay-view.lua').read_text())
     lua.globals().viewModule = view_module
     lua.execute('''
 viewRecorder={mode='play',active=true,status='playing',manifest={player=1},engine={
+ commands=commandOwnerFixture,
  localSession=function() return true end,networkState=function()
   local slots={}; for i=1,8 do slots[i]={kind='ai'} end; return {roster=slots}
  end}}
@@ -108,7 +112,8 @@ def check_book_resources(path, reader, lua, native, root, variant):
     def put(a,v): machine.mem_write(a,struct.pack('<i',v))
     lua.globals().core.readInteger=get; lua.globals().core.writeInteger=put
     view=lua.globals().nativeView
-    slot=native.addr(0x1a275dc); actor=native.addr(0x191d768)+engine.actorOffset
+    commands=native_command_fixture(variant)
+    slot=commands['localPlayer']; actor=commands['handler']+engine.actorOffset
     tab=native.addr(0x1fe7d1c)+4
     resolution=struct.unpack('<I',reader(entry+2,4))[0]
     resources=engine.playerResources

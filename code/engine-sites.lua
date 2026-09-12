@@ -33,7 +33,6 @@ return {
     menuText = 0x011265A8,
     gameCore = 0x01FE7D10,
     paused = 0x01FEA054,
-    writeIndexOffset = 0x00109EE0,
   },
   Extreme = {
     calendar = {address=0x0045699E,bytes={139,68,36,4,137,129,188,65,14,0,184,100,0,0,0,137,145,192,65,14,0},value=0x0120F6F4},
@@ -68,6 +67,5 @@ return {
     menuText = 0x01126A28,
     gameCore = 0x02A7B210,
     paused = 0x02A7D554,
-    writeIndexOffset = 0x00166370,
   },
 }

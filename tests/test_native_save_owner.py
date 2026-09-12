@@ -52,7 +52,7 @@ core.exposeCode=function(address,count,convention)
  if wrappers[address] then assert(count==2 and convention==1); return wrappers[address] end
  return function() end
 end
-local engine=require('code/engine').new(resolved)
+local engine=require('code/engine').new(require('code/native-command').bind(resolved))
 assert(engine.saveNative(engine.sites.packager,engine.sites.sections)==4321)
 assert(engine.readWorldNative(engine.sites.packager,engine.sites.sections)==4321)
 assert(before==2 and after==2 and callCount==2 and scanCount==scans)

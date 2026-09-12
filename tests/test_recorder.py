@@ -65,7 +65,16 @@ function mapSaveFixture()
   readWorld=extreme and 0x474c50 or 0x474a20,writeWorld=extreme and 0x4746b0 or 0x474480}
 end
 mapSaveOwner={getNativeSaveInterface=mapSaveFixture}
-modules={['map-extensions']=mapSaveOwner}
+function commandFixture()
+ local extreme=realNative.profile.name=='Extreme'
+ local base=extreme and 0x23547d8 or 0x191d768
+ return {version=1,handler=base,ring=base+0x3c67c,stride=1272,capacity=200,
+  writeIndex=base+(extreme and 0x166370 or 0x109ee0),currentCommand=base+0x2d824,
+  localPlayer=extreme and 0x24baadc or 0x1a275dc,tick=extreme and 0x2a7b2a8 or 0x1fe7da8,
+  receivedParameters=base+0xcdc,scheduleCommand=function() scheduled=scheduled+1 end}
+end
+commandOwner={getNativeCommandInterface=commandFixture}
+modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
 -- Session/dispatch fixtures replace the OS hashing boundary; native-hash has its own real API tests.
 require('code/native-hash').sha256=function(data) return sha.sha256(data) end
 Recorder = require('code/replay-streams')
@@ -144,7 +153,7 @@ core.callTo=function() return {} end
 core.calculateCodeSize=function(code) return #code+4 end
 package.loaded['code/sessions']={captureSettings=function() end}
 modules={ui={access=function() return {manager={lookupMenu=function(id) return 0x90000+id*100 end}} end},
- ['map-extensions']=mapSaveOwner,
+ ['map-extensions']=mapSaveOwner,protocol=commandOwner,
  winProcHandler={cinterface=function() return {RegisterProc=101,CallNextProc=102} end},
  cffi={cffi=function() return {tonumber=tonumber,cast=function(_,v) return v end} end}}
 local module=dofile(source_root..'/init.lua')

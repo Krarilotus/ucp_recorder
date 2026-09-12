@@ -120,7 +120,7 @@ require('code/battle-statistics').verify=function() return {} end
 local result=require('code/match-results').sites.SHC; core.writeBytes(result.address,result.bytes)
 require('code/fixes').verify=function() return {} end
 require('code/sessions').captureSettings=function() error('settings sentinel') end
-modules={['map-extensions']=mapSaveOwner}
+modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
 function noMutation() error('unexpected recorder mutation') end
 core.allocate=noMutation; core.allocateCode=noMutation; core.writeCode=noMutation
 core.detourCode=noMutation; core.hookCode=noMutation; core.exposeCode=noMutation
@@ -184,7 +184,7 @@ assert(config.multiplayerDiagnostics and config.singleplayerRngDiagnostics)
     def test_owner_save_bindings_are_required_for_both_variants(self):
         self.check('''
 local Engine=require('code/engine')
-modules={['map-extensions']=mapSaveOwner}
+modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
 for variant,sites in pairs(require('code/engine-sites')) do
  realNative.profile.name=variant
  for _,site in pairs(sites) do
@@ -197,6 +197,6 @@ for variant,sites in pairs(require('code/engine-sites')) do
  modules={}
  local ok,reason=pcall(Engine.verify)
  assert(not ok and tostring(reason):find('Map Extensions 1.1.1',1,true))
- modules={['map-extensions']=mapSaveOwner}
+ modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
 end
 ''')
