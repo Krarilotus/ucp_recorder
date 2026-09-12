@@ -5,10 +5,11 @@ local validation=require('code/validation')
 local ticks=require('code/tick-journal')
 local M={PROFILE='recorder-mp-v1',MAX_TICKS=128*1024*1024}
 
-function M.presentationOrTransport(event)
+function M.presentationOrTransport(event,admission)
   if event.reason~='immediate command is outside timed replay coverage' then return false end
   local packet=event.details
   if type(packet)~='table' or packet.scheduledTime~=0 then return false end
+  if require('code/admission-replay').packet(packet,admission) then return true end
   local size=packet.category==12 and 10 or packet.category==117 and 136
   return size and packet.size==size and type(packet.data)=='string'
     and #packet.data==size*2 and not packet.data:find('[^%x]')
@@ -22,7 +23,7 @@ function M.seal(capture)
     nextReplay=capture.nextReplay,previousReplay=capture.previousReplay,
     settingsHash=capture.settingsHash,environmentHash=capture.environmentHash,
     settingsCapture=capture.settingsCapture,restartSettingsHash=capture.restartSettingsHash,
-    automarket=capture.automarket,player=capture.initialNetwork.localPlayer,
+    automarket=capture.automarket,admission=capture.admission,player=capture.initialNetwork.localPlayer,
     startTick=capture.startTick,lastTick=capture.lastObservedTick,
     startResources=capture.initialResources,finalResources=capture.finalResources,
     finalRng=capture.finalRng,finalRngHash=capture.finalRngHash,rngHash=capture.rngHash,
@@ -76,7 +77,7 @@ function M.seal(capture)
           assert(checkpoints:write(json:encode({time=event.time,rng=event.rng,rngHash=event.rngHash,
             resources=event.resources,extensionState=event.extensionState})..'\n'))
         elseif event.kind=='gap' then
-          assert(M.presentationOrTransport(event),'Uncovered multiplayer event: '..tostring(event.reason))
+          assert(M.presentationOrTransport(event,manifest.admission),'Uncovered multiplayer event: '..tostring(event.reason))
         else assert(event.kind=='command','Untracked multiplayer command or event') end
         end
       elseif event.kind=='header' then

@@ -23,6 +23,14 @@ This avoids full state hashing every tick and retains the ending observation eve
 when quit/recovery has already changed the live world. Snapshot and recorder
 overhead still need measured game acceptance.
 
+Protocol 1.1.0 retains the existing Automarket 1.1.0 command layout. The adapter
+admits that version without changing recorded command IDs or payload validation.
+Multiplayer captures record the admission protocol registration; a delayed
+80-byte lobby request/reply is classified as transport only for that exact ID,
+version and fixed header. Protocol's owner ignores it outside the lobby. Unknown
+custom messages remain unsupported; no admission message is replayed as a timed
+simulation command. This avoids a harmless late reply forcing a recovery segment.
+
 This integration does not establish a lobby content handshake or prove replay
 compatibility by itself. Validation must include native-only
 recordings, required-state captures, save/reload and recovery segments, differing

@@ -34,6 +34,14 @@ allActiveExtensions={}; assert(not adapter.compatible(manifest.automarket))
 assert(adapter.compatible(nil))
 ''')
 
+    def test_admission_protocol_preserves_the_automarket_wire_owner(self):
+        self.check('''
+allActiveExtensions[2].version='1.1.0'
+allActiveExtensions[3].version='1.1.0'
+assert(adapter.compatible(manifest.automarket))
+assert(pcall(validation.sessionCommand,marketCommand(),manifest))
+''')
+
     def test_unknown_custom_protocol_invalid_actor_fee_flags_and_sizes_fail(self):
         self.check('''
 for _,change in ipairs({{1,132},{5,2},{269,101},{272,255},{9,2},{17,2},{66,2}}) do

@@ -79,7 +79,8 @@ end
 
 function M:gap(reason,details)
   Trace.gap(self,reason,details)
-  if not require('code/multiplayer-session').presentationOrTransport({reason=reason,details=details}) then
+  if not require('code/multiplayer-session').presentationOrTransport({reason=reason,details=details},
+      self.capture and self.capture.admission) then
     self.recoveryPending=reason
   end
 end
