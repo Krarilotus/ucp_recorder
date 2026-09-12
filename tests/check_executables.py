@@ -4,6 +4,7 @@ import argparse
 import struct
 from lupa.luajit21 import LuaRuntime
 from native_save_fixture import native_save_fixture
+from native_rng_fixture import native_rng_fixture
 
 
 def image_reader(path):
@@ -55,7 +56,7 @@ def check(folder):
             assert (size,compressed,section)==(expected['size'],expected['compressed'],expected['section'])
         from test_world_header import check_references
         check_references(reader,name)
-        rng = native.addr(0x1a279c0)
+        rng = native_rng_fixture(name)['state']
         assert native.addr(0x1a3160c) == rng+0x9c4c
         from native_command_fixture import native_command_fixture
         commands=native_command_fixture(name)

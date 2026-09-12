@@ -275,3 +275,34 @@ are stand-ins; this is not physical multiplayer or a live match.
 Both native replay-view checks also pass: 24 player-summary cases and all eight
 players' resource-book views per game, with identity restored and player/RNG
 state unchanged. Pixel drawing is simulated.
+
+## Native RNG state and observers
+
+Recorder 0.50.16 resolves its RNG state and both stream entries once before
+installation. The lobby initialization context supplies the state pointer;
+its seed setter and both Protocol handler operands are verified. Full stream
+bodies establish the 40016-byte state layout, 20000-entry short table, separate
+indices, wrap rules and unchanged thiscall/return behavior. Diagnostic detours
+retain the original six-byte index loads and recheck both full bodies before
+installing either hook. There are no per-tick or per-draw scans.
+
+Reuse inspection: framework `fixes/threading.lua` at 02a7a6b moves the music
+timer but exports no RNG state/function API. Legacy `port/o_healer.lua` at
+caa50ab derives RNG operands for its own patch; it exports no shared RNG API.
+AIC Tactics `config/grace.lua` at e8812c8 resolves its recruitment context;
+Recorder cannot depend on a personality module for ordinary recordings. The
+existing Recorder observer therefore remains the owner, using framework
+`core.AOBScan`/`core.scanForAOB`, decoded operands and `core.detourCode`.
+OpenSHC `Random/RNG.hpp` and the original stream instructions confirm layout
+and behavior; their reference addresses are confined to tests.
+
+Validation: 498 portable tests pass (one existing skip), including relocation,
+negative discovery and late hook conflicts in Lua 5.4/LuaJIT. All six local and
+official EFIGS/Polish SHC/Extreme fixtures resolve three bindings, reject 13
+negative cases each and make six discovery calls without repeated scans.
+Original-instruction tests preserve all RNG bytes/registers with and without
+the observer at both index wraps. The actual Protocol/Recorder path also
+passes 600 SP dispatches, 1200 offline replay dispatches and 600 local captures
+per fixture. Emulator callback/memory/OS boundaries are stand-ins, not live
+game or physical multiplayer acceptance. Other native profiles, including
+the optional fire/spawn diagnostic contexts, remain unfinished.

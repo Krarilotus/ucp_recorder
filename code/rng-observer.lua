@@ -1,14 +1,11 @@
 -- Attribution only. Original RNG instructions execute unchanged after the detour.
-local native=require('code/native')
 local M={}
 function M.verify()
-  local sites={
-    {stream=1,address=native.addr(0x46a800),bytes={139,129,76,156,0,0}},
-    {stream=2,address=native.addr(0x46a7d0),bytes={139,129,72,156,0,0}},
-  }
+  local sites={}
   -- Check every entry before installing any hook.
-  for _,site in ipairs(sites) do
-    require('code/hook-check').verify(site,'RNG diagnostic hook conflicts at stream '..site.stream)
+  for stream,entry in ipairs(require('code/rng-bindings').resolve().streams) do
+    require('code/hook-check').verify(entry,'RNG diagnostic hook conflicts at stream '..stream)
+    sites[stream]={stream=stream,address=entry.address,bytes=core.readBytes(entry.address,6)}
   end
   return sites
 end

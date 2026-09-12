@@ -1,5 +1,9 @@
 """Original RNG execution with/without the Lua observer callback; UCP bridge is a stand-in."""
 import struct
+import re
+import pefile
+from native_command_fixture import native_command_fixture
+from native_rng_fixture import native_rng_fixture
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
     UC_X86_REG_EDX, UC_X86_REG_ESI, UC_X86_REG_EDI, UC_X86_REG_EBP,
@@ -7,6 +11,19 @@ from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
 
 
 def check_rng_observer(reader, lua, native, root, variant):
+    image=pefile.PE(data=reader.image).get_memory_mapped_image()
+    scans=[]
+    def scan(pattern,start=None):
+        scans.append((pattern,start))
+        expression=b''.join(b'.' if t=='?' else re.escape(bytes([int(t,16)])) for t in pattern.split())
+        offset=(start or 0x400000)-0x400000
+        found=re.search(expression,image[offset:],re.DOTALL)
+        return 0x400000+offset+found.start() if found else 0
+    lua.globals().scan=scan
+    lua.globals().core.AOBScan=scan;lua.globals().core.scanForAOB=scan
+    lua.globals().core.readInteger=lambda a:struct.unpack('<i',reader(a,4))[0]
+    lua.globals().commandHandler=native_command_fixture(variant)['handler']
+    lua.execute('modules={protocol={getNativeCommandInterface=function() return {handler=commandHandler} end}}')
     lua.globals().nativeObserverProfile = native
     lua.execute('''
 package.loaded['code/native']=nativeObserverProfile
@@ -35,8 +52,8 @@ end
         EDX=UC_X86_REG_EDX, ESI=UC_X86_REG_ESI, EDI=UC_X86_REG_EDI,
         EBP=UC_X86_REG_EBP, ESP=UC_X86_REG_ESP, EFLAGS=UC_X86_REG_EFLAGS)
     cases = 0
-    for stream, entry, offset in ((1, 0x46a800, 0x9c4c), (2, 0x46a7d0, 0x9c48)):
-        address = native.addr(entry)
+    for stream, offset in ((1, 0x9c4c), (2, 0x9c48)):
+        address = native_rng_fixture(variant)['streams'][stream-1]
         for index in (0, 1, 19998, 19999):
             outcomes = []
             for observed in (False, True):
@@ -72,4 +89,5 @@ end
             cases += 1
     print(f'PASS: {variant} {cases} original RNG/observer pairs including both index wraps; state/registers identical')
     assert lua.globals().actualAttribution.count == cases
+    assert len(scans)==6,'RNG observation repeated discovery'
     print(f'PASS: {variant} actual SP caller attribution observes all {cases} native cases without changing RNG state')
