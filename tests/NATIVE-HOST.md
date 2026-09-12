@@ -13,9 +13,12 @@ loading the Lua RPS library alone only exposes its functions. Run from that dire
 ```bat
 lua_rps_host.exe <recorder>/tests/check_input_chain_windows.lua <recorder> <framework>/content/ucp/code <winProcHandler-1.0.0.dll>
 lua_rps_host.exe <recorder>/tests/check_binary_memory_windows.lua <recorder> <framework>/content/ucp/code <cffi.dll>
+lua_rps_host.exe <recorder>/tests/check_pause_menu_windows.lua <recorder> <framework>/content/ucp/code <cffi.dll> <ui>/ui/headers/latest/ui.h <ui>/ui/menu.lua
 ```
 
 Use DLLs from the correctly versioned module ZIPs. The input check requires
 WinProc Handler 1.0.0's exports; 0.2.0 is insufficient. These checks use private
 allocations, native callbacks and Windows services without launching or attaching
 to a game. They do not establish live input, simulation or replay acceptance.
+The pause check uses the actual UI 1.0.1 source extracted into that private test
+directory, exercising its insertion API rather than a replacement array owner.

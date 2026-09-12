@@ -38,6 +38,7 @@ core = {
   exposeCode = function() return function() scheduled=scheduled+1 end end,
 }
 utils = {createLuaFunctionWrapper=function() return 0 end}
+hooks = {registerHookCallback=function() end}
 json = {encode=function(_,value) return value end, decode=function(_,value) return value end}
 io.open = function(path,mode)
   mode=mode:gsub('b','')

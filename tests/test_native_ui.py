@@ -206,28 +206,48 @@ assert(calls[2][3]==788 and calls[2][4]==12 and calls[2][6]==0xCCF4FF and calls[
 assert(calls[1][5]==-1 and calls[2][5]==-1)
 ''')
 
-    def test_restart_replacement_preserves_initialized_callbacks_and_never_overwrites_recording_row(self):
+    def test_pause_owner_runs_after_init_and_preserves_restart_callbacks(self):
         self.check('''
-local hooks,arrays={},{}; local playing=false; local nextFunction=700
+local observed={}; local playing=false; local nextFunction=700;local afterInit
 utils.createLuaFunctionWrapper=function() nextFunction=nextFunction+1; return nextFunction end
-core.hookCode=function(f,address) hooks[address]=f; return function() return 42 end end
+core.hookCode=function(f,address) observed[address]=f; return function() return 42 end end
 core.copyMemory=function(to,from,size)
  for i=0,size-4,4 do memory[to+i]=memory[from+i] or 0 end
 end
-core.writeCode=function(_,code) arrays[#arrays+1]=code[1].variables.array end
+core.writeCode=function() error('Pause initializer must not be patched') end
+hooks={registerHookCallback=function(name,callback) assert(name=='afterInit');afterInit=callback end}
+local modal={height=357,pointerToMenu=0x9000}
+local owner={menuItemsIndex=9,menuItems={},menu={menuItemArray=0x8000}}
+for i=0,9 do owner.menuItems[i]={address=0x8000+i*80};memory[0x8000+i*80+76]=0x9000 end
+local row=0x8000+5*80
+for offset,value in pairs({[4]=100,[8]=206,[12]=300,[16]=27,[20]=1001,[28]=1002}) do memory[row+offset]=value end
+memory[0x8000+9*80]=0x66
+local inserts=0
+function owner:insertMenuItem(index,params)
+ inserts=inserts+1;assert(index==9)
+ local base=core.allocate(11*80)
+ core.copyMemory(base,0x8000,10*80);core.copyMemory(base+10*80,0x8000+9*80,80)
+ core.copyMemory(base+index*80,params.address,80);memory[base+index*80+76]=0x9000
+ self.menu.menuItemArray=base;self.menuItems={};self.menuItemsIndex=10
+ for i=0,10 do self.menuItems[i]={address=base+i*80} end
+end
+local ffi={tonumber=function(v) return v end,addressof=function(item) return item.address end,
+ cast=function(ct,v) if ct=='MenuItem *' then return {[0]={address=v}} end;return v end}
+modules={cffi={cffi=function() return ffi end},ui={access=function()
+ return {manager={lookupModalMenu=function(id) assert(id==5);return modal end},
+  api={ui={Menu={fromPointer=function(_,p,id) assert(p==0x9000 and id==5);return owner end}}}}
+end}}
 ui:extendPause('Save',function() end,function() return not playing end,function() return playing end)
-local row=arrays[1]+5*80
--- Native construction happens AFTER extendPause. It resolves the callbacks
--- inherited from the interaction group, which are zero in the source template.
-memory[row+20]=1001; memory[row+28]=1002; memory[row+76]=0x9000
-memory[arrays[1]+9*80+76]=0x9000
-local activate=hooks[sites.activateModal.address]
-activate(0,5,1); assert(memory[row+20]==1001 and memory[row+28]==1002)
-playing=true; activate(0,5,1)
-assert(memory[row+20]~=0 and memory[row+28]~=0 and memory[row+28]~=1002)
-activate(0,5,1) -- reopening must not replace the saved original with our row
-playing=false; activate(0,5,1)
+local activate=observed[sites.activateModal.address]
+assert(inserts==0 and not ui.pauseMenu and activate(0,5,1)==42)
+afterInit();assert(inserts==1 and ui.pauseMenu)
+row=owner.menu.menuItemArray+5*80
+activate(0,5,1);assert(memory[row+20]==1001 and memory[row+28]==1002 and modal.height==405)
+playing=true;activate(0,5,1);activate(0,5,1)
+assert(memory[row+20]~=1001 and memory[row+28]~=1002 and modal.height==357)
+playing=false;activate(0,5,1)
 assert(memory[row+20]==1001 and memory[row+28]==1002 and memory[row+76]==0x9000)
+assert(inserts==1)
 ''')
 
     def test_summary_and_book_renderers_share_scoped_view_and_preserve_return_value(self):

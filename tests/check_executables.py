@@ -67,12 +67,6 @@ def check(folder):
                 if hasattr(site, 'items'):
                     expected=bytes(site['bytes'].values())
                     assert reader(site['address'],len(expected))==expected, f'{name}: {site_name}'
-        ui=lua.execute((root/'code/ui-sites.lua').read_text())[name]
-        pause=ui['pauseArray']['value']
-        assert struct.unpack('<I',reader(pause+9*80,4))[0]==0x66
-        for index in range(1,9):
-            x,y,width,height=struct.unpack('<4i',reader(pause+index*80+4,16))
-            assert x==100 and width==300 and height==27 and y+height<342
         # Decode the complete mood-selection function, including conditional
         # branches: checking only known patch sites would miss an extra RNG call.
         from capstone import Cs, CS_ARCH_X86, CS_MODE_32

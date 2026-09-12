@@ -65,3 +65,25 @@ luaopen_RPS alone does not initialize native callback state. This test does not
 establish live-game keyboard/graphics/Hotkeys composition acceptance.
 The full portable suite passes 481 tests with one existing skip. The init fixture
 now includes the declared input owner and the framework code-size operation.
+
+## Pause menu insertion
+
+The installed UI 1.0.1 `ui/menu.lua` exports `Menu:fromPointer` and
+`Menu:insertMenuItem`; `manager.lookupModalMenu(5)` supplies the initialized
+pause modal. Automarket 858890f uses this insertion API during framework
+`afterInit`, after native construction and before the Windows message loop.
+The actual CFFI implementation was exercised before adopting it here.
+
+Recorder now inserts its pause item through that owner at the same lifecycle
+boundary and retains the returned menu/allocation. It removes the private copy
+of the whole pause array and the constructor-operand patch, along with both
+fixed pause bindings. Restart control snapshots are taken after native callback
+initialization, located again in the current array when toggled, and restored
+without overwriting appended controls. Height changes retain other additions.
+
+The console check with actual UI source and installed CFFI/Lua/RPS passes
+insertion, preserved native callbacks/rows/sentinel, restart disabling/restoring,
+later owner reallocation, additive height changes and retained allocations after
+collection. Portable tests cover afterInit timing and the production consumer.
+Live pause-menu/replay acceptance remains outstanding. This does not yet remove
+the remaining UI callable/hook profiles; existing UI exports are the next reuse path.
