@@ -165,3 +165,31 @@ scans. An installed 32-bit Lua console check with the shipped native ZIP DLL
 (`a4dfd1beb49b09f8e2c52ad680101bd8843c9c008988268610442b7b85e1cc7c`)
 and actual Map read handles round-trips all Automarket payload bytes. Its framework
 loader and module inventory are stand-ins; no game or native save is run.
+
+## Private world codec
+
+Reuse inspection: framework `core.lua` at 02a7a6b exposes the cached AoB scanner
+and native call bridge, but no PKWARE buffer codec. Map Extensions 1.1.1 at
+9d35dfb (`mapextensions/game.lua`, `callbacks.lua`, `handles.lua`) owns wrapped
+save/load and ZIP sections. Its API operates on native world state or ZIP data;
+it does not provide compression of Recorder's immutable world-section buffers.
+Recorder's existing `world-codec.lua`, `world-container.write` and
+`codec-worker.new` already own that private-buffer path. Keep their original
+game primitives and buffer lifetime; change only their runtime binding here.
+
+Both codec entries now use framework AoB discovery, with shared SHC/Extreme
+contexts identifying workspace allocation, failure cleanup, thiscall stack
+cleanup and input argument access. Import operands and relative calls are
+relocatable. Both sites must resolve uniquely and pass context verification
+before either callable is exposed. Resolution runs once; compression batches
+and simulation ticks do not scan. No hook, alternate codec, global decoder,
+file-hash whitelist or fixed-address fallback is added. Other Recorder fixed
+profiles and live acceptance remain unfinished.
+
+Validation: the complete portable suite passes 490 tests (one existing skip),
+including relocated bindings on Lua 5.4 and LuaJIT. Each private SHC/Extreme
+image resolves both functions and rejects ten missing, ambiguous, modified or
+stale-cache cases before exposing any native call. The original-instruction
+codec/container/restore harness is also retained and now drives the production
+AoB path; its run status is recorded with the PR rather than inferred from these
+binding checks.

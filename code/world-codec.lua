@@ -1,11 +1,15 @@
 -- Use the game's PKWARE primitives on private data, never its global decoder or
 -- multiplayer save routine. Callers own source stability; the codec never yields.
-local native=require('code/native')
 local binary=require('code/binary-memory')
 local build=require('code/build-profile')
 local M={MAX_SECTION=32*1024*1024}
-local entries={SHC={implode=0x4724c0,explode=0x4725a0},
-  Extreme={implode=0x4726e0,explode=0x4727c0}}
+-- Shared SHC/Extreme wrappers: private 0x8dd8 workspace, allocation/lock
+-- failures, five stack arguments and thiscall cleanup. Relocatable imports and
+-- memset calls are wildcarded; no game decoder singleton is used.
+local contexts={
+  implode='83 EC 34 55 56 57 68 D8 8D 00 00 6A 42 8B F1 BD 01 00 00 00 FF 15 ? ? ? ? 8B F8 85 FF 75 09 5F 5E 5D 83 C4 34 C2 14 00 53 57 FF 15 ? ? ? ? 8B D8 85 DB 75 13 57 FF 15 ? ? ? ? 5B 5F 5E 33 C0 5D 83 C4 34 C2 14 00 6A 34 8D 44 24 14 6A 00 50 E8 ? ? ? ? 8B 44 24 64 8B 4C 24 5C 8B 54 24 60',
+  explode='83 EC 34 53 56 68 D8 8D 00 00 6A 42 BB 01 00 00 00 FF 15 ? ? ? ? 8B F0 85 F6 75 08 5E 5B 83 C4 34 C2 14 00 57 56 FF 15 ? ? ? ? 8B F8 85 FF 75 12 56 FF 15 ? ? ? ? 5F 5E 33 C0 5B 83 C4 34 C2 14 00 6A 34 8D 44 24 10 6A 00 50 E8 ? ? ? ? 8B 54 24 58 8B 4C 24 54 8B 44 24 5C',
+}
 local functions
 
 ---@class RecorderWorldCodec
@@ -17,10 +21,22 @@ local Codec={}
 
 local function prepare()
   if functions then return functions end
-  local sites=assert(entries[native.profile.name],'Unsupported native world codec')
-  local check=require('code/hook-check').verify
-  check({address=sites.implode,bytes={0x83,0xec,0x34,0x55,0x56,0x57}},'Native world compressor conflicts')
-  check({address=sites.explode,bytes={0x83,0xec,0x34,0x53,0x56}},'Native world decompressor conflicts')
+  local sites={}
+  for name,pattern in pairs(contexts) do
+    local ok,address=pcall(core.AOBScan,pattern)
+    assert(ok and type(address)=='number' and address>0,
+      'Recorder cannot resolve native world codec '..name)
+    local second=core.scanForAOB(pattern,address+1)
+    assert(second==nil or second==0,'Recorder has an ambiguous native world codec '..name)
+    local tokens={}
+    for token in pattern:gmatch('%S+') do tokens[#tokens+1]=token end
+    local bytes=core.readBytes(address,#tokens)
+    for i,token in ipairs(tokens) do
+      assert(token=='?' or bytes[i]==tonumber(token,16),
+        'Recorder has a modified or occupied native world codec '..name)
+    end
+    sites[name]=address
+  end
   binary.prepare()
   functions={implode=core.exposeCode(sites.implode,6,1),explode=core.exposeCode(sites.explode,6,1),address=sites.implode}
   return functions
