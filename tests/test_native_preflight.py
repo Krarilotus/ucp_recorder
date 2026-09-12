@@ -9,38 +9,45 @@ class NativePreflightTests(unittest.TestCase):
 
     def prepare(self):
         self.check('''
-profiles=nil
-for i=1,20 do
- local name,value=debug.getupvalue(realNative.verify,i)
- if name=='profiles' then profiles=value; break end
-end
-assert(profiles)
-function populate(profile)
- bytes={}
- core.writeBytes(0x400000,{0x4d,0x5a})
- core.writeBytes(0x40003c,{0x18,1,0,0})
- core.writeBytes(0x400118,profile.header)
-end
+profiles={{name='SHC'},{name='Extreme'}}
+function populate(profile) extreme=profile.name=='Extreme';bytes={} end
+major='1';minor='41';identityCalls=0;hashCalls=0
+data={version={getGameVersionMajor=function() return major end,
+ getGameVersionMinor=function() return minor end,isExtreme=function() return extreme end}}
+package.loaded['code/platform']={identity=function()
+ identityCalls=identityCalls+1;return {executable='C:/Games/Crusader/test.exe'} end}
+require('code/native-hash').file=function(path,limit)
+ assert(path=='C:/Games/Crusader/test.exe' and limit==64*1024*1024)
+ hashCalls=hashCalls+1;return string.rep(extreme and 'b' or 'a',64) end
 ''')
 
-    def test_header_selects_variant_without_fixed_lifecycle_bindings(self):
+    def test_framework_selects_variant_without_fixed_lifecycle_bindings(self):
         self.prepare()
         self.check('''
 for _,profile in ipairs(profiles) do
  populate(profile)
- assert(realNative.verify()==profile)
- assert(profile.sites==nil and profile.addresses==nil and realNative.addr==nil)
+ local result=realNative.verify();assert(result.name==profile.name)
+ assert(result.sha256==string.rep(extreme and 'b' or 'a',64))
+ assert(result.sites==nil and result.addresses==nil and result.header==nil and realNative.addr==nil)
 end
+assert(identityCalls==2 and hashCalls==2)
 ''')
 
-    def test_invalid_headers_clear_previous_variant(self):
+    def test_unsupported_version_or_unreadable_executable_clears_previous_identity(self):
         self.prepare()
         self.check('''
-for _,address in ipairs({0x400000,0x40003c,0x400118,0x400120,0x400140}) do
- populate(profiles[1]); assert(realNative.verify()==profiles[1])
- bytes[address]=0xcc
+for _,bad in ipairs({'40','42','invalid'}) do
+ minor='41';populate(profiles[1]);assert(realNative.verify().name=='SHC')
+ minor=bad
  assert(not pcall(realNative.verify) and realNative.profile==nil)
 end
+assert(hashCalls==3)
+minor='41';major='2';assert(not pcall(realNative.verify) and realNative.profile==nil)
+major='1';require('code/native-hash').file=function() error('cannot read') end
+assert(not pcall(realNative.verify) and realNative.profile==nil)
+require('code/native-hash').file=function() return 'malformed' end
+assert(not pcall(realNative.verify) and realNative.profile==nil)
+data=nil;assert(not pcall(realNative.verify) and realNative.profile==nil)
 ''')
 
     def test_unused_seed_site_is_neither_required_nor_patched(self):
@@ -56,7 +63,7 @@ for _,profile in ipairs(profiles) do
   if site.kind=='seed' then seed=site end
  end
  bytes[seed.address]=0xcc
- assert(realNative.verify()==profile)
+ assert(realNative.verify().name==profile.name)
  assert(fixes.verify()==sites)
  local ok,reason=pcall(fixes.verify,123)
  assert(not ok and tostring(reason):find('conflicts at seed',1,true))

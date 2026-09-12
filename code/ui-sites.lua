@@ -38,32 +38,17 @@ local function member(object,path)
   for key in path:gmatch('[^.]+') do object=object and object[key] end
   return object
 end
-local function verify(address,pattern,name)
-  local expected={}
-  for token in pattern:gmatch('%S+') do expected[#expected+1]=token end
-  local actual=core.readBytes(address,#expected)
-  for i,token in ipairs(expected) do
-    assert(token=='?' or actual[i]==tonumber(token,16),
-      'Recorder UI has a modified or occupied '..name)
-  end
-  return actual
-end
-local function unique(pattern,name)
-  local ok,address=pcall(core.AOBScan,pattern)
-  assert(ok and type(address)=='number' and address>0,'Recorder UI cannot resolve '..name)
-  local second=core.scanForAOB(pattern,address+1)
-  assert(second==nil or second==0,'Recorder UI has an ambiguous '..name)
-  return address
-end
 function M.resolve(api,ffi)
   assert(api and api.game and api.manager,'Recorder requires UI 1.0.1 access')
   local sites={}
+  local check=require('code/hook-check')
   for name,context in pairs(contexts) do
-    local address=context.owner and pointer(ffi,member(api.game,context.owner),name)
-      or unique(context.pattern,name)
-    local guard=verify(address,context.pattern,name)
+    local guard=context.owner
+      and check.context(pointer(ffi,member(api.game,context.owner),name),context.pattern,'Recorder UI '..name)
+      or check.resolve(context.pattern,'Recorder UI '..name)
+    local address=guard.address
     sites[name]={address=address,bytes=core.readBytes(address,context.size),
-      kind=context.kind,patch=context.patch,guard={address=address,bytes=guard}}
+      kind=context.kind,patch=context.patch,guard=guard}
     if context.operand then sites[name].value=core.readInteger(address+context.operand) end
   end
   for name,path in pairs(ownerValues) do
