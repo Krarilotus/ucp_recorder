@@ -5,8 +5,8 @@ from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
 from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_ECX, UC_X86_REG_EAX
 
 
-def check_spawn_context(reader, lua, root, variant):
-    context = lua.execute((root/'code/rng-spawn-context.lua').read_text())
+def check_spawn_context(reader, lua, root, variant, reference=False):
+    context = lua.execute((root/('tests/fixtures' if reference else 'code')/'rng-spawn-context.lua').read_text())
     profile = context.verify(variant)
     start, end = profile.entry, profile.call
     instructions = list(Cs(CS_ARCH_X86, CS_MODE_32).disasm(reader(start, end-start), start))
@@ -62,8 +62,8 @@ def check_menu_pause(reader, lua, root, variant):
     print(f'PASS: {variant} {cases} original native menu-pause queries, including multiplayer exclusion')
 
 
-def check_fire_context(reader, lua, root, variant):
-    context = lua.execute((root/'code/rng-fire-context.lua').read_text())
+def check_fire_context(reader, lua, root, variant, reference=False):
+    context = lua.execute((root/('tests/fixtures' if reference else 'code')/'rng-fire-context.lua').read_text())
     profile = context.verify(variant)
     machine = Uc(UC_ARCH_X86, UC_MODE_32)
     machine.mem_map(0x400000, 0x4000000)
@@ -71,8 +71,8 @@ def check_fire_context(reader, lua, root, variant):
     previous = lua.globals().core.readInteger
     lua.globals().core.readInteger = lambda a: struct.unpack('<i', machine.mem_read(a, 4))[0]
     try:
-        for site in context[variant].values():
-            start=site.address; code=reader(start,20)
+        for return_address,kind in profile.items():
+            start=return_address-20; code=reader(start,20)
             rng=start+20+struct.unpack('<i',code[-4:])[0]
             machine.mem_write(start,code)
             for values in ((4,120,160,8,3,100),(1,-8,0,256,-1,0)):
@@ -84,7 +84,7 @@ def check_fire_context(reader, lua, root, variant):
                 event=context.read(profile,start+20,sp,76394)
                 assert dict(event.items())==dict(zip(
                     ('player','microX','microY','height','spreadParameter','intensity'),values),
-                    kind=site.kind,time=76394,caller=stop)
+                    kind=kind,time=76394,caller=stop)
                 assert bytes(machine.mem_read(stack-32,64))==before
     finally:
         lua.globals().core.readInteger=previous

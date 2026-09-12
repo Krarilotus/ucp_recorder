@@ -53,10 +53,10 @@ function M:begin(manifest,mode)
   self.bytes=0; self:clear(); self.failed=nil
   self.previousTick=self.engine:tick()
   self.lastReturnedTick=self.previousTick
-  local contextOk,context=pcall(spawnContext.verify,native.profile.name)
+  local contextOk,context=pcall(spawnContext.verify)
   self.spawnProfile=contextOk and context or nil
   if not contextOk then print('RNG spawn context disabled: '..tostring(context)) end
-  local fireOk,fire=pcall(fireContext.verify,native.profile.name)
+  local fireOk,fire=pcall(fireContext.verify)
   self.fireProfile=fireOk and fire or nil
   if not fireOk then print('RNG fire context disabled: '..tostring(fire)) end
   self:write({kind='header',format=2,mode=mode,replay=manifest.id,

@@ -1,22 +1,29 @@
 -- Inputs to the two fire-admission routines, at their existing RNG2 call.
 -- This observes the caller and arguments; it neither ignites nor suppresses fire.
-local M={
- SHC={
-  {address=0x4052E0,kind='ignite',bytes={85,86,15,191,53,194,121,162,1,87,185,192,121,162,1,232,220,84,6,0}},
-  {address=0x4054E0,kind='spread',bytes={85,86,15,191,53,194,121,162,1,87,185,192,121,162,1,232,220,82,6,0}},
- },
- Extreme={
-  {address=0x4052F0,kind='ignite',bytes={85,86,15,191,53,194,174,75,2,87,185,192,174,75,2,232,236,86,6,0}},
-  {address=0x4054F0,kind='spread',bytes={85,86,15,191,53,194,174,75,2,87,185,192,174,75,2,232,236,84,6,0}},
- },
-}
-function M.verify(variant)
- local calls={}
- for _,site in ipairs(assert(M[variant],'Unsupported fire context profile')) do
-  require('code/hook-check').verify(site,'RNG fire context is unavailable')
-  calls[site.address+#site.bytes]=site.kind
+local M={}
+local binding,guards
+function M.verify()
+ local check=require('code/hook-check')
+ if not binding then
+  local rng=require('code/rng-bindings').resolve()
+  local calls,g={},{}
+  for _,kind in ipairs({'ignite','spread'}) do
+   local site=check.resolve(require('code/attribution-patterns')[kind],'Recorder RNG '..kind..' caller')
+   local a=site.address
+   assert(core.readInteger(a+5)==rng.state+2 and core.readInteger(a+11)==rng.state
+    and a+20+core.readInteger(a+16)==rng.streams[2].address,
+    'Recorder fire caller disagrees with the RNG owner')
+   assert(core.readInteger(a+45)==core.readInteger(a+38)+4,
+    'Recorder fire coordinate table layout is unavailable')
+   calls[a+20]=kind;g[kind]=site
+  end
+  assert(core.readInteger(g.ignite.address+38)==core.readInteger(g.spread.address+38)
+   and core.readInteger(g.ignite.address+101)==core.readInteger(g.spread.address+109),
+   'Recorder fire callers disagree on their native coordinate/tile tables')
+  binding=calls;guards=g
  end
- return calls
+ for _,site in pairs(guards) do check.verify(site,'RNG fire context is unavailable') end
+ return binding
 end
 function M.read(profile,address,stack,tick)
  local kind=profile[address]

@@ -25,6 +25,13 @@ assert(memory[100]==0x4052f4 and memory[140]==100)
     def setUp(self):
         fixture.RecorderTests.setUp(self)
         self.check('''
+-- Isolated attribution routing uses historical callers; binding tests exercise
+-- the production resolver with relocated owners and native executable images.
+for _,name in ipairs({'rng-fire-context','rng-spawn-context'}) do
+ local context=require('tests/fixtures/'..name);local verify=context.verify
+ context.verify=function() return verify('SHC') end
+ package.loaded['code/'..name]=context
+end
 local directories={}
 package.loaded['code/platform']={mkdir=function(path)
  if directories[path] then return false end; directories[path]=true; return true

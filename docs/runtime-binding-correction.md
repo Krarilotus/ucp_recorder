@@ -611,3 +611,30 @@ Native callees are executed where stated; gate helper callees, OS/transport and
 module bridges remain fixtures. Optional fire/spawn attribution bindings and the
 temporary identity gate remain unfinished. This is component evidence, not a
 live game, whole-world save/replay, physical multiplayer or performance claim.
+
+## Optional RNG caller attribution
+
+Recorder 0.50.26 replaces the last fixed fire/spawn caller tables. Three unique
+framework AoB contexts identify the native entry and RNG call, validate the
+saved-register/argument layout and agree with the existing RNG owner. Spawn also
+checks native capacity (2500 or 10000), paired capacity bounds and Protocol's
+clock/tag fields. Both fire callers must share coordinate and tile tables.
+The short fire entry was ambiguous in the actual executables; its identifying
+context includes the subsequent native admission logic. No game code is copied.
+
+The inspected owner and consumer are Recorder's `rng-observer` and
+`rng-attribution` at c9dc055. Attribution still reads stacks at that observer's
+existing two stream hooks; these optional bindings install no hook and perform
+no writes. They resolve lazily once when diagnostics starts and recheck current
+contexts on a later attempt. Cached RNG identity remains usable after Recorder
+has installed its own observer. A rejected optional context disables that part
+of diagnostics, preserving the match and existing diagnostic limits.
+
+519 portable tests pass (one existing skip). Lua 5.4 and LuaJIT cover relocated
+callers, both capacity layouts and owner/context disagreement. All six native
+SHC/Extreme local/EFIGS/Polish fixtures pass three callers, 32 rejection cases,
+two prior-observer-hook cases and 100 cached accesses without additional scans.
+Original native prologues establish the read-only argument layout: four fire
+cases without callee stubs and one spawn case with `setUnitValues` stubbed.
+The temporary executable identity gate remains to be replaced after the final
+binding inventory. These checks do not establish live game acceptance.
