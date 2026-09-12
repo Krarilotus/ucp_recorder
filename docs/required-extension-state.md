@@ -36,3 +36,11 @@ compatibility by itself. Validation must include native-only
 recordings, required-state captures, save/reload and recovery segments, differing
 provider content, physical peers and measured checkpoint cost. No such acceptance
 is claimed by these source changes.
+
+AI-only single-player matches use native observer slot `0`. Recorder accepts it
+only for recordings with no player commands; multiplayer and command actors
+still require slots `1` through `8`. This permits saving spectator recordings
+without assigning the observer control of an AI. A GamerGrill match exposed the
+old manifest rejection after 17 successful required-state checkpoints; the
+corrected validation passes file-based copy/seal/preflight tests. Native replay
+playback with observer slot zero remains an acceptance check.
