@@ -2,27 +2,15 @@
 -- Repeated maintenance-only passes cost one native increment each. Only the
 -- rare unclocked world admission crosses into Lua to preserve execution order.
 local fixes=require('code/fixes')
-local native=require('code/native')
 local M={}
-local profiles={
-  SHC={
-    maintenance={address=0x45ce7c,bytes={185,8,50,169,1}},
-    world={address=0x45cf56,bytes={139,206,232,147,145,255,255},target=0x4560f0},
-    gameState=0x112b0b8,
-  },
-  Extreme={
-    maintenance={address=0x45d08c,bytes={185,8,103,82,2}},
-    world={address=0x45d166,bytes={139,206,232,179,145,255,255},target=0x456320},
-    gameState=0x112b538,
-  },
-}
-M.profiles=profiles
 
 function M.verify()
-  local profile=assert(profiles[native.profile.name])
+  local profile=require('code/maintenance-sites').resolve()
   for _,key in ipairs({'maintenance','world'}) do
-    require('code/hook-check').verify(profile[key],'Recorder maintenance hook conflicts at '..key)
+    local site=profile[key]
+    require('code/hook-check').verify(site.guard or site,'Recorder maintenance hook conflicts at '..key)
   end
+  for _,guard in ipairs(profile.guards or {}) do require('code/hook-check').verify(guard,'Recorder phase reference changed') end
   return profile
 end
 
@@ -51,6 +39,7 @@ function M.runner(sites,profile,state,origin)
 end
 
 function M.new(engine,profile,onWorld)
+  assert(M.verify()==profile,'Recorder maintenance profile was not verified')
   local self=setmetatable({engine=engine,state=core.allocate(24,true)},{__index=M})
   self.internalWork=self.state+20
   local callback=core.allocateCode({0x90,0x90,0x90,0x90,0x90,0xc3})

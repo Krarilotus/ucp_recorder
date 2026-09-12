@@ -75,7 +75,7 @@ function commandFixture()
 end
 commandOwner={getNativeCommandInterface=commandFixture}
 modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
-for _,name in ipairs({'network-sites','world-hash-sites'}) do
+for _,name in ipairs({'network-sites','world-hash-sites','maintenance-sites'}) do
  local fixture=require('tests/fixtures/'..name)
  fixture.resolve=function() return fixture[realNative.profile.name or 'SHC'] end
  package.loaded['code/'..name]=fixture
@@ -134,7 +134,7 @@ assert(memory[0x191de0c]==777 and memory[0x01a275dc]==3)
 package.loaded['code/native']={profile={name='SHC'},verify=function() end,addr=function(a) return a end}
 local sites=require('code/engine-sites').SHC
 for _,key in ipairs({'maintenance','world'}) do
- local site=require('code/maintenance-native').profiles.SHC[key]
+ local site=require('tests/fixtures/maintenance-sites').SHC[key]
  core.writeBytes(site.address,site.bytes)
 end
 for _,site in pairs(sites) do

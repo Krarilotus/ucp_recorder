@@ -13,7 +13,7 @@ class MaintenanceNativeTests(unittest.TestCase):
         self.lua.globals().source_root = ROOT.as_posix()
         self.lua.execute("package.path=source_root..'/?.lua;'..package.path")
         self.emitter = self.lua.eval("require('code/scoped-code')")
-        self.profiles = self.lua.eval("require('code/maintenance-native')").profiles
+        self.profiles = self.lua.eval("require('tests/fixtures/maintenance-sites')")
 
     def run_observer(self, variant, kind, *, active=1, mode=99, tick=11,
                      previous=11, count=0, unclocked=0, flags=0xa83):
