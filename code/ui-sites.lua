@@ -1,64 +1,89 @@
--- Native UI entry points/pointer operands checked against both original executables.
--- Signatures and ABI: UCP ui module ui/game.lua and ui/headers/latest/ui.h.
-return {
-  SHC = {
-    updateMenu = {address=0x004F6470,bytes={86,87,139,241,51,255}},
-    menuHit = {address=0x004F6485,bytes={137,61,204,179,242,0},value=0x00F2B3CC},
-    mouse = {address=0x004F4349,bytes={185,176,201,242,0},value=0x00F2C9B0},
-    missionBar = {address=0x004D7DDA,bytes={106,4,104,164,0,0,0,185,144,160,254,1,232,181,214,247,255},value=0x01FEA090},
-    spriteClip = {address=0x00454990,bytes={139,68,36,4,139,84,36,8,137,129,84,200}},
-    clippedSprite = {address=0x004554A0,bytes={139,68,36,4,139,84,36,8,83,85,86,87}},
-    maskedSprite = {address=0x004557B0,bytes={81,131,61,228,160,254,1,0,139,21,188,199}},
-    reportPause = {address=0x00444EB3, bytes={131,61,84,160,254,1,0}, kind='raw', patch='equalFlags'},
-    mapViewport = {address=0x00454FA4, bytes={139,61,92,236,26,2,3,207,3,206,105,201,216,15,0,0,3,202,3,13,88,236,26,2}, value=0x021AEC58},
-    avatar = {address=0x004D8AE0, bytes={83,139,92,36,8,85,86,51,237}},
-    header = {address=0x00468FE0, bytes={131,68,36,8,8,83,139,92,36,8,85,139,108,36,20,131,195,8,131,237,16,86,51,192,87}},
-    playerSummary = {address=0x00433780, bytes={131,236,16,139,13,220,117,162,1}},
-    buildingAndStatus = {address=0x004494E0, bytes={131,61,148,131,249,0,20}},
-    textWidth = {address=0x00471690, bytes={86,139,116,36,8,133,246,117,6,51,192,94,194,8,0}},
-    basicButton = {address=0x00463A90, bytes={139,68,36,4,131,236,8,86,139,53,168,49,237,0,51,201}},
-    buttonSurface = {address=0x004918CC, bytes={185,188,199,242,0}, value=0x00F2C7BC},
-    handleMenu = {address=0x004F6280, bytes={83,139,217,86,139,51,199,67,20,0,0,0,0}},
-    menuConstructor = {address=0x004F4100, bytes={81,83,139,217}},
-    modalConstructor = {address=0x004A9E00, bytes={139,84,36,8,139,193,139,76,36,4,137,8}},
-    activateModal = {address=0x004A9ED0, bytes={83,85,51,237,57,108,36,16}},
-    text = {address=0x00474250, bytes={131,124,36,28,0,83,86,139,241,117,6,199,6,0,0,0,0,139,92,36,12,133,219,116,124}},
-    border = {address=0x004711B0, bytes={86,139,241,232,152,122,255,255,139,68,36,24,139,76,36,20,139,84,36,16,80,139,68,36,16,81,139,76,36,16,82,80,81,139,206,232,168,122,255,255,133,192,116,54}},
-    buttonState = {address=0x00428615, bytes={139,61,168,49,237,0,141,68,56,101}, value=0x00ED31A8},
-    textManager = {address=0x004337DC, bytes={137,21,120,117,21,2,126,5}, value=0x02157578},
-    pencil = {address=0x004090B9, bytes={185,32,215,145,1,232,205,125,6,0,57,126,216}, value=0x0191D720},
-    gold = {address=0x004679AA, bytes={102,163,216,51,223,0,232,155,254,255,255,106,88}, value=0x00DF33D8},
-    modalComposition = {address=0x0042544C, bytes={185,144,124,254,1,232,122,74,8,0,94,91,233,147,114,9,0}, value=0x01FE7C90},
-    modalStack = {address=0x004A9E40, bytes={139,21,164,66,223,0,137,80,36}, value=0x00DF42A4},
-  },
-  Extreme = {
-    updateMenu = {address=0x004F6800,bytes={86,87,139,241,51,255}},
-    menuHit = {address=0x004F6815,bytes={137,61,76,184,242,0},value=0x00F2B84C},
-    mouse = {address=0x004F46D9,bytes={185,48,206,242,0},value=0x00F2CE30},
-    missionBar = {address=0x004D816A,bytes={106,4,104,164,0,0,0,185,144,213,167,2,232,85,213,247,255},value=0x02A7D590},
-    spriteClip = {address=0x00454BC0,bytes={139,68,36,4,139,84,36,8,137,129,84,200}},
-    clippedSprite = {address=0x004556D0,bytes={139,68,36,4,139,84,36,8,83,85,86,87}},
-    maskedSprite = {address=0x004559E0,bytes={81,131,61,228,213,167,2,0,139,21,60,204}},
-    reportPause = {address=0x004450E3, bytes={131,61,84,213,167,2,0}, kind='raw', patch='equalFlags'},
-    mapViewport = {address=0x004551D4, bytes={139,61,92,33,196,2,3,207,3,206,105,201,216,15,0,0,3,202,3,13,88,33,196,2}, value=0x02C42158},
-    avatar = {address=0x004D8E70, bytes={83,139,92,36,8,85,86,51,237}},
-    header = {address=0x00469210, bytes={131,68,36,8,8,83,139,92,36,8,85,139,108,36,20,131,195,8,131,237,16,86,51,192,87}},
-    playerSummary = {address=0x004339C0, bytes={131,236,16,139,13,220,170,75,2}},
-    buildingAndStatus = {address=0x00449710, bytes={131,61,20,136,249,0,20}},
-    textWidth = {address=0x004718B0, bytes={86,139,116,36,8,133,246,117,6,51,192,94,194,8,0}},
-    basicButton = {address=0x00463CA0, bytes={139,68,36,4,131,236,8,86,139,53,40,54,237,0,51,201}},
-    buttonSurface = {address=0x00491A2C, bytes={185,60,204,242,0}, value=0x00F2CC3C},
-    handleMenu = {address=0x004F6610, bytes={83,139,217,86,139,51,199,67,20,0,0,0,0}},
-    menuConstructor = {address=0x004F4490, bytes={81,83,139,217}},
-    modalConstructor = {address=0x004A9F70, bytes={139,84,36,8,139,193,139,76,36,4,137,8}},
-    activateModal = {address=0x004AA040, bytes={83,85,51,237,57,108,36,16}},
-    text = {address=0x00474480, bytes={131,124,36,28,0,83,86,139,241,117,6,199,6,0,0,0,0,139,92,36,12,133,219,116,124}},
-    border = {address=0x004713D0, bytes={86,139,241,232,168,122,255,255,139,68,36,24,139,76,36,20,139,84,36,16,80,139,68,36,16,81,139,76,36,16,82,80,81,139,206,232,184,122,255,255,133,192,116,54}},
-    buttonState = {address=0x00428645, bytes={139,61,40,54,237,0,141,68,56,101}, value=0x00ED3628},
-    textManager = {address=0x00433A1C, bytes={137,21,120,170,190,2,126,5}, value=0x02BEAA78},
-    pencil = {address=0x004090C9, bytes={185,144,71,53,2,232,221,127,6,0,57,126,216}, value=0x02354790},
-    gold = {address=0x00467BDA, bytes={102,163,120,53,223,0,232,155,254,255,255,106,88}, value=0x00DF3578},
-    modalComposition = {address=0x004254FC, bytes={185,144,177,167,2,232,58,75,8,0,94,91,233,83,115,9,0}, value=0x02A7B190},
-    modalStack = {address=0x004A9FB0, bytes={139,21,60,67,223,0,137,80,36}, value=0x00DF433C},
-  },
+-- UI 1.0.1 retains its exported bindings; only missing capabilities use AoB.
+local contexts={
+  activateModal={pattern='53 55 33 ED 39 6C 24 10 8B D9 75 16 39 2B 75 12 39 2D ? ? ? ? 74 0A B9 ? ? ? ? E8 ? ? ? ? 83 7B 2C 13 75 19 B9 ? ? ? ? C7 43 2C FF FF FF FF E8 ? ? ? ? 85 C0 0F 85 89 01 00 00', size=8, owner='UI.activateModalMenu'},
+  avatar={pattern='53 8B 5C 24 08 55 56 33 ED 83 3C 9D ? ? ? ? FF 57 75 07 8B 2C 9D ? ? ? ? 8B 74 24 1C 8B 7C 24 18 56 57 8D 83 22 02 00 00 50 6A 2E B9 ? ? ? ? E8 ? ? ? ? 85 ED 75 78 8B 04 9D ? ? ? ?', size=9},
+  basicButton={pattern='8B 44 24 04 83 EC 08 56 8B 35 ? ? ? ? 33 C9 83 F8 20 57 8B 3D ? ? ? ? 0F 84 38 05 00 00 83 F8 FF 75 0B 89 4C 24 14 8D 48 02 8B 44 24 14 8D 84 C0 E0 FE FF FF 03 C0 99 83 E2 1F 55 03 C2', size=16, owner='Rendering.renderButtonBackground'},
+  border={pattern='56 8B F1 E8 ? ? ? ? 8B 44 24 18 8B 4C 24 14 8B 54 24 10 50 8B 44 24 10 51 8B 4C 24 10 52 50 51 8B CE E8 ? ? ? ? 85 C0 74 36 57 8B CE E8 ? ? ? ? 8B 56 3C 8B 7E 34 8B CE 89 56 34 E8 ? ? ? ?', size=44, owner='Rendering.drawBorderBox'},
+  buildingAndStatus={pattern='83 3D ? ? ? ? 14 C7 05 ? ? ? ? 00 00 00 00 75 14 A1 ? ? ? ? 05 D8 01 00 00 50 6A 00 6A 03 E9 C4 00 00 00 A1 ? ? ? ? 83 F8 01 75 48 0F B7 0D ? ? ? ? A1 ? ? ? ? 51 8B 0D ? ? ? ?', size=7},
+  clippedSprite={pattern='8B 44 24 04 8B 54 24 08 53 55 56 57 8B F9 8B 0C 85 ? ? ? ? 69 C0 58 14 00 00 8D 74 11 FF 8B 1C B5 ? ? ? ? 03 5F 78 83 BC 38 30 05 00 00 01 8D AC 38 30 05 00 00 75 27 8B C6 C1 E0 04 0F BF 88 ? ? ? ?', size=12},
+  handleMenu={pattern='53 8B D9 56 8B 33 C7 43 14 00 00 00 00 8B 06 83 F8 66 0F 84 B9 01 00 00 57 8B 7C 24 10 8D 49 00 83 F8 64 75 27 A1 ? ? ? ? 39 46 18 0F 84 8E 01 00 00 83 FF 02 0F 84 85 01 00 00 8B 46 20 8D 0C 80', size=13},
+  header={pattern='83 44 24 08 08 53 8B 5C 24 08 55 8B 6C 24 14 83 C3 08 83 ED 10 56 33 C0 57 89 44 24 14 8D 49 00 85 C0 75 05 8D 78 30 EB 0F 8B F8 83 EF 38 F7 DF 1B FF 83 E7 FA 83 C7 3C 33 F6 85 ED 7E 4C 8B 4C 24 18', size=25},
+  mapViewport={pattern='8B 3D ? ? ? ? 03 CF 03 CE 69 C9 D8 0F 00 00 03 CA 03 0D ? ? ? ? 8B 15 ? ? ? ? 03 0D ? ? ? ? 8D 0C 4A 8B 55 F4 89 4D DC 8B 0A BA D8 0F 00 00 2B D1 03 D2 89 55 EC 8D 14 09 2B C2', size=24, operand=20},
+  maskedSprite={pattern='51 83 3D ? ? ? ? 00 8B 15 ? ? ? ? 55 8B E9 56 8B 75 78 89 74 24 08 74 4E 8B 44 24 10 8B 0C 85 ? ? ? ? 8B 54 24 14 8D 4C 11 FF 8B 54 24 28 8B C1 8B 0C 8D ? ? ? ? 52 C1 E0 04 0F BF 90 ? ? ? ?', size=12},
+  menuConstructor={pattern='51 53 8B D9 33 C9 56 8B 74 24 10 89 33 89 4B 04 89 4B 08 C7 43 0C E8 03 00 00 89 4B 18 89 4B 34 C7 43 1C 18 FC FF FF 83 3E 66 89 5C 24 08 0F 84 1C 01 00 00 55 57 8D 46 04 EB 09 EB 03 8D 49 00', size=4, owner='UI.Menu'},
+  missionBar={pattern='6A 04 68 A4 00 00 00 B9 ? ? ? ? E8 ? ? ? ? B9 ? ? ? ? E8 ? ? ? ? 6A 00 6A 03 68 A4 00 00 00 8D 56 08 52 57 6A 01 68 A4 00 00 00 B9 ? ? ? ? E8 ? ? ? ? C7 05 ? ? ? ? 01 00 00 00', size=17, operand=8},
+  modalConstructor={pattern='8B 54 24 08 8B C1 8B 4C 24 04 89 08 8B 4C 24 0C 89 50 04 8B 54 24 10 89 48 08 8B 4C 24 14 89 50 0C 8B 54 24 18 89 48 10 8B 4C 24 1C 89 50 14 8B 54 24 20 89 48 18 8B 4C 24 24 89 50 1C 89 48 20', size=12, owner='UI.MenuModal'},
+  playerSummary={pattern='83 EC 10 8B 0D ? ? ? ? 69 C9 F4 39 00 00 8B 91 ? ? ? ? B8 1F 85 EB 51 F7 EA 8B 81 ? ? ? ? 53 55 8B A9 ? ? ? ? C1 FA 05 56 8B B1 ? ? ? ? 89 4C 24 18 8B 0D ? ? ? ? 8B DA', size=9},
+  reportPause={pattern='83 3D ? ? ? ? 00 0F 85 BD 02 00 00 A1 ? ? ? ? BB 01 00 00 00 3B C3 0F 84 8E FE FF FF 83 F8 06 0F 84 85 FE FF FF 83 3D ? ? ? ? 0F 75 0F B9 ? ? ? ? E8 ? ? ? ? A1 ? ? ? ?', size=7, kind='raw', patch='equalFlags'},
+  spriteClip={pattern='8B 44 24 04 8B 54 24 08 89 81 54 C8 16 00 8B 44 24 0C 89 91 58 C8 16 00 8B 54 24 10 89 81 5C C8 16 00 89 91 60 C8 16 00 C2 10 00', size=12},
+  text={pattern='83 7C 24 1C 00 53 56 8B F1 75 06 C7 06 00 00 00 00 8B 5C 24 0C 85 DB 74 7C 8B C3 8D 50 01 8B FF 8A 08 83 C0 01 84 C9 75 F7 8B 4C 24 20 57 8D 4C C9 12 2B C2 8D 3C 8E 50 53 8B CF E8 ? ? ? ?', size=25, owner='Rendering.renderTextToScreenConst'},
+  textWidth={pattern='56 8B 74 24 08 85 F6 75 06 33 C0 5E C2 08 00 8B C6 57 8D 78 01 8A 10 83 C0 01 84 D2 75 F7 2B C7 50 8B 44 24 14 8D 44 C0 12 56 8D 0C 81 E8 ? ? ? ? 5F 5E C2 08 00', size=15},
+  updateMenu={pattern='56 57 8B F1 33 FF 39 7E 38 75 03 89 7E 3C 89 7E 38 89 7E 40 57 89 3D ? ? ? ? E8 ? ? ? ? 89 7E 10 5F 5E C3', size=6},
 }
+local ownerValues={
+  textManager='Rendering.textManager', pencil='Rendering.pencilRenderCore',
+  gold='Rendering.Colors.pGreyishYellow', buttonState='Rendering.ButtonState',
+  buttonSurface='Rendering.alphaAndButtonSurface', mouse='Input.mouseState',
+  modalComposition='UI.MenuModalComposition1',
+}
+local M={}
+local function pointer(ffi,value,name)
+  assert(value~=nil,'Recorder UI owner is missing '..name)
+  local address=ffi.tonumber(ffi.cast('unsigned long',value))
+  assert(type(address)=='number' and address>0 and address<0x80000000,
+    'Recorder UI owner returned an invalid '..name)
+  return address
+end
+local function member(object,path)
+  for key in path:gmatch('[^.]+') do object=object and object[key] end
+  return object
+end
+local function verify(address,pattern,name)
+  local expected={}
+  for token in pattern:gmatch('%S+') do expected[#expected+1]=token end
+  local actual=core.readBytes(address,#expected)
+  for i,token in ipairs(expected) do
+    assert(token=='?' or actual[i]==tonumber(token,16),
+      'Recorder UI has a modified or occupied '..name)
+  end
+  return actual
+end
+local function unique(pattern,name)
+  local ok,address=pcall(core.AOBScan,pattern)
+  assert(ok and type(address)=='number' and address>0,'Recorder UI cannot resolve '..name)
+  local second=core.scanForAOB(pattern,address+1)
+  assert(second==nil or second==0,'Recorder UI has an ambiguous '..name)
+  return address
+end
+function M.resolve(api,ffi)
+  assert(api and api.game and api.manager,'Recorder requires UI 1.0.1 access')
+  local sites={}
+  for name,context in pairs(contexts) do
+    local address=context.owner and pointer(ffi,member(api.game,context.owner),name)
+      or unique(context.pattern,name)
+    local guard=verify(address,context.pattern,name)
+    sites[name]={address=address,bytes=core.readBytes(address,context.size),
+      kind=context.kind,patch=context.patch,guard={address=address,bytes=guard}}
+    if context.operand then sites[name].value=core.readInteger(address+context.operand) end
+  end
+  for name,path in pairs(ownerValues) do
+    sites[name]={value=pointer(ffi,member(api.game,path),name)}
+  end
+  local state=api.manager.getState()
+  sites.modalStack={value=pointer(ffi,state and state.modalMenuStackTop,'modal stack')}
+  -- Native update clears this flag immediately before dispatching menu items.
+  sites.menuHit={value=core.readInteger(sites.updateMenu.address+23)}
+  assert(sites.menuHit.value>0,'Recorder UI has an invalid menu hit flag')
+  -- Three calls in the mission strip must address the same texture owner.
+  local bar=sites.missionBar
+  assert(core.readInteger(bar.address+18)==bar.value and core.readInteger(bar.address+49)==bar.value,
+    'Recorder UI mission texture operands disagree')
+  local viewport=sites.mapViewport
+  assert(core.readInteger(viewport.address+2)==viewport.value+4,
+    'Recorder UI viewport coordinate layout differs')
+  -- The native building/status selector is WindowState.currentBuildMenu (+0x5c).
+  sites.window={value=core.readInteger(sites.buildingAndStatus.address+2)-0x5c}
+  assert(sites.window.value>0,'Recorder UI has an invalid window state')
+  return sites
+end
+return M

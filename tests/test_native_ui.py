@@ -368,12 +368,13 @@ assert(not seen[0] and seen[1] and not seen[2] and seen[3])
     def test_optional_ui_resolves_entries_before_recorder_hooks(self):
         self.check('''
 local accessed=false
-modules={ui={access=function() accessed=true end},
+local api={}; local ffi={}
+modules={ui={access=function() accessed=true; return api end},
+ cffi={cffi=function() return ffi end},
  winProcHandler={cinterface=function() return {RegisterProc=101,CallNextProc=102} end}}
-core.readBytes=function(address,size)
+require('code/ui-sites').resolve=function(owner,cffi)
  assert(accessed,'UI callable entries were not resolved before native verification')
- for _,site in pairs(sites) do if site.address==address then return site.bytes end end
- error('unexpected address')
+ assert(owner==api and cffi==ffi); return sites
 end
 assert(NativeUI.verify()==sites)
 modules=nil
@@ -442,7 +443,10 @@ assert(memory[0x9000]==-2147483645 and memory[0xa000]==3)
         self.check('''
 realNative.profile.name='SHC'
 NativeUI=require('code/native-ui')
-sites=require('code/ui-sites').SHC
+sites=dofile(source_root..'/tests/fixtures/ui-sites.lua').SHC
+for _,site in pairs(sites) do core.writeBytes(site.address,site.bytes) end
+local b=sites.buildingAndStatus.bytes
+sites.window={value=b[3]+b[4]*256+b[5]*65536+b[6]*16777216-0x5c}
 local ranges={}
 local allocate=core.allocate
 core.allocate=function(size)

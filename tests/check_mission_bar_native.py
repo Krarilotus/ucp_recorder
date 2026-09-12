@@ -6,7 +6,7 @@ from unicorn.x86_const import UC_X86_REG_ECX, UC_X86_REG_ESP, UC_X86_REG_EBX
 
 
 def check_mission_bar(reader,lua,root,variant):
-    sites=lua.execute((root/'code/ui-sites.lua').read_text())[variant]
+    sites=lua.execute((root/'tests/fixtures/ui-sites.lua').read_text())[variant]
     reference=reader(sites.missionBar.address,17)
     assert reference[:8]==bytes.fromhex('6a0468a4000000b9')
     assert struct.unpack_from('<I',reference,8)[0]==sites.missionBar.value

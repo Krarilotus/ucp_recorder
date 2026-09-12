@@ -13,6 +13,8 @@ local mouse=9000; local overlay={menu=7000}
 local ui={sites={mouse={value=mouse},menuHit={value=9500},updateMenu={address=5000,bytes={1,2,3,4,5,6}}},
  inputOverlays={[14]=6000,[16]=6000},updateOverlay=function(_,root,action)
   assert(root==6000 and action==0); return visible and overlay or nil end}
+setmetatable(ui,{__index=require('code/native-ui')})
+core.writeBytes(5000,ui.sites.updateMenu.bytes)
 local inNative=false
 core.hookCode=function(fn,address,count,convention,length)
  assert(address==5000 and count==1 and convention==1 and length==6); hook=fn

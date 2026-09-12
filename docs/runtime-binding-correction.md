@@ -87,3 +87,48 @@ later owner reallocation, additive height changes and retained allocations after
 collection. Portable tests cover afterInit timing and the production consumer.
 Live pause-menu/replay acceptance remains outstanding. This does not yet remove
 the remaining UI callable/hook profiles; existing UI exports are the next reuse path.
+
+## UI binding inventory
+
+Inspected installed UI 1.0.1 and source d3a807c (`ui/game.lua`, `manager/init.lua`,
+`init.lua`), its CFFI ABI declarations and the Automarket caller. Before Recorder
+installs any UI hooks, `ui:access()` resolves its main-state exports. Reuse
+`UI.Menu`, `UI.MenuModal`, `UI.activateModalMenu`, `Rendering.renderTextToScreenConst`,
+`Rendering.drawBorderBox` and `Rendering.renderButtonBackground`. Reuse its text
+manager, pencil, color, button state/surface, mouse and modal-composition pointers,
+and `manager.getState().modalMenuStackTop`. Verify callable instruction context
+at the owner's returned pointer; do not scan again for these exports.
+
+The inspected API has no exports for menu update/dispatch, player-summary and
+building-status render boundaries, report admission, header/portrait rendering,
+text width, clipped/masked mission sprites or map viewport coordinates. Recorder
+already owns these replay presentation hooks; replace their private address
+profiles with framework AoB discovery and decoded operands. Derive the hit flag
+from the verified menu-update body rather than scanning for it separately.
+Resolve once at preflight, reject absent/ambiguous/modified contexts, then retain
+the original overwritten bytes for UCP's existing hook facilities. No new hooks
+or simulation work are added. Recorder's broader lifecycle/world profiles are
+still separate unfinished work; this inventory does not authorize a fixed-address
+fallback or removing their current guard while those profiles remain.
+
+The UI profile table is now removed from production. Six callable addresses and
+eight data pointers come from UI; thirteen further contexts use framework scans.
+Native operands supply the remaining roots. Each hook checks the full captured
+preflight context immediately before installation, including operands and code
+beyond the overwritten prologue. This adds no scans or work to simulation ticks.
+
+Both private SHC 1.41 and Extreme 1.41 images pass all 29 named bindings and 34
+negative cases each with the installed UI `ui/game.lua` and actual framework
+`utils.AOBExtract`. The CFFI boundary in this image check returns numeric pointers;
+it does not execute game code. Existing original-instruction presentation checks
+cover the native calling conventions separately. Portable Lua 5.4/LuaJIT tests
+cover relocated bindings, absent/ambiguous sites, missing owner exports, conflicting
+operands and a change after preflight. See `tests/check_ui_bindings.py`.
+The full portable suite passes 484 tests (one existing skip). Original-instruction
+header, mission-bar raster/clip, menu-input and 192 report-admission cases per
+game family pass. Rendering stand-ins are identified by each native harness;
+the mission TGX check executes the original rasterizer against private surfaces.
+
+This is not a completed Recorder binding port: lifecycle, engine, world, history,
+network and other existing fixed profiles still remain. Installed UI/Hotkeys/game
+composition, language/distribution variants and live replay acceptance are pending.

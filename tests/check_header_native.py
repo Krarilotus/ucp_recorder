@@ -6,7 +6,7 @@ from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EBX, UC_X86_REG_ESI, UC
 
 
 def check_header(reader, lua, root, variant):
-    sites = lua.execute((root/'code/ui-sites.lua').read_text())[variant]
+    sites = lua.execute((root/'tests/fixtures/ui-sites.lua').read_text())[variant]
     start = sites.header.address
     instructions = []
     for item in Cs(CS_ARCH_X86, CS_MODE_32).disasm(reader(start, 0x200), start):

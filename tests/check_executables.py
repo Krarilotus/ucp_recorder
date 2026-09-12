@@ -62,7 +62,8 @@ def check(folder):
         assert reader(menu, 1) == b'\x68'
         assert struct.unpack('<I', reader(menu+1, 4))[0] == native.addr(0x5e9848)
         for profile_file in ('engine-sites.lua','ui-sites.lua','scoped-sites.lua','network-sites.lua','offline-sites.lua'):
-            sites=lua.execute((root/'code'/profile_file).read_text())[name]
+            source=root/('tests/fixtures' if profile_file=='ui-sites.lua' else 'code')/profile_file
+            sites=lua.execute(source.read_text())[name]
             for site_name,site in sites.items():
                 if hasattr(site, 'items'):
                     expected=bytes(site['bytes'].values())
