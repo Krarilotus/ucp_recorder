@@ -11,7 +11,7 @@ class HistoryNativeTests(unittest.TestCase):
         self.check(r'''
 realNative.profile={name='SHC',addresses={[0x191d768]=0x191d768,[0x1fe7d1c]=0x1fe7d1c}}
 local store=require('code/sessions'); store.list=function() return {} end
-sites=require('code/history-sites').SHC
+sites=require('tests/fixtures/history-sites').SHC
 battle:begin(); nativeRecord=core.readString(battle.buffer,stats.SIZE)
 core.writeString(sites.records,nativeRecord); core.writeInteger(sites.storedCount,1)
 core.writeInteger(0x191dd80,99)

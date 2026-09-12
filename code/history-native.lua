@@ -1,22 +1,16 @@
 -- Adapt the native history's data source, not its renderer. The existing rows,
 -- portraits, scroll bar, hover card and results transition remain game-owned.
-local native=require('code/native')
 local binary=require('code/binary-memory')
 local stats=require('code/battle-statistics')
 local tr=require('code/locale').text
 local M={}
 
 function M.verify()
-  local sites=assert(require('code/history-sites')[native.profile.name])
-  for _,name in ipairs({'prepareList','prepare','action','frame','helpText'}) do
-    require('code/hook-check').verify(sites[name],'Battle history conflicts at '..name)
-  end
-  for _,site in ipairs(sites.operands) do require('code/hook-check').verify(site,'Battle history data conflicts') end
-  return sites
+  return require('code/history-sites').verify()
 end
 
 function M.new(ui,recorder,browser,rename)
-  local sites=require('code/history-sites')[native.profile.name]
+  local sites=require('code/history-sites').resolve()
   local o=setmetatable({ui=ui,recorder=recorder,browser=browser,sites=sites,
     currentView=recorder.engine.sites.gameCore+0xc,model=require('code/battle-history').new(sites)},{__index=M})
   -- Our catalogue owns sorting/filtering. Retain native resource preparation,

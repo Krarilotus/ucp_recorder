@@ -15,16 +15,18 @@ from native_image import load_image
 from check_executables import image_reader
 
 
-def check(folder):
+def check(folder,binding=None,pack_binding=None,variant_filter=None):
     root = Path(__file__).resolve().parents[1]
     decoder = Cs(CS_ARCH_X86, CS_MODE_32); decoder.detail = True
     for variant, filename, pack in (
         ('SHC', 'Stronghold Crusader.exe', 0x4d1700),
         ('Extreme', 'Stronghold_Crusader_Extreme.exe', 0x4d1950),
     ):
+        if variant_filter and variant!=variant_filter:continue
+        if pack_binding is not None:pack=pack_binding
         path = folder/filename; reader = image_reader(path)
         lua = LuaRuntime(unpack_returned_tuples=True)
-        sites = lua.execute((root/'code/history-sites.lua').read_text())[variant]
+        sites = binding or lua.execute((root/'tests/fixtures/history-sites.lua').read_text())[variant]
         expected = set()
         for site in sites.operands.values():
             assert reader(site.address, len(site.bytes)) == bytes(site.bytes.values())
