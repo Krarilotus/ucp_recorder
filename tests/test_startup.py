@@ -120,7 +120,7 @@ require('code/battle-statistics').verify=function() return {} end
 local result=require('code/match-results').sites.SHC; core.writeBytes(result.address,result.bytes)
 require('code/fixes').verify=function() return {} end
 require('code/sessions').captureSettings=function() error('settings sentinel') end
-modules={['map-extensions']={}}
+modules={['map-extensions']=mapSaveOwner}
 function noMutation() error('unexpected recorder mutation') end
 core.allocate=noMutation; core.allocateCode=noMutation; core.writeCode=noMutation
 core.detourCode=noMutation; core.hookCode=noMutation; core.exposeCode=noMutation
@@ -181,24 +181,22 @@ assert(result.status=='disabled' and result.reason:find('settings sentinel',1,tr
 assert(config.multiplayerDiagnostics and config.singleplayerRngDiagnostics)
 ''')
 
-    def test_supported_save_wrappers_on_both_variants_keep_strict_tail_checks(self):
+    def test_owner_save_bindings_are_required_for_both_variants(self):
         self.check('''
 local Engine=require('code/engine')
-modules={['map-extensions']={}}
+modules={['map-extensions']=mapSaveOwner}
 for variant,sites in pairs(require('code/engine-sites')) do
  realNative.profile.name=variant
  for _,site in pairs(sites) do
   if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
  end
- for _,opcode in ipairs({0xe8,0xe9}) do
-  core.writeBytes(sites.save.address,{opcode,1,2,3,4,0x56})
-  assert(Engine.verify()==sites)
-  allActiveExtensions[1].version='9.0.0'
-  assert(not pcall(Engine.verify))
-  allActiveExtensions[1].version='1.0.0'
-  bytes[sites.save.address+5]=0xcc
-  local ok,reason=pcall(Engine.verify)
-  assert(not ok and tostring(reason):find('conflicts at save',1,true))
- end
+ local resolved=Engine.verify()
+ assert(resolved.save.address==mapSaveFixture().writeWorld)
+ assert(resolved.readWorld.address==mapSaveFixture().readWorld)
+ assert(sites.save==nil and sites.readWorld==nil) -- no mutation of static profiles
+ modules={}
+ local ok,reason=pcall(Engine.verify)
+ assert(not ok and tostring(reason):find('Map Extensions 1.1.1',1,true))
+ modules={['map-extensions']=mapSaveOwner}
 end
 ''')

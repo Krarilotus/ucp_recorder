@@ -4,6 +4,7 @@ Allocation/file calls and menu/queue callees are stubs. This establishes hook
 boundaries, not complete save decoding or live multiplayer restoration.
 """
 import struct
+from native_save_fixture import native_save_fixture
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
     UC_X86_REG_ESI, UC_X86_REG_EDI, UC_X86_REG_EBP, UC_X86_REG_ESP, UC_X86_REG_EIP)
@@ -11,6 +12,8 @@ from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
 
 def check_load(reader, lua, root, variant):
     sites=lua.execute((root/'code/engine-sites.lua').read_text())[variant]
+    owner=native_save_fixture(variant)
+    sites.packager=owner['packager']; sites.sections=owner['sections']
     shift=0 if variant=='SHC' else 0x230
     begin=0x474a20+shift
     marker=sites.loadWorldComplete.address

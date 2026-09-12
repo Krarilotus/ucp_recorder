@@ -40,6 +40,13 @@ allActiveExtensions[2].version='1.1.0'
 allActiveExtensions[3].version='1.1.0'
 assert(adapter.compatible(manifest.automarket))
 assert(pcall(validation.sessionCommand,marketCommand(),manifest))
+for _,protocol in ipairs({'1.1.1','1.1.2'}) do
+ allActiveExtensions[2].version=protocol
+ allActiveExtensions[3].version='1.1.1'
+ assert(adapter.compatible(manifest.automarket))
+ assert(pcall(validation.sessionCommand,marketCommand(),manifest))
+end
+allActiveExtensions[2].version='2.0.0'; assert(not pcall(adapter.current))
 ''')
 
     def test_unknown_custom_protocol_invalid_actor_fee_flags_and_sizes_fail(self):

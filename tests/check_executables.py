@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse
 import struct
 from lupa.luajit21 import LuaRuntime
+from native_save_fixture import native_save_fixture
 
 
 def image_reader(path):
@@ -43,7 +44,7 @@ def check(folder):
             expected = bytes(site['bytes'].values())
             assert reader(site['address'], len(expected)) == expected, f'{name}: {key} phase'
         world=lua.execute((root/'code/world-sections.lua').read_text())[name]
-        table=reader(world['address'],world['bytes'])
+        table=reader(native_save_fixture(name)['sections'],world['bytes'])
         import hashlib
         assert hashlib.sha256(table).hexdigest()==world['hash'], f'{name}: native save table'
         assert len(table)==1968 and struct.unpack_from('<I',table,len(table)-16)[0]==0

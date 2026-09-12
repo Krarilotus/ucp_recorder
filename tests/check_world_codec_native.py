@@ -11,6 +11,7 @@ import sys
 import zlib
 import tempfile
 import os
+from native_save_fixture import native_save_fixture
 
 from native_image import load_image
 from check_executables import image_reader
@@ -130,6 +131,7 @@ def check_codec(path,source_root,variant):
         assert address in (encode, decode) and count == 6 and convention == 1
         return lambda this, *args: call(address, *args, this=this)
     lua.globals().variant = variant
+    lua.globals().nativeSaveFixture=lua.table_from(native_save_fixture(variant))
     lua.globals().source_root = source_root.as_posix()
     lua.globals().allocate = allocate
     lua.globals().release = release
@@ -144,6 +146,7 @@ def check_codec(path,source_root,variant):
     lua.execute('''
 package.path=source_root..'/?.lua;'..package.path
 package.loaded['code/native']={profile={name=variant}}
+modules={['map-extensions']={getNativeSaveInterface=function() return nativeSaveFixture end}}
 package.loaded['code/native-hash']={prepare=function() end}
 core={allocate=allocate,deallocate=release,exposeCode=expose,readBytes=readBytes,
  readString=readString,writeString=writeString,writeBytes=writeBytes,readInteger=readInteger,writeInteger=writeInteger}
