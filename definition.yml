@@ -1,12 +1,13 @@
 name: recorder
 display-name: UCP-Recorder
-version: 0.50.10
+version: 0.50.11
 type: module
 author: Corax
 dependencies:
   framework: ">=3.0.7"
   ui: "^1.0.1"
   files: "^1.4.0"
+  map-extensions: "^1.1.1"
   winProcHandler: "^1.0.0"
 meta:
   version: 1.0.0

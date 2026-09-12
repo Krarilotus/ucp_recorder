@@ -11,10 +11,10 @@ class AutomarketContainerTests(unittest.TestCase):
         self.check('''
 allActiveExtensions={{name='automarket',version='1.1.0'},
  {name='protocol',version='1.0.0'},{name='map-extensions',version='1.0.0'}}
-modules={protocol={getProtocolNumber=function() return 130 end},['map-extensions']={}}
+modules={protocol={getProtocolNumber=function() return 130 end},['map-extensions']=mapSaveOwner}
 closed=0; calls={}; data='\\2\\0\\0\\0'..string.rep('x',2412)
 core.openLibraryHandle=function(path)
- assert(path=='ucp/modules/map-extensions-1.0.0/luamemzip.dll')
+ assert(path=='ucp/modules/map-extensions/luamemzip.dll')
  return {require=function(_,name)
   assert(name=='luamemzip')
   return {MemoryZip=function(_,input,compression,mode)

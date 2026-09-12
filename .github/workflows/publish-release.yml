@@ -63,9 +63,16 @@ jobs:
           ref: 981b1becbc01fb282ead0415074f696bfefca07a
           path: files-reference
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Krarilotus/ucp-extension-map-extensions
+          ref: 9d35dfb2495c277f199c0b38d3443742046010ff
+          path: map-reference
+          persist-credentials: false
       - run: python -m unittest discover -s tests -v
         env:
           UCP_FILES_TEST_ROOT: files-reference
+          UCP_MAP_TEST_ROOT: map-reference
       - name: Configure recorded-settings framework checks when provided
         if: hashFiles('tests/framework-settings/CMakeLists.txt') != ''
         run: cmake -S tests/framework-settings -B build-framework-settings

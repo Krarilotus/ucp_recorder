@@ -19,17 +19,11 @@ function M.verify()
   for name, site in pairs(sites) do
     if type(site)=='table' then
       local actual=core.readBytes(site.address, #site.bytes)
-      -- map-extensions wraps this callable entry to include extension save data.
-      -- We call that entry, never bypass or overwrite its five-byte hook.
-      -- RPS hookCode uses CALL rel32 in the shipped framework; other supported
-      -- wrappers use JMP rel32. Keep the untouched sixth byte checked below.
-      local wrappedSave=(name=='save' or name=='readWorld') and adapter.saveHookAvailable()
-        and (actual[1]==0xE8 or actual[1]==0xE9)
       require('code/hook-check').verify(site,'Recorder session hook conflicts at '..name,
-        actual,wrappedSave and 5 or 0)
+        actual)
     end
   end
-  return sites
+  return require('code/native-save').bind(sites)
 end
 
 function M.new(sites)

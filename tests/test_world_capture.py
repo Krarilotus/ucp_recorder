@@ -100,6 +100,9 @@ package.loaded['code/platform']={replace=replace_file,mkdir=make_directory}
 require('code/native').profile={name='SHC',sha256=string.rep('a',64)}
 local profile=require('code/world-sections').SHC
 profile.hash=table_hash; profile.total=total_bytes
+package.loaded['code/native-save']={interface=function()
+ return {version=1,sections=0xb92a58,sectionCount=122,descriptorSize=16}
+end}
 store=require('code/sessions'); files=require('code/capture-files')
 world=require('code/world-capture'); now=1
 require('code/world-header').read=function()

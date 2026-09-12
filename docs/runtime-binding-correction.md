@@ -132,3 +132,36 @@ the mission TGX check executes the original rasterizer against private surfaces.
 This is not a completed Recorder binding port: lifecycle, engine, world, history,
 network and other existing fixed profiles still remain. Installed UI/Hotkeys/game
 composition, language/distribution variants and live replay acceptance are pending.
+
+## Save owner bindings
+
+Map Extensions 1.1.1 at 9d35dfb exposes `getNativeSaveInterface()` from the
+existing `mapextensions/game.lua` owner. Its original section table, packager
+and read/write entries already come from framework scans. Recorder now requires
+that API and uses those wrapped entries, preserving Map's before/after callbacks
+and required/custom-section substitution. Four fixed fields per engine profile
+and both duplicated section-table addresses are removed. No save hook is added,
+no original trampoline is bypassed and no replacement section registry is built.
+
+The public interface is checked before Recorder installs anything. Native-world
+capture reads the owner's section table as well. Existing fixed descriptor-table
+fingerprints are still retained by `world-layout.lua`; replacing that restriction
+with validated native schema/identity is unfinished, along with the other engine
+and lifecycle bindings. This change alone does not broaden Recorder's executable
+acceptance or establish live save/replay compatibility.
+
+The inspected Protocol changes through 1.1.2 do not modify its command interface,
+hooks, helpers or Automarket wire layout. Map 1.1.1 changes metadata exposure only;
+its callbacks, required providers and native ZIP DLL remain unchanged. Recorder's
+Automarket adapter now recognizes those revisions. The existing ZIP consumer uses
+the framework's active Map alias; `core.openLibraryHandle` resolves aliases before
+opening the library (`core.lua` at 02a7a6b). This removes a stale version-built
+library path without adding a loader or touching live serialization.
+
+Validation: 486 portable tests pass (one existing skip), including the actual
+Map owner and Recorder consumer at relocated fixture addresses, both wrappers,
+callback order, section substitution, missing/incompatible metadata and zero new
+scans. An installed 32-bit Lua console check with the shipped native ZIP DLL
+(`a4dfd1beb49b09f8e2c52ad680101bd8843c9c008988268610442b7b85e1cc7c`)
+and actual Map read handles round-trips all Automarket payload bytes. Its framework
+loader and module inventory are stand-ins; no game or native save is run.

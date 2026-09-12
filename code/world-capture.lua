@@ -7,7 +7,8 @@ local M={CHUNK=65536}
 
 function M.layout()
   local profile=assert(sections[native.profile.name],'Unsupported world capture executable')
-  local raw=core.readString(profile.address,profile.bytes)
+  local owner=require('code/native-save').interface()
+  local raw=core.readString(owner.sections,profile.bytes)
   local entries=require('code/world-layout').decode(raw,native.profile.name)
   return entries,profile,raw
 end
