@@ -485,3 +485,40 @@ captures. UI/Protocol initialization and framework proxy/extraction are real
 in binding tests; Map ABI metadata, OS/transport, native bridge and selected
 callees are fixtures. Full installed game, save/replay and physical multiplayer
 acceptance are still required.
+
+## Results and player resources
+
+Recorder 0.50.22 removes the last production `engine-sites` profile and the
+statistics/insertion address tables. `result-sites` uses three framework AoB
+lookups plus uniqueness checks: the results timer, building resource recount,
+and complete SKMasters insertion routine. The insertion's CALL supplies the
+native packer, whose CALL supplies the native scorer. Complete instruction
+contexts, unrolled player reads/writes, record strides, capacities and relative
+targets are checked before any Recorder patch is installed. Subsequent calls
+use the retained bindings; there is no per-tick discovery.
+
+Reuse inspection: UI 1.0.2 `getNativeMenuInterface` at af31ceb owns the transition
+entry; Protocol 1.1.4 at 10001be owns the local-player field. Both must agree
+with the timer/packer. Map 1.1.1 `mapextensions/game.lua` at 9d35dfb exposes save
+entries and section descriptors, not result packing or insertion observers.
+Recorder already owns these observers and bounded snapshots. OpenSHC's
+`Game/Skirmish.func.hpp`, `IO/SkMasterDataEntry.hpp` and the original instructions
+establish the cdecl ABI and layouts; no OpenSHC reference address is used at
+runtime. Legacy source and the native score, insertion, recount and victory
+logic remain unchanged. No hook or native-call bridge is added.
+
+Validation: 510 portable tests pass (one existing skip), including both Lua
+runtimes with relocated owners and context/operand/conflict rejection. All six
+local/official EFIGS/Polish SHC 1.41 and Extreme 1.41.1-E images pass the 14
+bindings, 19 missing/ambiguous/stale/occupied checks each, 192 original/patched
+result-timer cases, four native insertion/eviction/rejection cases, 18 native
+packer/score cases and nine resource-recount cases. The packer uses the native
+scorer and bounded copies; only its OS date call is stubbed. Timer UI callees,
+insertion disk output, module bridges and transport remain stand-ins. Private
+image scan timings are not game-performance measurements.
+The native dispatch harness also uses these production engine bindings for
+600 SP/1200 offline replay dispatches and 600 local captures per image.
+
+History and scoped/offline/optional RNG bindings and the temporary executable
+identity gate still need correction. This is component evidence, not an
+installed-game, whole-world save/replay or physical multiplayer acceptance.

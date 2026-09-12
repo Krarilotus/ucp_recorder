@@ -1,28 +1,15 @@
 -- The game maintains SkirmishStatistics throughout the match. Keep the same
 -- observed boundary as the recorder; never invoke victory/defeat processing.
-local native=require('code/native')
 local M={SIZE=0xbf0,RESULTS_SIZE=0x778}
-local layouts={
-  SHC={pack=0x4d1700,temporary=0xdf5658,results=0x1a26d2c,groups=0x1183424,ai=0x191de7c,alive=0x117ef40},
-  Extreme={pack=0x4d1950,temporary=0xdf56f0,results=0x24ba22c,groups=0x1216064,ai=0x2354eec,alive=0x1211b80},
-}
 
 function M.verify()
-  local layout=assert(layouts[native.profile.name])
-  local p=layout.temporary
-  require('code/hook-check').verify({address=layout.pack,
-    bytes={139,68,36,4,163,p%256,math.floor(p/256)%256,math.floor(p/65536)%256,math.floor(p/16777216)}},
-    'Battle statistics packer conflicts')
-  require('code/hook-check').verify({address=layout.pack+0x2a,bytes={232}},
-    'Battle statistics score call conflicts')
-  return layout
+  return require('code/result-sites').verify().statistics
 end
 
 function M.new(engine,layout)
-  local scoreAddress=layout.pack+0x2f+core.readInteger(layout.pack+0x2b)
   return setmetatable({engine=engine,layout=layout,buffer=core.allocate(M.SIZE+1,true),
     alive=core.allocate(18,true),backup=core.allocate(M.SIZE,true),
-    pack=core.exposeCode(layout.pack,1,0),score=core.exposeCode(scoreAddress,1,0)},{__index=M})
+    pack=core.exposeCode(layout.pack,1,0),score=core.exposeCode(layout.score,1,0)},{__index=M})
 end
 
 function M:begin()

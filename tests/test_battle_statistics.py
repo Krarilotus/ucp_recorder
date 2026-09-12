@@ -21,8 +21,7 @@ function core.readInteger(a)
 end
 function core.readSmallInteger(a) return (bytes[a] or 0)+(bytes[a+1] or 0)*256 end
 function core.copyMemory(a,b,n) core.writeString(a,core.readString(b,n)) end
-layout={pack=1000,temporary=2000,results=8000,groups=11000,ai=11100,alive=11200}
-core.writeInteger(layout.pack+0x2b,1234-layout.pack-0x2f)
+layout={pack=1000,score=1234,temporary=2000,results=8000,groups=11000,ai=11100,alive=11200}
 core.exposeCode=function(a,count,convention)
  assert(count==1 and convention==0)
  if a==layout.pack then return function()
