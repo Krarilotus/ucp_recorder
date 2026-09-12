@@ -58,7 +58,7 @@ function M.new(engine,profile,onWorld)
   local function site(key,patch,kind)
     local source=profile[key]
     return {address=source.address,bytes=source.bytes,target=source.target,kind=kind,
-      patch=patch,state=self.state,clock=native.addr(0x1fe7da8),callback=callback}
+      patch=patch,state=self.state,clock=engine.commands.tick,callback=callback}
   end
   fixes.install({site('maintenance','maintenanceCount','raw'),site('world','unclockedWorld','prefixCall')},
     self.state,engine.base+0x618)

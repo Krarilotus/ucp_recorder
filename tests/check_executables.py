@@ -24,6 +24,7 @@ def image_reader(path):
             if start <= rva and rva+size <= start+raw_size:
                 return image[raw+rva-start:raw+rva-start+size]
         raise ValueError(f'Address outside original file: {address:x}')
+    read.image=image
     return read
 
 
@@ -56,10 +57,12 @@ def check(folder):
         check_references(reader,name)
         rng = native.addr(0x1a279c0)
         assert native.addr(0x1a3160c) == rng+0x9c4c
-        synchrony = native.addr(0x191d768)
+        from native_command_fixture import native_command_fixture
+        commands=native_command_fixture(name)
+        synchrony = commands['handler']
         assert native.addr(0x191de0c) == synchrony+0x6a4
         offset = 0x109e74 if name == 'SHC' else 0x166304
-        assert native.addr(0x1a275dc) == synchrony+offset
+        assert commands['localPlayer'] == synchrony+offset
         menu = native.addr(0x59ab30)
         assert reader(menu, 1) == b'\x68'
         assert struct.unpack('<I', reader(menu+1, 4))[0] == native.addr(0x5e9848)

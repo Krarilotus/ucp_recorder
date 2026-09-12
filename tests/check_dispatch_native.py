@@ -7,7 +7,10 @@ original executable instructions. This is not a live UCP hook/ABI test.
 """
 from pathlib import Path
 import struct
-from lupa.luajit21 import LuaRuntime
+import os
+import re
+from lupa.lua53 import LuaRuntime
+from native_save_fixture import native_save_fixture
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn import x86_const as reg
 
@@ -15,6 +18,14 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 def check_dispatch(reader,variant):
+    import pefile
+    pe=pefile.PE(data=reader.image)
+    image=pe.get_memory_mapped_image(); image_base=pe.OPTIONAL_HEADER.ImageBase
+    def scan(pattern,start=None,stop=None):
+        expression=b''.join(b'.' if token=='?' else re.escape(bytes([int(token,16)])) for token in pattern.split())
+        offset=max(0,(start or image_base)-image_base)
+        found=re.search(expression,image[offset:(stop-image_base) if stop else None],re.DOTALL)
+        return image_base+offset+found.start() if found else 0
     shc=variant=='SHC'
     base=0x191d768 if shc else 0x23547d8
     tick=0x1fe7da8 if shc else 0x2a7b2a8
@@ -63,8 +74,13 @@ def check_dispatch(reader,variant):
             return lambda *args: 0x7f00 # ask the emulator to run the original body
         g=lua.globals()
         g.source_root=ROOT.as_posix(); g.variant=variant
-        g.native_address=lambda a: {0x191d768:base,0x1a279c0:0x1a279c0 if shc else 0x24baec0,
-            0x480210:schedule,0x1a275dc:base+actor+4,0x1fe7da8:tick}[a]
+        g.protocol_root=Path(os.environ.get('UCP_PROTOCOL_TEST_ROOT',ROOT.parent/'aic-tactics-protocol-native')).as_posix()
+        g.framework_root=Path(os.environ.get('UCP_FRAMEWORK_CODE',ROOT.parent/'UnofficialCrusaderPatch3/content/ucp/code')).as_posix()
+        g.scan=scan
+        g.image_read_integer=lambda a:struct.unpack('<i',reader(a,4))[0]
+        g.image_read_bytes=lambda a,n:lua.table_from(reader(a,n))
+        g.map_save_fixture=lua.table_from(native_save_fixture(variant))
+        g.native_address=lambda a: {0x1a279c0:0x1a279c0 if shc else 0x24baec0}[a]
         g.read_integer=get; g.write_integer=put
         g.read_short=lambda a: struct.unpack('<H',read(a,2))[0]
         g.write_short=lambda a,v: write(a,struct.pack('<H',int(v)&0xffff))
@@ -82,7 +98,25 @@ core={allocate=allocate,allocateCode=allocate,exposeCode=expose,hookCode=hook,de
  readInteger=read_integer,writeInteger=write_integer,readBytes=read_bytes,writeBytes=write_bytes,
  readSmallInteger=read_short,writeSmallInteger=write_short,
  readByte=read_byte,writeByte=write_byte,writeCode=write_bytes,writeString=write_string}
-engine=require('code/engine').new(require('code/engine-sites')[variant])
+core.exposeCode=function(a,n,abi)
+ local invoke=expose(a,n,abi);return function(...) return invoke(...) end
+end
+-- Resolve the actual Protocol API against the original image. The protocol
+-- hook installer and afterInit version callback are stand-ins here; the tested
+-- command is original category15. Recorder hooks remain emulator callbacks.
+package.path=protocol_root..'/?.lua;'..package.path
+core.AOBScan=scan;core.scanForAOB=scan
+core.readInteger=image_read_integer;core.readBytes=image_read_bytes
+package.loaded.core=core;log=function() end
+utils=dofile(framework_root..'/utils.lua')
+package.loaded['game.version']={setMultiplayerGameVersion=function() end}
+package.loaded['game.hooks']={setHooks=function() end}
+hooks={registerHookCallback=function() end}
+local protocol=dofile(protocol_root..'/init.lua');protocol:enable({})
+modules={protocol=protocol,['map-extensions']={getNativeSaveInterface=function() return map_save_fixture end}}
+core.readInteger=read_integer;core.readBytes=read_bytes
+local sites=require('code/native-command').bind(require('code/native-save').bind(require('code/engine-sites')[variant]))
+engine=require('code/engine').new(sites)
 engine.haltingMenuNative=function() return 0 end -- UI query checked separately
 recorder={mode='play',status='playing',active=true,engine=engine,manifest={player=3,variant=variant}}
 recorder.beforeCommandWork=require('code/session-recorder').beforeCommandWork

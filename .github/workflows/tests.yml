@@ -19,6 +19,12 @@ jobs:
           ref: 9d35dfb2495c277f199c0b38d3443742046010ff
           path: map-reference
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Krarilotus/ucp-extension-protocol
+          ref: 175d7a96ad5add2627b7244826586026b618a504
+          path: protocol-reference
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -27,3 +33,4 @@ jobs:
         env:
           UCP_FILES_TEST_ROOT: files-reference
           UCP_MAP_TEST_ROOT: map-reference
+          UCP_PROTOCOL_TEST_ROOT: protocol-reference

@@ -246,3 +246,32 @@ relocation and every descriptor field; the two new decoder tests cover 2444
 subtests. Both private native tables match all 122 schema entries, and relocating
 every pointer changes only the captured integrity hash. Original-instruction
 container/restore and CI results are recorded in the PR.
+
+## Protocol command owner
+
+Protocol 1.1.3 at 175d7a9 adds `getNativeCommandInterface()` to the existing
+`protocols/common.lua` / `game/interface.lua` owner. Recorder requires that
+version and binds the returned metadata before installing hooks. The handler,
+ring, write/current indices, local-player pointer and tick are reused, as is
+the existing scheduler callable: no consumer scan or second native call bridge.
+The existing replay scope, private payload validation and queue rollback remain
+with Recorder. Its history/view/maintenance users share the engine's bindings.
+Four address-map entries per game and both write-index offsets are removed.
+
+The inspected Protocol prerequisite changes discovery/API exposure only, so the
+Automarket 272-byte format remains unchanged and its adapter recognizes 1.1.3.
+Other Recorder native profiles and combined live acceptance remain unfinished.
+
+Validation: 496 portable tests pass (one existing skip), including both Lua
+runtimes through the actual Protocol public API with a stand-in native call.
+Following the final ring/context reuse, 39 affected tests pass. Original local
+SHC/Extreme and the four official EFIGS/Polish fixtures pass 600 SP dispatches,
+1200 offline replay dispatches and 600 local captures each, including wrap and
+rollback. These execute the original scheduler/selector/dispatcher through the
+actual Protocol common/interface/API and Recorder consumer. Protocol's hook
+installer, native memory helpers, a test command handler and RPS hook bridges
+are stand-ins; this is not physical multiplayer or a live match.
+
+Both native replay-view checks also pass: 24 player-summary cases and all eight
+players' resource-book views per game, with identity restored and player/RNG
+state unchanged. Pixel drawing is simulated.

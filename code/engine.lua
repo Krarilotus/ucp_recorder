@@ -23,12 +23,13 @@ function M.verify()
         actual)
     end
   end
-  return require('code/native-save').bind(sites)
+  return require('code/native-command').bind(require('code/native-save').bind(sites))
 end
 
 function M.new(sites)
-  local e={sites=sites, base=native.addr(0x191d768), rng=native.addr(0x1a279c0)}
-  e.schedule=core.exposeCode(native.addr(0x480210),5,1)
+  local commands=assert(sites.commands,'Verify the Protocol command interface before creating Recorder')
+  local e={sites=sites,commands=commands,base=commands.handler,rng=native.addr(0x1a279c0)}
+  e.schedule=commands.scheduleCommand
   e.saveNative=core.exposeCode(sites.save.address,2,1)
   e.loadNative=core.exposeCode(sites.load.address,1,0)
   e.readWorldNative=core.exposeCode(sites.readWorld.address,2,1)
@@ -49,12 +50,12 @@ function M:resetCommands()
   self.executing=nil
 end
 
-function M:tick() return core.readInteger(native.addr(0x1fe7da8)) end
+function M:tick() return core.readInteger(self.commands.tick) end
 function M:calendarMonth()
   local address=self.sites.calendar.value
   return require('code/snapshot-cadence').month(core.readInteger(address+4),core.readInteger(address))
 end
-function M:player() return core.readInteger(native.addr(0x1a275dc)) end
+function M:player() return core.readInteger(self.commands.localPlayer) end
 function M:singlePlayer()
   local mode=core.readInteger(self.base+0x618)
   return mode==0 or mode==99
@@ -151,12 +152,12 @@ function M:canSchedule()
   local index=core.readInteger(self.base+self.sites.writeIndexOffset)
   if index<0 or index>=200 then return false end
   if self.journal.slots[index] then return false end
-  local state=core.readByte(self.base+0x3c67c+index*1272+9)
+  local state=core.readByte(self.commands.ring+index*1272+9)
   return state==0 or state==10
 end
 
 function M:validateQueued(slot,command)
-  local address=self.base+0x3c67c+slot*1272
+  local address=self.commands.ring+slot*1272
   assert(core.readByte(address+9)==1,'Replay ring entry is not pending')
   assert(core.readInteger(address)==command.time,'Native command scheduling tick changed')
   assert(core.readInteger(address+4)==command.player,'Native replay sender changed')
@@ -174,7 +175,7 @@ function M:scheduleCommand(command)
   for i=#bytes+1,1260 do bytes[i]=0 end
   core.writeBytes(self.buffer,bytes)
   local slot=core.readInteger(self.base+self.sites.writeIndexOffset)
-  local address=self.base+0x3c67c+slot*1272
+  local address=self.commands.ring+slot*1272
   local oldSlot=core.readBytes(address,1272)
   local scratch={}
   for _,offset in ipairs({self.sites.writeIndexOffset,0x2d824,0x2d828,0x2d830,self.sites.writeIndexOffset+4}) do
@@ -184,7 +185,7 @@ function M:scheduleCommand(command)
   self.copyError=nil; self.copySeen=false
   -- protocol 1.0.0's receive callback reads this native packet buffer even when
   -- the scheduler was given a different pointer. Restore it after the copy.
-  local received=self.base+0xcdc
+  local received=self.commands.receivedParameters
   local oldReceived
   if command.commandCategory==122 then
     oldReceived=core.readBytes(received,1260)
@@ -219,7 +220,7 @@ function M:selectPlayback(recorder)
   local entries=self.journal:select(self:tick())
   -- Reject unknown pending entries before *any* handler in this batch runs.
   for slot=0,199 do
-    local state=core.readByte(self.base+0x3c67c+slot*1272+9)
+    local state=core.readByte(self.commands.ring+slot*1272+9)
     if state~=0 and state~=10 then
       local source=assert(self.journal.slots[slot],'Untracked native command in replay ring')
       self:validateQueued(slot,source.command)
@@ -246,14 +247,14 @@ function M:abortPlayback()
   if not self:localSession() then return end
   core.writeInteger(self.base+self.sites.selectedCountOffset,0)
   for slot in pairs(self.journal.slots) do
-    core.writeByte(self.base+0x3c67c+slot*1272+9,10)
+    core.writeByte(self.commands.ring+slot*1272+9,10)
   end
 end
 
 function M:beforeCommand(recorder)
   assert(not self.executing,'Nested native command execution is unsupported')
-  local slot=require('code/validation').integer(core.readInteger(self.base+0x2d824),0,199,'native ring slot')
-  local address=self.base+0x3c67c+slot*1272
+  local slot=require('code/validation').integer(core.readInteger(self.commands.currentCommand),0,199,'native ring slot')
+  local address=self.commands.ring+slot*1272
   local source=recorder.mode=='play' and self.journal.slots[slot] or self.received[slot]
   assert(source,'Native command has no captured payload/ownership')
   local command=source.command
@@ -274,8 +275,8 @@ end
 function M:captureCommand(size, payload)
   local validation=require('code/validation')
   validation.integer(size,0,1260,'native payload size')
-  local slot=validation.integer(core.readInteger(self.base+0x2d824),0,199,'native ring slot')
-  local address=self.base+0x3c67c+slot*1272
+  local slot=validation.integer(core.readInteger(self.commands.currentCommand),0,199,'native ring slot')
+  local address=self.commands.ring+slot*1272
   self.received[slot]={command={commandCategory=core.readByte(address+8),time=core.readInteger(address),
     size=size,data=require('code/utils').tableToHex(core.readBytes(payload or address+10,size))}}
 end

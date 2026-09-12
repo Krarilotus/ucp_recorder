@@ -1,7 +1,6 @@
 -- A view is a presentation choice. The native actor, queue and replay manifest
 -- never change. Each native renderer reads the selected player's live statistics;
 -- the original local slot is restored before that rendering scope returns.
-local native=require('code/native')
 local M={}
 function M.new(recorder)
  return setmetatable({recorder=recorder},{__index=M})
@@ -45,7 +44,7 @@ end
 function M:render(callback)
  if not self:available() then return callback() end
  local slot=self:player()
- local address=native.addr(0x1a275dc)
+ local address=self.recorder.engine.commands.localPlayer
  local previous=core.readInteger(address)
  core.writeInteger(address,slot)
  local ok,result=xpcall(callback,debug.traceback)
