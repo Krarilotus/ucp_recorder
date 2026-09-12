@@ -152,5 +152,5 @@ require('code/world-hash-observer').install(trace)
                 put(base+0x7a8e0+(player+1)*48,old^0xffffffff)
                 assert samples[1]['domains'][13]==old # Lua owns an immediate copy
             pairs+=1
-    assert len(scans)==2,'World hash observation repeated discovery'
+    assert len(scans)==1,'World hash observation repeated discovery'
     print(f'PASS: {variant} {pairs} native world-hash observer pairs; 14 stores, all slots, skip paths, ABI and writes')

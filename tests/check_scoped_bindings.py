@@ -20,16 +20,16 @@ def check(path,variant,protocol,ui,framework):
         assert list(actual.bytes.values())==list(reference.bytes.values()),reference.name
     patterns=[p for p,start in f.scans[before:] if start is None]
     for _ in range(100):resolver.verify(123)
-    assert len(f.scans)-before==32
+    assert len(f.scans)-before==16
     def fresh():
         lua.execute("package.loaded['code/scoped-sites']=nil")
         return lua.eval("(require('code/scoped-sites'))")
     negative=0
     for pattern in patterns:
         a=f.matches[pattern]
-        for kind in ('missing','stale','ambiguous'):
+        for kind in ('missing','stale','framework-error'):
             saved=f.read(a,1);r=fresh()
-            if kind=='ambiguous':g.core.scanForAOB=lambda p,start: a+100 if p==pattern else f.scan(p,start)
+            if kind=='framework-error':g.core.AOBScan=lua.eval('function() error("fixture discovery error") end')
             else:
                 f.write(a,b'\xcc')
                 if kind=='stale':g.core.AOBScan=lambda p: a if p==pattern else f.scan(p)
@@ -75,6 +75,6 @@ def check(path,variant,protocol,ui,framework):
           and i.address+5+struct.unpack('<i',i.bytes[1:])[0]==rng}
         assert calls=={by_name[name].address for name in names},names
     return dict(variant=variant,sha256=hashlib.sha256(f.raw).hexdigest(),bindings=28,
-                negativeCases=negative,newDiscoveryCalls=32,optionalSeedCases=2,
+                negativeCases=negative,newDiscoveryCalls=16,optionalSeedCases=2,
                 nativePassiveGateCases=cases,completeAudioCallerInventory=True,
                 nativeHeadsTauntWeddingChecks=True,liveGame=False)

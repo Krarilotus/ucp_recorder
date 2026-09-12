@@ -52,17 +52,17 @@ function changeByte(a) bytes[a]=0xcc end
             with self.subTest(runtime=runtime):
                 self.fixture(runtime).execute("""
 assert(codec.compressorAddress()==expected.implode)
-assert(scans==4 and exposed==2)
+assert(scans==2 and exposed==2)
 for i=1,100 do assert(codec.compressorAddress()==expected.implode) end
-assert(scans==4 and exposed==2)
+assert(scans==2 and exposed==2)
 """)
 
-    def test_missing_ambiguous_and_occupied_capabilities_expose_nothing(self):
+    def test_missing_framework_error_and_occupied_capabilities_expose_nothing(self):
         for runtime in (Lua54, LuaJIT):
             for name in ('implode', 'explode'):
                 cases = (
                     f"local old=core.AOBScan; core.AOBScan=function(p) if p==patterns.{name} then return 0 end; return old(p) end",
-                    f"local old=core.scanForAOB; core.scanForAOB=function(p,a) if p==patterns.{name} then return a+1024 end; return old(p,a) end",
+                    f"local old=core.AOBScan; core.AOBScan=function(p) if p==patterns.{name} then error([[framework discovery failed]]) end; return old(p) end",
                     f"changeByte(expected.{name})",
                     # After the short prologue, including the stack cleanup.
                     f"changeByte(expected.{name}+35)",

@@ -73,13 +73,13 @@ def check(path,variant,protocol,ui,framework):
         assert result[key].address==address
     patterns=[p for p,start in fixture.scans[before:] if start is None]
     for _ in range(100):lua.globals().resolver.resolve();lua.globals().resolver.verify()
-    assert len(fixture.scans)-before==8
+    assert len(fixture.scans)-before==4
     negative=0
     for pattern in patterns:
         a=fixture.matches[pattern]
-        for kind in ('missing','stale','ambiguous'):
+        for kind in ('missing','stale','framework-error'):
             current=fixture.lua();g=current.globals();saved=fixture.read(a,1)
-            if kind=='ambiguous':g.core.scanForAOB=lambda p,start: a+100 if p==pattern else fixture.scan(p,start)
+            if kind=='framework-error':g.core.AOBScan=current.eval('function() error("fixture discovery error") end')
             else:
                 fixture.write(a,b'\xcc')
                 if kind=='stale':g.core.AOBScan=lambda p: a if p==pattern else fixture.scan(p)
@@ -104,4 +104,4 @@ def check(path,variant,protocol,ui,framework):
     a=native_save_fixture(variant)['readWorld'];saved=fixture.read(a,5)
     fixture.write(a,b'\xe9\x01\x02\x03\x04');fixture.lua().globals().resolver.verify();fixture.write(a,saved)
     return dict(variant=variant,sha256=hashlib.sha256(fixture.raw).hexdigest(),bindings=11,
-                negativeCases=negative,newDiscoveryCalls=8,mapWrapperCases=1,liveGame=False)
+                negativeCases=negative,newDiscoveryCalls=4,mapWrapperCases=1,liveGame=False)

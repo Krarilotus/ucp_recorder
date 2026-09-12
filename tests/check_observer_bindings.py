@@ -46,7 +46,7 @@ function verify() return network.verify(),world.verify() end
         assert site.address==expected[name].address and list(site.bytes.values())==list(expected[name].bytes.values())
     assert world.address==expected_world.address and list(world.bytes.values())==list(expected_world.bytes.values())
     for _ in range(100):lua.globals().verify()
-    assert len(scans)==8 and not hooks
+    assert len(scans)==4 and not hooks
     # Protocol's already-installed seven-byte dispatch patches are outside
     # Recorder's discovery/guard spans. Mimic those occupied adjacent sites.
     for site in (network.remoteImmediate,network.localImmediate):
@@ -61,7 +61,8 @@ function verify() return network.verify(),world.verify() end
             bad=fixture((lambda p:address if p==pattern else scan(p)) if stale else scan)
             bad.execute('assert(not pcall(verify))');negative+=1
         image[address-base:address-base+1]=saved
-        bad=fixture(second=lambda p,start:address+100 if p==pattern else scan(p,start))
+        assert scan(pattern,address+1)==0, 'non-unique fixture context'
+        bad=fixture(first=lambda p:0 if p==pattern else scan(p))
         bad.execute('assert(not pcall(verify))');negative+=1
     for guard,offsets in ((network.remoteImmediate.guard,(2,50)),
                           (network.localImmediate.guard,(20,68)),(world.guard,(2,25,69))):
@@ -76,4 +77,4 @@ function verify() return network.verify(),world.verify() end
         assert not hooks
         image[a-base:a-base+1]=saved
     return dict(variant=variant,referenceSha256=hashlib.sha256(raw).hexdigest(),bindings=4,
-                negativeCases=negative,discoveryCalls=8,adjacentProtocolPatches=2,liveGame=False)
+                negativeCases=negative,discoveryCalls=4,adjacentProtocolPatches=2,liveGame=False)

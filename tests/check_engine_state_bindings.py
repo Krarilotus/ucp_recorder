@@ -51,7 +51,7 @@ resolver=require('code/engine-state-sites')
             assert list(value.bytes.values())==list(expected[key].bytes.values()),key
     assert result.calendar.value==expected.calendar.value
     for _ in range(100):lua.globals().resolver.resolve();lua.globals().resolver.verify()
-    assert len(scans)-before==2 # Calendar only; all other entries reuse owners.
+    assert len(scans)-before==1 # Calendar only; all other entries reuse owners.
     negative=0
     tick=result.tickEntry.address;c=result.tick.guard.address;p=tick+0x1e8
     navigation=result.navigationCountdown
@@ -80,10 +80,10 @@ resolver=require('code/engine-state-sites')
         current.execute('assert(not pcall(resolver.verify))');negative+=1
         image[a-base:a-base+1]=saved
     calendar_pattern=next(pattern for pattern,start in scans if pattern.startswith('8B 54 24 08 33 C0'))
-    for kind in ('missing','stale','duplicate'):
+    for kind in ('missing','stale','framework-error'):
         current=fixture();g=current.globals()
         a=result.calendar.guard.address;saved=read(a,1)
-        if kind=='duplicate':g.core.scanForAOB=lambda pattern,start: a+100 if pattern==calendar_pattern else scan(pattern,start)
+        if kind=='framework-error':g.core.AOBScan=current.eval('function() error("fixture discovery error") end')
         else:
             image[a-base]=0xcc
             if kind=='stale':g.core.AOBScan=lambda pattern: a if pattern==calendar_pattern else scan(pattern)
@@ -93,4 +93,4 @@ resolver=require('code/engine-state-sites')
     current=fixture();assert current.globals().resolver.resolve().navigationCountdown==navigation
     current.globals().resolver.verify();image[a-base:a-base+4]=saved
     return dict(variant=variant,sha256=hashlib.sha256(raw).hexdigest(),bindings=10,
-                negativeCases=negative,newDiscoveryCalls=2,legacyPeriodCases=1,liveGame=False)
+                negativeCases=negative,newDiscoveryCalls=1,legacyPeriodCases=1,liveGame=False)

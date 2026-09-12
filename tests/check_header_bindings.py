@@ -49,7 +49,7 @@ sha={sha256=hash_data}; header=require('code/world-header')
     assert captured.encode('latin-1')==b''.join(read(a,n) for a,n in expected)
     lua.globals().header.validate(captured,descriptor)
     for _ in range(10): lua.globals().header.read()
-    assert len(scans)==10 and len(matches)==5
+    assert len(scans)==5 and len(matches)==5
     negative=0
     for pattern,address in list(matches.items()):
         saved=image[address-base]; image[address-base]=0xcc
@@ -59,7 +59,8 @@ sha={sha256=hash_data}; header=require('code/world-header')
             lua.execute('assert(not pcall(header.read))')
             assert not data_reads; negative+=1
         image[address-base]=saved
-        lua=fixture(second=lambda p,start:address+0x1000 if p==pattern else scan(p,start))
+        assert scan(pattern,address+1)==0, 'non-unique fixture context'
+        lua=fixture(aob=lambda p:0 if p==pattern else scan(p))
         data_reads.clear(); lua.execute('assert(not pcall(header.read))')
         assert not data_reads; negative+=1
     for _,parts in PARTS:

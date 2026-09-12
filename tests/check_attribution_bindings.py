@@ -14,7 +14,7 @@ def check(path,variant,protocol,ui,framework):
     assert b.entry==reference.entry and b.call==reference.call
     assert dict(calls.items())==dict(lua.eval("require('tests/fixtures/rng-fire-context').verify")(variant).items())
     for _ in range(100):spawn.verify();fire.verify()
-    assert len(f.scans)-before==6
+    assert len(f.scans)-before==3
     patterns=[p for p,start in f.scans[before:] if start is None]
     def fresh(name):
         lua.execute("package.loaded['code/rng-"+name+"-context']=nil")
@@ -22,10 +22,10 @@ def check(path,variant,protocol,ui,framework):
     negative=0
     for pattern in patterns:
         address=f.matches[pattern];name='spawn' if address==b.entry else 'fire'
-        for kind in ('missing','stale','ambiguous','late'):
+        for kind in ('missing','stale','framework-error','late'):
             r=fresh(name);saved=f.read(address,1)
             if kind=='late':r.verify()
-            if kind=='ambiguous':g.core.scanForAOB=lambda p,start:address+100 if p==pattern else f.scan(p,start)
+            if kind=='framework-error':g.core.AOBScan=lua.eval('function() error("fixture discovery error") end')
             else:
                 f.write(address,b'\xcc')
                 if kind=='stale':g.core.AOBScan=lambda p:address if p==pattern else f.scan(p)
@@ -45,5 +45,5 @@ def check(path,variant,protocol,ui,framework):
     check_spawn_context(f.read,lua,f.root,variant)
     check_fire_context(f.read,lua,f.root,variant)
     return dict(variant=variant,sha256=hashlib.sha256(f.raw).hexdigest(),callers=3,
-                negativeCases=negative,newDiscoveryCalls=6,priorObserverHookCases=2,
+                negativeCases=negative,newDiscoveryCalls=3,priorObserverHookCases=2,
                 nativeSpawnStackCases=1,nativeFireStackCases=4,liveGame=False)

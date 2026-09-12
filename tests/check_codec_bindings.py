@@ -56,7 +56,8 @@ codec=require('code/world-codec')
                 lua.execute('assert(not pcall(codec.compressorAddress)); assert(exposed==0)')
                 negative+=1
             image[address-base+offset]=original
-        lua=fixture(second=lambda p,start:address+0x1000 if p==pattern else scan(p,start))
+        assert scan(pattern,address+1)==0, 'non-unique fixture context'
+        lua=fixture(aob=lambda p: 0 if p==pattern else scan(p))
         lua.execute('assert(not pcall(codec.compressorAddress)); assert(exposed==0)')
         negative+=1
     return dict(variant=variant,referenceSha256=hashlib.sha256(raw).hexdigest(),

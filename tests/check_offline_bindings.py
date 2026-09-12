@@ -14,13 +14,13 @@ def check(path,variant,protocol,ui,framework):
         assert list(b[key].bytes.values())==list(value.bytes.values()),key
     patterns=[p for p,start in f.scans[before:] if start is None]
     for _ in range(100):resolver.verify()
-    assert len(f.scans)-before==8
+    assert len(f.scans)-before==4
     negative=0
     for pattern in patterns:
         a=f.matches[pattern]
-        for kind in ('missing','stale','ambiguous'):
+        for kind in ('missing','stale','framework-error'):
             current=f.lua();g=current.globals();saved=f.read(a,1)
-            if kind=='ambiguous':g.core.scanForAOB=lambda p,start: a+100 if p==pattern else f.scan(p,start)
+            if kind=='framework-error':g.core.AOBScan=current.eval('function() error("fixture discovery error") end')
             else:
                 f.write(a,b'\xcc')
                 if kind=='stale':g.core.AOBScan=lambda p: a if p==pattern else f.scan(p)
@@ -60,5 +60,5 @@ def check(path,variant,protocol,ui,framework):
             cases+=3
     check_save_pacing(f.read,lua,f.root,variant,b.savePacing)
     return dict(variant=variant,sha256=hashlib.sha256(f.raw).hexdigest(),bindings=10,
-                negativeCases=negative,newDiscoveryCalls=8,priorRecorderHooks=2,
+                negativeCases=negative,newDiscoveryCalls=4,priorRecorderHooks=2,
                 nativeGateCases=cases,nativeSavePacingCases=64,liveGame=False)

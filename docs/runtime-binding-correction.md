@@ -700,3 +700,17 @@ rejection without fallback. Actual game startup/performance is still required;
 private-image timings are not an installed-runtime benchmark.
 
 The full suite passes 520 portable tests (one existing skip, 6413 subtests).
+
+## Shipped UCP scanner (0.50.29)
+
+User direction supersedes the provisional 0.50.28 integration above. Recorder
+uses the cached `core.AOBScan(pattern)` shipped with UCP 3.0.7, matching established
+Legacy modules. `core.lua` and `data/cache.lua` were inspected at that target:
+cache hits are revalidated by the framework. No newer scanner API, private
+scanner/cache or second full-process search is required. Full instruction
+contexts, decoded owner/ABI/layout checks and activation-time hook guards remain.
+
+Stock discovery returns the first match. Context uniqueness is established in
+supported-image fixtures, not claimed as exhaustive runtime duplicate detection
+on arbitrary modified executables. The earlier extra process scan caused the
+observed startup stall. Live stock-runtime composition remains to be verified.

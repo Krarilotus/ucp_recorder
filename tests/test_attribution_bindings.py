@@ -47,9 +47,9 @@ assert(b.entry==shift+0x53e440 and b.call==shift+0x53e5c6)
 assert(f[shift+0x4052f4]=='ignite' and f[shift+0x4054f4]=='spread')
 for i=1,100 do assert(spawn.verify()==b and fire.verify()==f) end
 ''')
-                    self.assertEqual(len(self.scans),6)
+                    self.assertEqual(len(self.scans),3)
 
-    def test_missing_ambiguous_changed_and_wrong_owner_contexts(self):
+    def test_missing_framework_error_changed_and_wrong_owner_contexts(self):
         for runtime in (Lua54,LuaJIT):
             for key,offsets in [('spawn',[25,44,60,89,95,375,386,391]),
                                  ('ignite',[5,11,16,38,45,101]),('spread',[5,11,16,38,45,109])]:
@@ -63,7 +63,7 @@ for i=1,100 do assert(spawn.verify()==b and fire.verify()==f) end
                     if late:self.lua.globals()[name].verify()
                     self.memory[self.addresses[key]]=0xcc
                     self.lua.execute('assert(not pcall('+name+'.verify))')
-                for fail in ('AOBScan','scanForAOB'):
+                for fail in ('missing','error'):
                     self.prepare(runtime)
-                    self.lua.execute('core.'+fail+'=function() return '+('0' if fail=='AOBScan' else '1')+' end')
+                    self.lua.execute('core.AOBScan=function() '+('return 0' if fail=='missing' else 'error("framework discovery failed")')+' end')
                     self.lua.execute('assert(not pcall('+name+'.verify))')

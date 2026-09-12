@@ -56,15 +56,15 @@ assert(profile.receiveEntry==0x10030000)
 assert(#profile.maintenance.bytes==5 and #profile.world.bytes==7)
 for i=1,100 do assert(phases.verify()==profile) end
 ''')
-                self.assertEqual(len(self.scans),2);self.assertFalse(self.writes)
+                self.assertEqual(len(self.scans),1);self.assertFalse(self.writes)
 
     def test_invalid_contexts_operands_and_late_conflicts_cannot_install(self):
         for runtime in (Lua54,LuaJIT):
-            for case in ('missing','duplicate','owner','state','tile','callee','late'):
+            for case in ('missing','error','owner','state','tile','callee','late'):
                 with self.subTest(runtime=runtime,case=case):
                     self.prepare(runtime)
                     if case=='missing':self.lua.execute('core.AOBScan=function() return 0 end')
-                    elif case=='duplicate':self.lua.execute('core.scanForAOB=function() return 1 end')
+                    elif case=='error':self.lua.execute('core.AOBScan=function() error([[framework discovery failed]]) end')
                     elif case=='owner':self.put(0x10000015,0x30000004)
                     elif case=='state':self.put(0x1000000b,0)
                     elif case=='tile':self.put(0x1001016c+53,0x33000000)

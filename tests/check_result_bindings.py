@@ -92,13 +92,13 @@ def check(path,variant,protocol,ui,framework):
         else:assert value.address==engine_expected[key].address and list(value.bytes.values())==list(engine_expected[key].bytes.values()),key
     patterns=[p for p,start in f.scans[before:] if start is None]
     for _ in range(100):resolver.verify()
-    assert len(f.scans)-before==6
+    assert len(f.scans)-before==3
     negative=0
     for pattern in patterns:
         a=f.matches[pattern]
-        for kind in ('missing','stale','ambiguous'):
+        for kind in ('missing','stale','framework-error'):
             current=f.lua();g=current.globals();saved=f.read(a,1)
-            if kind=='ambiguous':g.core.scanForAOB=lambda p,start: a+100 if p==pattern else f.scan(p,start)
+            if kind=='framework-error':g.core.AOBScan=current.eval('function() error("fixture discovery error") end')
             else:
                 f.write(a,b'\xcc')
                 if kind=='stale':g.core.AOBScan=lambda p: a if p==pattern else f.scan(p)
@@ -120,6 +120,6 @@ def check(path,variant,protocol,ui,framework):
     pack_cases=check_packer(path,f,b)
     resource_cases=check_resources(f,b)
     return dict(variant=variant,sha256=hashlib.sha256(f.raw).hexdigest(),bindings=14,
-                negativeCases=negative,newDiscoveryCalls=6,privateImageResolutionMs=round(resolve_ms,3),
+                negativeCases=negative,newDiscoveryCalls=3,privateImageResolutionMs=round(resolve_ms,3),
                 resultsTimerCases=192,insertionCases=4,packerScoreCases=pack_cases,
                 resourceRecountCases=resource_cases,liveGame=False)

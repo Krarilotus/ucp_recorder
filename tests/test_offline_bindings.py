@@ -63,7 +63,7 @@ package.loaded['code/fixes']={install=function(sites,flag)
 local engine={offlineFlag=123};local runtime=require('code/offline-runtime')
 runtime.install(engine);runtime.install(engine);assert(installs==1 and engine.offlineInstalled)
 ''')
-                self.assertEqual(len(self.scans),8)
+                self.assertEqual(len(self.scans),4)
 
     def test_disagreeing_owner_fields_and_changed_contexts_cannot_install(self):
         cases=[('save',8),('save',37),('queue',13),('queue',78),('queue',19),('queue',26),('queue',42),
@@ -84,10 +84,10 @@ runtime.install(engine);runtime.install(engine);assert(installs==1 and engine.of
                         if late:self.lua.globals().resolver.resolve()
                         self.memory[self.addresses[key]]=0xcc
                         self.lua.execute('assert(not pcall(resolver.verify))')
-            for failure in ('missing','ambiguous'):
+            for failure in ('missing','error'):
                 with self.subTest(runtime=runtime,failure=failure):
                     self.prepare(runtime)
-                    self.lua.execute('core.'+('AOBScan' if failure=='missing' else 'scanForAOB')+'=function() return '+('0' if failure=='missing' else '1')+' end')
+                    self.lua.execute('core.AOBScan=function() '+('return 0' if failure=='missing' else 'error("framework discovery failed")')+' end')
                     self.lua.execute('''
 package.loaded['code/fixes']={install=function() error('MUTATED') end}
 local e={};local ok,reason=pcall(require('code/offline-runtime').install,e)
