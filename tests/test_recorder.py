@@ -76,6 +76,15 @@ end
 commandOwner={getNativeCommandInterface=commandFixture}
 modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
 package.loaded['code/engine-sites']=require('tests/fixtures/engine-sites')
+package.loaded['code/load-sites']={bind=function(sites)
+ local result={} for key,value in pairs(sites) do result[key]=value end
+ local extreme=realNative.profile.name=='Extreme'
+ for key,address in pairs({beginMatch=extreme and 0x442a37 or 0x442877,
+  prepareMatch=extreme and 0x442a86 or 0x4428c6,menuTransition=extreme and 0x46b578 or 0x46b358,
+  loadBegin=extreme and 0x495497 or 0x495337,resetMatch=extreme and 0x494d05 or 0x494ba5}) do
+  result[key]={address=address,bytes={}}
+ end
+ return result end,verify=function() end}
 package.loaded['code/engine-state-sites']={bind=function(sites) return sites end,verify=function() end}
 package.loaded['code/engine-command-sites']={bind=function(sites) return sites end,verify=function() end}
 for _,name in ipairs({'network-sites','world-hash-sites','maintenance-sites'}) do

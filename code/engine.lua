@@ -11,6 +11,7 @@ end
 
 function M.verify()
   local sites = require('code/engine-state-sites').bind(require('code/engine-command-sites').bind(assert(allSites[native.profile.name])))
+  sites=require('code/load-sites').bind(sites)
   local adapter=require('code/automarket-replay')
   if adapter.version('protocol') then
     assert(core.readByte(sites.execute.address+8)==0xE9,
@@ -27,6 +28,7 @@ end
 
 function M.new(sites)
   require('code/engine-state-sites').verify()
+  require('code/load-sites').verify()
   local commands=assert(sites.commands,'Verify the Protocol command interface before creating Recorder')
   local e={sites=sites,commands=commands,base=commands.handler,rng=require('code/rng-bindings').resolve().state}
   e.schedule=commands.scheduleCommand

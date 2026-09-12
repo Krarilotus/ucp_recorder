@@ -1,0 +1,119 @@
+-- Verified SHC 1.41 / SHC Extreme 1.41 addresses; see docs/native-port.md.
+local profiles = {
+  {name = "SHC", header = {80,69,0,0,76,1,4,0,189,147,175,90,0,0,0,0,0,0,0,0,224,0,3,1,11,1,8,0,0,208,25,0,0,240,101,0,0,0,0,0,38,64,24,0,0,16,0,0,0,224,25,0,0,0,64,0}, sha256 = "3bb0a8c1e72331b3a30a5aa93ed94beca0081b476b04c1960e26d5b45387ac5a", addresses = {
+    [0x0042AE90] = 0x0042AE90,
+    [0x0042BF4C] = 0x0042BF4C,
+    [0x00442877] = 0x00442877,
+    [0x004428B5] = 0x004428B5,
+    [0x004428C6] = 0x004428C6,
+    [0x004582ED] = 0x004582ED,
+    [0x0045CE34] = 0x0045CE34,
+    [0x0045CEFF] = 0x0045CEFF,
+    [0x0046A740] = 0x0046A740,
+    [0x0046A74A] = 0x0046A74A,
+    [0x0046A760] = 0x0046A760,
+    [0x0046B358] = 0x0046B358,
+    [0x0047A86B] = 0x0047A86B,
+    [0x0047A8D5] = 0x0047A8D5,
+    [0x0047C348] = 0x0047C348,
+    [0x0047EAF0] = 0x0047EAF0,
+    [0x00480353] = 0x00480353,
+    [0x004876A6] = 0x004876A6,
+    [0x00487C50] = 0x00487C50,
+    [0x00490690] = 0x00490690,
+    [0x00494BA5] = 0x00494BA5,
+    [0x00495337] = 0x00495337,
+    [0x004FC4A3] = 0x004FC4A3,
+    [0x004FC627] = 0x004FC627,
+    [0x005474A3] = 0x005474A3,
+    [0x0059AB30] = 0x0059AB30,
+    [0x005E9848] = 0x005E9848,
+    [0x0191DE0C] = 0x0191DE0C,
+    [0x0194AF98] = 0x0194AF98,
+    [0x01A279C2] = 0x01A279C2,
+    [0x01A279C4] = 0x01A279C4,
+    [0x01A31608] = 0x01A31608,
+    [0x01A3160C] = 0x01A3160C,
+  }, sites = {
+    {0x00442877, {185,192,121,162,1,232,191,126,2,0}},
+    {0x004428C6, {199,5,148,160,254,1,1,0,0,0}},
+    {0x0046B358, {137,110,24,137,70,4}},
+    {0x00495337, {139,13,36,102,18,1}},
+    {0x00494BA5, {185,176,201,242,0}},
+  }},
+  {name = "Extreme", header = {80,69,0,0,76,1,4,0,100,173,175,90,0,0,0,0,0,0,0,0,224,0,3,1,11,1,8,0,0,208,25,0,0,160,95,0,0,0,0,0,86,68,24,0,0,16,0,0,0,224,25,0,0,0,64,0}, sha256 = "55648e6b05d67d37a5773fe699bbb17a2d6ad4de1bb9dbded9a21caef82bd7fb", addresses = {
+    [0x0042AE90] = 0x0042AEC0,
+    [0x0042BF4C] = 0x0042BF7C,
+    [0x00442877] = 0x00442A37,
+    [0x004428B5] = 0x00442A75,
+    [0x004428C6] = 0x00442A86,
+    [0x004582ED] = 0x0045851D,
+    [0x0045CE34] = 0x0045D044,
+    [0x0045CEFF] = 0x0045D10F,
+    [0x0046A740] = 0x0046A960,
+    [0x0046A74A] = 0x0046A96A,
+    [0x0046A760] = 0x0046A980,
+    [0x0046B358] = 0x0046B578,
+    [0x0047A86B] = 0x0047AA3B,
+    [0x0047A8D5] = 0x0047AAA5,
+    [0x0047C348] = 0x0047C518,
+    [0x0047EAF0] = 0x0047ECC0,
+    [0x00480353] = 0x00480523,
+    [0x004876A6] = 0x004877B6,
+    [0x00487C50] = 0x00487D60,
+    [0x00490690] = 0x004907F0,
+    [0x00494BA5] = 0x00494D05,
+    [0x00495337] = 0x00495497,
+    [0x004FC4A3] = 0x004FC823,
+    [0x004FC627] = 0x004FC9A7,
+    [0x005474A3] = 0x005478C3,
+    [0x0059AB30] = 0x0059AF60,
+    [0x005E9848] = 0x005E9708,
+    [0x0191DE0C] = 0x02354E7C,
+    [0x0194AF98] = 0x02382008,
+    [0x01A279C2] = 0x024BAEC2,
+    [0x01A279C4] = 0x024BAEC4,
+    [0x01A31608] = 0x024C4B08,
+    [0x01A3160C] = 0x024C4B0C,
+  }, sites = {
+    {0x00442A37, {185,192,174,75,2,232,31,127,2,0}},
+    {0x00442A86, {199,5,148,213,167,2,1,0,0,0}},
+    {0x0046B578, {137,110,24,137,70,4}},
+    {0x00495497, {139,13,164,106,18,1}},
+    {0x00494D05, {185,48,206,242,0}},
+  }},
+}
+local M = {}
+-- Identify the two supported PE32 layouts independently of mutable hook sites.
+-- This header fingerprint selects addresses; it is not a whole-file hash check.
+function M.verify()
+  M.profile=nil
+  local dos=core.readBytes(0x400000,2)
+  local offset=core.readBytes(0x40003c,4)
+  assert(dos[1]==0x4d and dos[2]==0x5a and offset[1]==0x18
+    and offset[2]==1 and offset[3]==0 and offset[4]==0,
+    'Recorder: unsupported executable header')
+  local header=core.readBytes(0x400118,56)
+  for _,profile in ipairs(profiles) do
+    local matches=true
+    for i,expected in ipairs(profile.header) do
+      if header[i]~=expected then matches=false; break end
+    end
+    if matches then
+      M.profile=profile
+      for _,site in ipairs(profile.sites) do
+        require('code/hook-check').verify({address=site[1],bytes=site[2]},
+          'Recorder lifecycle hook conflicts')
+      end
+      return profile
+    end
+  end
+  error('Recorder: unsupported executable layout; no recorder hooks installed')
+end
+function M.addr(classic)
+  local profile = M.profile or M.verify()
+  local address = profile.addresses[classic]
+  assert(address, string.format("Unmapped recorder address %08X", classic))
+  return address
+end
+return M

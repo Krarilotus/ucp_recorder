@@ -76,6 +76,7 @@ def check_dispatch(reader,variant):
         g.source_root=ROOT.as_posix(); g.variant=variant
         g.protocol_root=Path(os.environ.get('UCP_PROTOCOL_TEST_ROOT',ROOT.parent/'aic-tactics-protocol-entry-points')).as_posix()
         g.framework_root=Path(os.environ.get('UCP_FRAMEWORK_CODE',ROOT.parent/'UnofficialCrusaderPatch3/content/ucp/code')).as_posix()
+        g.ui_root=Path(os.environ.get('UCP_UI_TEST_ROOT',ROOT.parent/'aic-tactics-ui-menu-interface')).as_posix()
         g.scan=scan
         g.image_read_integer=lambda a:struct.unpack('<i',reader(a,4))[0]
         g.image_read_bytes=lambda a,n:lua.table_from(reader(a,n))
@@ -113,9 +114,12 @@ package.loaded['game.hooks']={setHooks=function() end}
 hooks={registerHookCallback=function() end}
 local protocol=dofile(protocol_root..'/init.lua');protocol:enable({})
 modules={protocol=protocol,['map-extensions']={getNativeSaveInterface=function() return map_save_fixture end}}
+modules.luajit={};package.loaded.manager={initialize=function() end};package.loaded.patches={}
+local ui=dofile(ui_root..'/init.lua');local proxies=dofile(framework_root..'/extensions/proxies.lua')
+modules.ui=proxies.ExtensionProxy(ui)
 require('code/rng-bindings').resolve()
 local sites=require('code/engine-state-sites').bind(require('code/engine-command-sites').bind(require('tests/fixtures/engine-sites')[variant]))
-sites=require('code/native-command').bind(require('code/native-save').bind(sites))
+sites=require('code/load-sites').bind(require('code/native-command').bind(require('code/native-save').bind(sites)))
 engine=require('code/engine').new(sites)
 core.readInteger=read_integer;core.readBytes=read_bytes
 engine.haltingMenuNative=function() return 0 end -- UI query checked separately

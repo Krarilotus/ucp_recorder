@@ -37,7 +37,7 @@ def check(folder):
         lua.globals().read_bytes = lambda address, size: lua.table_from(list(reader(address, size)))
         lua.globals().source_root=root.as_posix()
         lua.execute("package.path=source_root..'/?.lua;'..package.path; core={readBytes=read_bytes}")
-        native = lua.execute((root/'code/native.lua').read_text())
+        native = lua.execute((root/'tests/fixtures/native.lua').read_text())
         profile = native.verify()
         assert profile['name'] == name
         phases = lua.eval("require('tests/fixtures/maintenance-sites')")[name]

@@ -20,24 +20,16 @@ function populate(profile)
  core.writeBytes(0x400000,{0x4d,0x5a})
  core.writeBytes(0x40003c,{0x18,1,0,0})
  core.writeBytes(0x400118,profile.header)
- for _,site in ipairs(profile.sites) do core.writeBytes(site[1],site[2]) end
 end
 ''')
 
-    def test_header_selects_variant_before_named_lifecycle_checks(self):
+    def test_header_selects_variant_without_fixed_lifecycle_bindings(self):
         self.prepare()
         self.check('''
 for _,profile in ipairs(profiles) do
  populate(profile)
  assert(realNative.verify()==profile)
- assert(#profile.sites==5)
- for _,site in ipairs(profile.sites) do
-  bytes[site[1]]=0xcc
-  local ok,reason=pcall(realNative.verify)
-  assert(not ok and tostring(reason):find('lifecycle hook conflicts',1,true))
-  assert(realNative.profile==profile)
-  core.writeBytes(site[1],site[2])
- end
+ assert(profile.sites==nil and profile.addresses==nil and realNative.addr==nil)
 end
 ''')
 
