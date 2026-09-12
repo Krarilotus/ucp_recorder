@@ -43,7 +43,7 @@ package.loaded['mapextensions.registry']={registry={}}
 modules['map-extensions']=dofile(map_root..'/init.lua')
 local native=game.getNativeSaveInterface()
 local scans=scanCount
-local base=require('code/engine-sites').SHC
+local base=require('tests/fixtures/engine-sites').SHC
 local resolved=require('code/native-save').bind(base)
 assert(base.save==nil and base.readWorld==nil and base.packager==nil and base.sections==nil)
 assert(resolved.save.address==native.writeWorld and resolved.readWorld.address==native.readWorld)

@@ -37,7 +37,7 @@ def check_spawn_context(reader, lua, root, variant):
 
 
 def check_menu_pause(reader, lua, root, variant):
-    site = lua.execute((root/'code/engine-sites.lua').read_text())[variant].haltingMenu
+    site = lua.execute((root/'tests/fixtures/engine-sites.lua').read_text())[variant].haltingMenu
     code = reader(site.address, len(site.bytes))
     mode = struct.unpack('<I', code[1:5])[0]
     modal = struct.unpack('<I', code[19:23])[0]

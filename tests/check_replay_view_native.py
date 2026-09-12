@@ -10,7 +10,7 @@ from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
 
 def check_replay_view(reader, lua, native, root, variant):
     sites = lua.execute((root/'tests/fixtures/ui-sites.lua').read_text())[variant]
-    engine = lua.execute((root/'code/engine-sites.lua').read_text())[variant]
+    engine = lua.execute((root/'tests/fixtures/engine-sites.lua').read_text())[variant]
     start = sites.playerSummary.address
     instructions = []
     for instruction in Cs(CS_ARCH_X86, CS_MODE_32).disasm(reader(start, 0x500), start):
@@ -95,7 +95,7 @@ def check_book_resources(path, reader, lua, native, root, variant):
     from native_image import load_image
     machine=Uc(UC_ARCH_X86,UC_MODE_32); load_image(machine,path)
     sites=lua.execute((root/'tests/fixtures/ui-sites.lua').read_text())[variant]
-    engine=lua.execute((root/'code/engine-sites.lua').read_text())[variant]
+    engine=lua.execute((root/'tests/fixtures/engine-sites.lua').read_text())[variant]
     entry=sites.buildingAndStatus.address
     # Both original variants use the same tab dispatcher offsets/layout.
     assert reader(entry+0x13d,3)==b'\xff\x24\x85'

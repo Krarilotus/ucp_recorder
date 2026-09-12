@@ -75,6 +75,8 @@ function commandFixture()
 end
 commandOwner={getNativeCommandInterface=commandFixture}
 modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
+package.loaded['code/engine-sites']=require('tests/fixtures/engine-sites')
+package.loaded['code/engine-command-sites']={bind=function(sites) return sites end,verify=function() end}
 for _,name in ipairs({'network-sites','world-hash-sites','maintenance-sites'}) do
  local fixture=require('tests/fixtures/'..name)
  fixture.resolve=function() return fixture[realNative.profile.name or 'SHC'] end
@@ -132,7 +134,7 @@ assert(memory[0x191de0c]==777 and memory[0x01a275dc]==3)
     def test_real_init_callbacks_return_register_changes(self):
         self.check('''
 package.loaded['code/native']={profile={name='SHC'},verify=function() end,addr=function(a) return a end}
-local sites=require('code/engine-sites').SHC
+local sites=require('tests/fixtures/engine-sites').SHC
 for _,key in ipairs({'maintenance','world'}) do
  local site=require('tests/fixtures/maintenance-sites').SHC[key]
  core.writeBytes(site.address,site.bytes)

@@ -21,7 +21,7 @@ data=data:sub(1,-2); assert(not pcall(function() engine:rngData() end))
         fixture.RecorderTests.setUp(self)
         self.check('''
 Engine=require('code/engine')
-local sites=require('code/native-command').bind(require('code/native-save').bind(require('code/engine-sites').SHC))
+local sites=require('code/native-command').bind(require('code/native-save').bind(require('tests/fixtures/engine-sites').SHC))
 engine=Engine.new(sites)
 core.readByte=function(a) return bytes[a] or 0 end
 core.writeByte=function(a,v) bytes[a]=v end
@@ -69,7 +69,7 @@ assert(memory[address]==456)
 
     def test_calendar_reads_native_month_year_in_both_layouts(self):
         self.check('''
-for _,sites in pairs(require('code/engine-sites')) do
+for _,sites in pairs(require('tests/fixtures/engine-sites')) do
  engine.sites=sites
  memory[sites.calendar.value]=3; memory[sites.calendar.value+4]=1184
  assert(engine:calendarMonth()==1184*12+3)
@@ -414,7 +414,7 @@ bytes[engine.sites.execute.address+8]=0xE9; assert(Engine.verify())
     def test_resource_snapshot_covers_eight_players_and_ignores_ui_slot_zero(self):
         self.check('''
 core.readBytes=function() error('Resource snapshots must not create byte tables') end
-for _,sites in pairs(require('code/engine-sites')) do
+for _,sites in pairs(require('tests/fixtures/engine-sites')) do
  local e=Engine.new(require('code/native-command').bind(require('code/native-save').bind(sites)))
  local function resource(player,index,value)
   local address=sites.playerResources+player*0x39f4+index*4

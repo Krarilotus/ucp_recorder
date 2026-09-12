@@ -100,7 +100,7 @@ assert(not ok and tostring(reason):find('found [01 ?? ??]',1,true))
 
     def prepare_enable(self):
         self.check('''
-nativeSites=require('code/engine-sites').SHC
+nativeSites=require('tests/fixtures/engine-sites').SHC
 for _,key in ipairs({'maintenance','world'}) do
  local site=require('tests/fixtures/maintenance-sites').SHC[key]
  core.writeBytes(site.address,site.bytes)
@@ -185,7 +185,7 @@ assert(config.multiplayerDiagnostics and config.singleplayerRngDiagnostics)
         self.check('''
 local Engine=require('code/engine')
 modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
-for variant,sites in pairs(require('code/engine-sites')) do
+for variant,sites in pairs(require('tests/fixtures/engine-sites')) do
  realNative.profile.name=variant
  for _,site in pairs(sites) do
   if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
