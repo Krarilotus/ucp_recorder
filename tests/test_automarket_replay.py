@@ -11,9 +11,9 @@ class AutomarketReplayTests(unittest.TestCase):
 adapter=require('code/automarket-replay'); validation=require('code/validation')
 allActiveExtensions={{name='automarket',version='1.1.0'},{name='protocol',version='1.0.0'},
  {name='map-extensions',version='1.0.0'}}
-modules={protocol={getProtocolNumber=function(_,extension,name)
+modules={protocol={getNativeCommandInterface=commandFixture,getProtocolNumber=function(_,extension,name)
  assert(extension=='automarket' and name=='commitSingle'); return 131
-end},['map-extensions']={}}
+end},['map-extensions']=mapSaveOwner}
 function marketCommand()
  local payload={}; for i=1,272 do payload[i]=0 end
  payload[1]=131; payload[5]=1; payload[9]=1; payload[17]=1; payload[269]=25
@@ -40,13 +40,16 @@ allActiveExtensions[2].version='1.1.0'
 allActiveExtensions[3].version='1.1.0'
 assert(adapter.compatible(manifest.automarket))
 assert(pcall(validation.sessionCommand,marketCommand(),manifest))
-for _,protocol in ipairs({'1.1.1','1.1.2'}) do
+for _,protocol in ipairs({'1.1.1','1.1.2','1.1.4','1.1.5','1.1.6'}) do
  allActiveExtensions[2].version=protocol
  allActiveExtensions[3].version='1.1.1'
  assert(adapter.compatible(manifest.automarket))
  assert(pcall(validation.sessionCommand,marketCommand(),manifest))
 end
-allActiveExtensions[2].version='2.0.0'; assert(not pcall(adapter.current))
+modules.protocol.getNativeCommandInterface=function()
+ local value=commandFixture();value.version=2;return value
+end
+assert(not pcall(adapter.current))
 ''')
 
     def test_unknown_custom_protocol_invalid_actor_fee_flags_and_sizes_fail(self):

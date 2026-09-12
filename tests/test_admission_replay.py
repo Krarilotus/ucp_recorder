@@ -37,6 +37,10 @@ modules={protocol={multiplayerAdmissionVersion=function()return 1 end,
   assert(extension=='protocol' and name=='content-admission-v1');return 132
  end}}
 assert(adapter.current().protocol==132)
+for _,version in ipairs({'1.1.1','1.1.4','1.1.5','1.1.6'}) do
+ allActiveExtensions[1].version=version
+ assert(adapter.current().protocol==132)
+end
 modules.protocol.getProtocolNumber=function()return nil end;assert(adapter.current()==nil)
 modules.protocol.multiplayerAdmissionVersion=function()return 2 end
 assert(not pcall(adapter.current))

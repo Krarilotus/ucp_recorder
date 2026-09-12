@@ -3,9 +3,9 @@
 local validation=require('code/validation')
 local M={}
 function M.current()
-  if require('code/automarket-replay').version('protocol')~='1.1.0' then return end
-  local protocol=assert(modules and modules.protocol,'Protocol admission owner is unavailable')
-  assert(type(protocol.multiplayerAdmissionVersion)=='function' and protocol:multiplayerAdmissionVersion()==1,
+  local protocol=modules and modules.protocol
+  if not protocol or type(protocol.multiplayerAdmissionVersion)~='function' then return end
+  assert(protocol:multiplayerAdmissionVersion()==1,
     'Unsupported Protocol admission API')
   local id=protocol:getProtocolNumber('protocol','content-admission-v1')
   if id==nil then return end

@@ -16,13 +16,10 @@ function M.current()
   for _,extension in ipairs(allActiveExtensions or {}) do versions[extension.name]=extension.version end
   if not versions.automarket then return nil end
   assert(versions.automarket=='1.1.0','Replay adapter requires Automarket 1.1.0')
-  -- These owner revisions preserve Automarket's 272-byte commitSingle wire
-  -- format. Admission/VFS/native metadata changes do not change that protocol.
-  assert((versions.protocol=='1.0.0' or versions.protocol=='1.1.0'
-      or versions.protocol=='1.1.1' or versions.protocol=='1.1.2' or versions.protocol=='1.1.3' or versions.protocol=='1.1.4')
-    and (versions['map-extensions']=='1.0.0' or versions['map-extensions']=='1.1.0'
-      or versions['map-extensions']=='1.1.1'),
-    'Automarket replay adapter requires a supported Protocol and Map Extensions revision')
+  -- Automarket owns the 272-byte payload; verify transport/save capabilities
+  -- through their existing owners rather than a stale package-version list.
+  require('code/native-command').bind({})
+  require('code/native-save').interface()
   local protocol=assert(modules and modules.protocol,'Automarket replay protocol is unavailable')
   local id=protocol:getProtocolNumber('automarket','commitSingle')
   integer(id,130,2147483647,'Automarket protocol number')

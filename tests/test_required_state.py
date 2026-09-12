@@ -34,7 +34,7 @@ def test_capture_uses_owner_and_preserves_existing_entries():
       assert(required.capture(entries) and captures==1 and digests==0)
       assert(entries['aic/state.bin']=='state' and entries['automarket/data.bin']=='market')
       assert(not pcall(required.capture,entries))
-      version='1.0.0'
+      modules['map-extensions']={}
       assert(not required.capture({}) and required.integrity()==nil)
       required.validate(nil)
     ''')
@@ -67,5 +67,5 @@ def test_boundary_observation_defers_digest_until_completion():
       required.observeBoundary();assert(observations==1 and digests==0)
       digest='state-2'
       assert(required.boundaryIntegrity().aic.digest=='state-1')
-      version='1.0.0';required.observeBoundary();assert(required.boundaryIntegrity()==nil)
+      modules['map-extensions']={};required.observeBoundary();assert(required.boundaryIntegrity()==nil)
     ''')
