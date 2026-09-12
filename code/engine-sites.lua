@@ -1,15 +1,8 @@
 -- Checked native entry points used by session capture and playback.
 return {
   SHC = {
-    calendar = {address=0x0045676E,bytes={139,68,36,4,137,129,252,25,5,0,184,100,0,0,0,137,145,0,26,5,0},value=0x0117CAB4},
     resultsTimer = {address=0x004AFB4A, bytes={61,64,31,0,0}, kind='raw', patch='equalFlags'},
     resultsBranch = {address=0x004AFB4F, bytes={118,41}},
-    haltingMenu = {address=0x0046BD20, bytes={161,128,221,145,1,133,192,116,8,131,248,99,116,3,51,192,195,131,61,4,102,18,1,0,116,6,184,1,0,0,0,195,51,192,131,61,188,124,254,1,28,15,148,192,195}},
-    tick = {address=0x0045CE44, bytes={185,192,121,162,1}},
-    tickEntry = {address=0x0045CD10, bytes={131,61,36,228,145,1,0}, kind='raw', patch='return'},
-    tickExit = {address=0x0045CDA8, bytes={94,195}},
-    tickReturned = {address=0x0057C384, bytes={185,104,215,145,1}},
-    navigationCountdown = 0x0117CAD8, -- native updateSeparateAreaTileMap (4995E0)
     fileName = {address=0x0046C300, bytes={139,129,196,11,0,0}},
     mapName = {address=0x0046C2E0, bytes={139,68,36,4,61,244,1,0,0}},
     load = {address=0x004950B0, bytes={129,236,244,3,0,0}},
@@ -20,20 +13,10 @@ return {
     receivedParameters = {address=0x004908BB, bytes={141,150,220,12,0,0,82,139,19}},
     switchMenu = {address=0x0046B350, bytes={0,0,139,68,36}},
     resources = 0x011BF130,
-    menuText = 0x011265A8,
-    gameCore = 0x01FE7D10,
-    paused = 0x01FEA054,
   },
   Extreme = {
-    calendar = {address=0x0045699E,bytes={139,68,36,4,137,129,188,65,14,0,184,100,0,0,0,137,145,192,65,14,0},value=0x0120F6F4},
     resultsTimer = {address=0x004AFCBA, bytes={61,64,31,0,0}, kind='raw', patch='equalFlags'},
     resultsBranch = {address=0x004AFCBF, bytes={118,41}},
-    haltingMenu = {address=0x0046BF40, bytes={161,240,77,53,2,133,192,116,8,131,248,99,116,3,51,192,195,131,61,132,106,18,1,0,116,6,184,1,0,0,0,195,51,192,131,61,188,177,167,2,28,15,148,192,195}},
-    tick = {address=0x0045D054, bytes={185,192,174,75,2}},
-    tickEntry = {address=0x0045CF20, bytes={131,61,148,84,53,2,0}, kind='raw', patch='return'},
-    tickExit = {address=0x0045CFB8, bytes={94,195}},
-    tickReturned = {address=0x0057C7B4, bytes={185,216,71,53,2}},
-    navigationCountdown = 0x0120F718, -- native updateSeparateAreaTileMap (499750)
     fileName = {address=0x0046C520, bytes={139,129,196,11,0,0}},
     mapName = {address=0x0046C500, bytes={139,68,36,4,61,244,1,0,0}},
     load = {address=0x00495210, bytes={129,236,244,3,0,0}},
@@ -44,8 +27,5 @@ return {
     receivedParameters = {address=0x00490A1B, bytes={141,150,220,12,0,0,82,139,19}},
     switchMenu = {address=0x0046B570, bytes={0,0,139,68,36}},
     resources = 0x01293C20,
-    menuText = 0x01126A28,
-    gameCore = 0x02A7B210,
-    paused = 0x02A7D554,
   },
 }

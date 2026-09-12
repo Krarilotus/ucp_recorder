@@ -402,3 +402,42 @@ passes 600 original SP dispatches, 1200 offline replay dispatches and 600 local
 captures through the production binding, including ring wrap and rollback.
 Native bridge, transport, memory-helper and test-command boundaries remain
 stand-ins. Other engine/native profiles and full live acceptance are unfinished.
+
+## Coordinator state and calendar
+
+Recorder 0.50.20 derives tick entry/return/admission, halting-menu query,
+GameCore/pause/menu-input state and navigation countdown from its existing
+maintenance caller/coordinator binding. Protocol's command metadata and
+Recorder's RNG owner validate the repeated state operands and native calls.
+Only the native calendar setter needs another framework lookup; its field
+relationships yield the month/year address relative to the resolved game state.
+The six context records and four state pointers replace both fixed engine
+profiles. History, replay UI and overlay input reuse the resolved GameCore
+current-view field, removing that entry from `native.lua` too.
+
+Reuse inspection: UI `ui/game.lua` and `manager/init.lua` at c373343 export
+rendering/menu objects, not GameCore, native clock admission or the calendar.
+Map `mapextensions/game.lua` at 9d35dfb exports save entries/table, not these
+simulation phases. Framework `hooks.lua` at 02a7a6b exposes initialization.
+Recorder therefore retains its existing phase/gate ownership and uses
+`hook-check.context/resolve`. OpenSHC `GameStateStructures/processGameTick.cpp`
+and original instructions establish the original order and ABI. No native
+update is reimplemented and no hook, poller or per-tick lookup is added.
+
+The tick entry/admission/returned hooks retain their 7/5/5-byte spans and the
+original return path. Full contexts are rechecked before engine construction,
+before Recorder's own later scope/phase patches alter those contexts. The
+navigation reset immediate is deliberately variable: unchanged Legacy
+`o_increase_path_update_tick_rate` changes 200 to 50. Repeated countdown
+operands still must agree; both settings execute the game's original code.
+
+Validation: 506 portable tests pass (one existing skip); the final menu-view
+reuse passes 44 affected tests. Both Lua runtimes cover relocated addresses,
+missing/ambiguous contexts and late conflicts. All six local/official
+EFIGS/Polish SHC 1.41 and Extreme 1.41.1-E images pass ten bindings, 33 negative
+cases and the Legacy period case each. Each also passes 77 original coordinator
+cases through these bindings and 600 SP/1200 offline replay dispatches plus
+600 local captures. Protocol metadata is a fixture in the coordinator runner
+and the real owner in the binding/dispatch tests. Other native callees, bridges
+and transport remain stand-ins; live gameplay, save/replay and physical
+multiplayer acceptance are still outstanding.

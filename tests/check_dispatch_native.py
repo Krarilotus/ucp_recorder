@@ -114,10 +114,10 @@ hooks={registerHookCallback=function() end}
 local protocol=dofile(protocol_root..'/init.lua');protocol:enable({})
 modules={protocol=protocol,['map-extensions']={getNativeSaveInterface=function() return map_save_fixture end}}
 require('code/rng-bindings').resolve()
-local sites=require('code/engine-command-sites').bind(require('tests/fixtures/engine-sites')[variant])
+local sites=require('code/engine-state-sites').bind(require('code/engine-command-sites').bind(require('tests/fixtures/engine-sites')[variant]))
 sites=require('code/native-command').bind(require('code/native-save').bind(sites))
-core.readInteger=read_integer;core.readBytes=read_bytes
 engine=require('code/engine').new(sites)
+core.readInteger=read_integer;core.readBytes=read_bytes
 engine.haltingMenuNative=function() return 0 end -- UI query checked separately
 recorder={mode='play',status='playing',active=true,engine=engine,manifest={player=3,variant=variant}}
 recorder.beforeCommandWork=require('code/session-recorder').beforeCommandWork

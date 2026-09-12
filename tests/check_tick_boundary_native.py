@@ -40,6 +40,10 @@ core={AOBScan=scan,scanForAOB=scan,readBytes=read_bytes,readInteger=read_int}
 modules={protocol={getNativeCommandInterface=function() return commandFixture end}}
 ''')
     phase_profile=maintenance.verify()
+    lua.globals().commandFixture.queueEntry=sites.queue.address
+    lua.execute('commandFixture.scheduleCommand=function() end')
+    sites=lua.eval("require('code/engine-state-sites').bind")(sites)
+    lua.execute("require('code/engine-state-sites').verify()")
     entry, clock, ending = (sites[key] for key in ('tickEntry', 'tick', 'tickExit'))
     extreme = variant == 'Extreme'
     sync = 0x23547d8 if extreme else 0x191d768
@@ -220,5 +224,5 @@ modules={protocol={getNativeCommandInterface=function() return commandFixture en
                     extra_work=(3, logical_pause))
                 assert halted == ([], 17, viewer_pause & 0xffffffff, 1), halted
                 count += 1
-    assert len(scans)==2,'Maintenance replay repeated binding discovery'
+    assert len(scans)==10,'Native state/maintenance replay repeated binding discovery'
     print(f'PASS: {variant} tick entry/endpoint halt and passive control flow ({count} cases)')
