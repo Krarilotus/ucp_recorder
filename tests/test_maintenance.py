@@ -101,7 +101,7 @@ local output,closed={},0
 local input={lines=function() local i=0; return function() i=i+1; return rows[i] end end,
  close=function() closed=closed+1; return true end}
 io.open=function(path,mode)
- if mode=='r' then return input end
+ if mode=='rb' then return input end
  return {write=function(_,line) output[#output+1]=line; return true end,
  close=function() closed=closed+1; return true end}
 end

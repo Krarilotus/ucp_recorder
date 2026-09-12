@@ -4,6 +4,7 @@ import json
 import hashlib
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 import test_session_files
 
 spec = importlib.util.spec_from_file_location('capture_inspector', Path(__file__).resolve().parents[1]/'tools/inspect_replay.py')
@@ -12,6 +13,158 @@ spec.loader.exec_module(inspector)
 
 
 class MultiplayerCaptureTests(unittest.TestCase):
+    def test_ending_state_is_retained_after_native_world_changes(self):
+        self.valid_world()
+        self.lua.execute('''
+tick(1)
+local expected=sha.sha256(engine:rngData())
+engine.rngData=function() error('Cannot resample after the match') end
+engine.rngState=function() error('Cannot resample ending counters') end
+engine.resourceData=function() error('Cannot resample ending resources') end
+trace:observe('stop','match exit')
+assert(not trace.failed,trace.failureReason)
+assert(trace.lastCapture.finalRngHash==expected and trace.lastCapture.finalRng[4]==4)
+assert(not trace.boundary.valid)
+''')
+
+    def test_periodic_host_and_client_snapshots_survive_named_prefix_and_bookmark_conversion(self):
+        self.valid_world()
+        self.lua.execute('''
+local storage=require('code/snapshot-store'); local saved=0; local month=12000
+require('code/platform').milliseconds=function() return now*100 end
+engine.calendarMonth=function() return month end
+engine.saveSnapshot=function() error('Native multiplayer save is prohibited') end
+require('code/world-capture').writeFrozenFixture=function(path,actual)
+ assert(actual==engine and not trace.pendingTick and not trace.executing)
+ saved=saved+1; local data=string.rep('world',400); store.write(path,data)
+ return {bytes=#data,sha256=sha.sha256(data)}
+end
+for player=1,2 do
+ month=12000; network.localPlayer=player; trace=Capture.new(engine,{})
+ local copy
+ for time=1,130 do
+  now=time
+  if time==10 then command() end
+  if time==64 then month=12300 end
+  tick(time)
+  if time==65 then copy=trace:saveCopy('Embedded peer point') end
+ end
+ assert(saved==player)
+ trace:observe('stop','match exit')
+ local automatic=store.load(trace.lastCapture.id,profile)
+ local named=store.load(copy.id,profile)
+ for _,manifest in ipairs({automatic,named}) do
+  assert(#manifest.snapshots==1 and manifest.snapshotOriginMonth==12000)
+  local point=manifest.snapshots[1]; assert(point.tick==64 and point.commands==1 and not point.traceSequence)
+  local ready=storage.prepare(manifest,point,storage.path(manifest,point))
+  assert(ready.rng==engine:rngData())
+  local r=require('code/replay-streams'):new({name=store.path(manifest.id)..'/stream'})
+  r:openFiles('r'); r.mode='play'; r.tickFile=assert(io.open(store.path(manifest.id)..'/ticks.bin','rb'))
+  r:restoreBookmark(point.bookmark)
+  assert(r:peekCommand()==nil)
+  assert(json:decode(r.rngFile:read()).time==64) -- point precedes its verification row
+  assert(require('code/tick-journal').decode(r.tickFile:read(28)).time==64)
+  r:reset()
+ end
+end
+assert(nativeWrites==0)
+''')
+
+    def test_release_host_and_client_preserve_inputs_without_command_resource_snapshots(self):
+        self.valid_world()
+        self.lua.execute('''
+require('code/build-profile').diagnostics=false
+for player=1,2 do
+ network.localPlayer=player; trace=Capture.new(engine,{})
+ for time=1,2050 do
+  tick(time)
+  if time==50 then command() end
+ end
+ local copy=trace:saveCopy('Release prefix')
+ trace:observe('stop','match exit')
+ local manifest=store.load(trace.lastCapture.id,profile)
+ assert(manifest.verificationProfile=='state-digest-v1' and manifest.commandCount==1)
+ store.preflight(manifest); store.preflight(store.load(copy.id,profile))
+ assert(#store.read(trace.lastCapture.path..'/ticks.bin')==2050*28)
+ local checkpoints,commands=0,0
+ for line in io.lines(trace.lastCapture.path..'/commands.jsonl') do
+  local event=json:decode(line)
+  if event.kind=='checkpoint' then
+   checkpoints=checkpoints+1; assert(event.stateHash and not event.resources and not event.rngHash)
+  elseif event.kind=='command' then
+   commands=commands+1; assert(event.beforeRng and event.rng and not event.resources)
+  end
+ end
+ assert(checkpoints==2 and commands==1)
+end
+assert(nativeWrites==0)
+''')
+        # This fixture models world construction; inspect the real journal and
+        # sidecars without mistaking its placeholder world bytes for a native save.
+        with patch.object(inspector, 'world_capture', return_value={'status': 'fixture'}):
+            result = inspector.multiplayer_capture(self.path())
+        self.assertEqual(result['journalFraming'], 'sealed', result)
+
+    def test_recovery_keeps_calendar_cadence_and_embedded_worlds_in_both_named_segments(self):
+        self.valid_world()
+        self.lua.execute('''
+local month=12000; local saved=0
+engine.calendarMonth=function() return month end
+require('code/platform').milliseconds=function() return now*100 end
+require('code/world-capture').writeFrozenFixture=function(path)
+ saved=saved+1; local data=string.rep(tostring(saved),2000); store.write(path,data)
+ return {bytes=#data,sha256=sha.sha256(data)}
+end
+for time=1,65 do
+ if time==64 then month=12300 end
+ tick(time)
+end
+local first=trace.capture.id; assert(saved==1)
+network.syncStatus=1; now=66; trace:observe('immediateCommand','receive')
+network.syncStatus=0; month=12350
+for time=10,75 do
+ if time==64 then month=12600 end
+ tick(time)
+ if time==10 then assert(saved==1,'Recovery start must not duplicate the first snapshot') end
+end
+assert(saved==2 and trace.capture.snapshotOriginMonth==12000)
+local copy=trace:saveCopy('Recovery points'); trace:observe('stop','exit')
+local storage=require('code/snapshot-store')
+for _,id in ipairs({first,copy.id}) do
+ local root=store.load(id,profile); local recovered=store.load(root.nextReplay,profile)
+ assert(root.snapshotOriginMonth==12000 and recovered.snapshotOriginMonth==12000)
+ for _,manifest in ipairs({root,recovered}) do
+  assert(#manifest.snapshots==1 and manifest.snapshots[1].tick==64)
+  storage.prepare(manifest,manifest.snapshots[1],storage.path(manifest,manifest.snapshots[1]))
+ end
+ assert(root.snapshots[1].worldHash~=recovered.snapshots[1].worldHash)
+end
+assert(nativeWrites==0)
+''')
+
+    def test_periodic_io_failure_does_not_stop_network_command_recording(self):
+        self.valid_world()
+        self.lua.execute('''
+local month=12000; local attempted=0
+engine.calendarMonth=function() return month end
+require('code/platform').milliseconds=function() return now*100 end
+require('code/world-capture').writeFrozenFixture=function() attempted=attempted+1; error('disk full') end
+for time=1,130 do
+ now=time
+ if time==64 then month=12300 end
+ if time==70 then command() end
+ tick(time)
+end
+assert(attempted==1 and trace.snapshots.disabled and not trace.failed)
+trace:observe('stop','exit')
+local manifest=store.load(trace.lastCapture.id,profile)
+assert(manifest.commandCount==1 and not manifest.snapshots and nativeWrites==0)
+''')
+
+    def test_release_recovery_and_named_copy_keep_all_simulation_boundaries(self):
+        self.lua.execute("require('code/build-profile').diagnostics=false; trace=Capture.new(engine,{})")
+        self.test_recovery_links_and_named_copy_keep_both_worlds_independent()
+
     def test_tick_preflight_streams_split_frames_and_rejects_corrupt_tail(self):
         self.valid_world()
         self.lua.execute('''
@@ -49,11 +202,14 @@ for i=1,8 do
  network.roster[i]={slot=i,kind=i<=2 and 'human' or 'empty',ai=0,variation=0}
 end
 engine={base=1000,rng=2000,sites={actorOffset=32},
+ calendarMonth=function() return 12000 end,commandsPending=function() return false end,
  tick=function() return now end,player=function() return network.localPlayer end,
  singlePlayer=function() return single end,
  networkState=function() return json:decode(json:encode(network)) end,
  rngData=function() return string.rep('a',0x9c50) end,
+ resourceData=function() return string.rep('r',800) end,
  rngState=function() return {1,2,3,4} end,resourceState=function() return resourceState() end}
+engine.newRecordingBoundary=require('tests/recording_boundary_fixture')
 store.settings=function()
  local raw='settings'; local env='environment'; local restart='resolved launch settings'
  return {raw=raw,hash=sha.sha256(raw),environment=env,environmentHash=sha.sha256(env),settingsCapture='resolved-v1',
@@ -63,6 +219,11 @@ trace=Capture.new(engine,{multiplayerDiagnosticsEndTick=128,multiplayerDiagnosti
 function tick(t)
  now=t; trace:observe('onTick'); assert(not trace.failed,trace.failureReason)
  now=t+1; trace:observe('afterTick'); now=t; assert(not trace.failed,trace.failureReason)
+ require('code/snapshot-jobs').poll()
+end
+require('code/world-capture').freeze=function(actual)
+ return {ready=function() return true end,cancel=function() end,close=function() end,
+  write=function(_,path) return require('code/world-capture').writeFrozenFixture(path,actual) end}
 end
 function command()
  reads[engine.base+0x2d824]=0; reads[engine.base+32]=network.localPlayer
@@ -87,10 +248,10 @@ core.readByte=function() return 34 end
 engine.rngData=function()
  return string.char(1,0,2,0,123,0,0,0)..string.rep('a',40000)..string.char(3,0,0,0,4,0,0,0)
 end
-package.loaded['code/world-capture']={capture=function(path)
+require('code/world-capture').capture=function(path)
  for _,name in ipairs({'world.json','world.bin','world-layout.bin','world-header.bin'}) do store.write(path..'/'..name,'world') end
  return {status='complete',header=true,hash=sha.sha256('world')}
-end}
+end
 ''')
 
     def test_native_boundaries_seal_host_and_client_into_the_shared_replay_library(self):

@@ -6,7 +6,7 @@ the existing native SHA256 implementation. The normal world restore invokes the
 save owner's validators before extension deserialization. No alternative native
 save or network command path is introduced.
 
-Each existing 64-tick checkpoint includes the provider's format, package SHA256
+Each existing verification checkpoint includes the provider's format, package SHA256
 and deterministic state digest. Preflight rejects missing or incompatible
 contracts; playback compares the digest at the original checkpoint boundary.
 `tools/compare_multiplayer.py` also compares these fields between physical peers.
@@ -16,7 +16,7 @@ checkpoint shape and behavior.
 
 The recorder also observes required state at each recorded boundary and seals
 `finalExtensionState` into SP and multiplayer replay manifests. Playback compares
-it at the exact ending tick, including endings between 64-tick checkpoints.
+it at the exact ending tick, including endings between verification checkpoints.
 The save owner permits paired observation/digest callbacks; AIC Tactics uses a
 fixed native memcpy snapshot and hashes it only when sealing/copying a recording.
 This avoids full state hashing every tick and retains the ending observation even
@@ -44,3 +44,12 @@ without assigning the observer control of an AI. A GamerGrill match exposed the
 old manifest rejection after 17 successful required-state checkpoints; the
 corrected validation passes file-based copy/seal/preflight tests. Native replay
 playback with observer slot zero remains an acceptance check.
+
+The branch incorporates the existing Recorder owner's 02014385 changes rather
+than replacing its capture/seek implementation. Release checkpoints keep the
+owner's 1,024-tick compact state digest; diagnostic and older recordings keep
+64-tick detailed checks. Required state uses that same cadence and the existing
+retained native recording boundary. Initial and frozen restore-point captures
+both use `world-capture.extensionState()`. The owner's saved-game admission fix
+uses requestedView at the native load return; currentView still denotes the load
+dialog there. These integrations still require a fresh native acceptance run.

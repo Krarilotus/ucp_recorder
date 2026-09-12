@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module>
+  <files>
+    <file src="dist/store/*" target="." />
+  </files>
+</module>

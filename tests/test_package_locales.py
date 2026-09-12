@@ -13,6 +13,13 @@ class PackageLocaleTests(unittest.TestCase):
         options = (ROOT / 'options.yml').read_text(encoding='utf-8')
         keys = set(re.findall(r'{{([^{}]+)}}', options))
         self.assertEqual(len(keys), 14)
+        definition = (ROOT / 'definition.yml').read_text(encoding='utf-8')
+        tag_block = re.search(r'^tags:\n((?:[ \t]+-[^\n]+\n?)+)', definition, re.M)
+        self.assertIsNotNone(tag_block)
+        tags = re.findall(r'^\s+- ([a-z][a-z0-9-]*)$', tag_block[1], re.M)
+        self.assertEqual(set(tags), {'replay', 'multiplayer', 'tools'})
+        self.assertEqual(len(tags), len(set(tags)))
+        keys.update('tags.' + tag for tag in tags)
         locales = list((ROOT / 'locale').glob('*.yml'))
         self.assertEqual({path.stem for path in locales}, LANGUAGES)
         for path in locales:

@@ -438,7 +438,9 @@ assert(traceRows[1].firstTick==1 and traceRows[2].kind=='command')
     def test_capture_status_uses_selected_language_and_distinguishes_incomplete(self):
         self.bounded()
         self.check('''
-os.getenv=function() return 'de' end
+os.getenv=function() error('In-game labels must not query launcher language') end
+data={version={getGameLanguage=function() return 'german' end}}
+require('code/text-encoding').encode=function(text) return text end -- status text, not native rendering
 assert(engine.trace:statusLines()[1]=='Warte auf Testaufzeichnung ab Tick 64.')
 memory[0x1fe7da8]=64; engine.trace:observe('onTick')
 assert(engine.trace:statusLines()[1]=='Testaufzeichnung läuft: Tick 64 / 128')
@@ -493,6 +495,22 @@ assert(recorder.mode=='none' and not recorder.error)
 
 
 class CompareTraceTests(unittest.TestCase):
+    def test_compact_peer_fingerprints_compare_without_detailed_resources(self):
+        a = self.full_trace()
+        a[0].update(firstTick=1, verificationProfile='state-digest-v1')
+        a[1] = dict(kind='checkpoint', sequence=1, time=1024, rng=[1,2,3,4], stateHash='b'*64)
+        b = self.other_peer(a)
+        self.assertEqual(self.compare(a,b)['status'], 'matched')
+        b[1]['stateHash'] = 'c'*64
+        self.assertEqual(self.compare(a,b)['firstDifference']['field'], 'stateHash')
+        report = self.module.inspect_trace(self.root/'a.jsonl')
+        self.assertNotIn('inspectionError', report)
+        self.assertIn('stateCheckpointDigest', report)
+        b[1]['time'] = 2048
+        self.assertEqual(self.compare(a,b)['status'], 'incomplete')
+        b[0]['verificationProfile'] = 'unknown'
+        self.assertEqual(self.compare(a,b)['status'], 'incomplete')
+
     def sync_pair(self):
         import struct
         a, b = self.network_trace(), self.network_trace(2)

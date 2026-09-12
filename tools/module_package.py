@@ -1,6 +1,7 @@
 """Build recorder data/source packages without executing code from the source tree."""
 from dataclasses import dataclass
 import hashlib
+import json
 from pathlib import Path
 import re
 import zipfile
@@ -16,6 +17,14 @@ class ModulePackage:
 DIAGNOSTIC_MODULES = frozenset({
     'rng-attribution.lua', 'rng-observer.lua', 'rng-fire-context.lua', 'rng-spawn-context.lua',
 })
+
+# Frozen fallback for publishing older PR stages that predate the shared manifest.
+LEGACY_FILES = dict(format=1,
+    required=['definition.yml', 'options.yml', 'init.lua', 'README.md', 'CHANGELOG.md'],
+    trees=[['code', '*.lua'], ['docs', '*.md'], ['docs/images', '*.jpg'], ['locale', '*.yml'], ['locale', '*.md']],
+    optional=['tools/compare_multiplayer.py', 'tools/inspect_replay.py'],
+    diagnosticFiles=['code/' + name for name in DIAGNOSTIC_MODULES] + ['tools/compare_multiplayer.py', 'tools/inspect_replay.py'],
+    diagnosticOptions=['singleplayerRngDiagnostics', 'multiplayerDiagnostics', 'multiplayerDiagnosticsStartTick', 'multiplayerDiagnosticsEndTick'])
 
 
 def build_module(source: Path, destination: Path, *, profile: str | None = None) -> ModulePackage:
@@ -34,17 +43,21 @@ def build_module(source: Path, destination: Path, *, profile: str | None = None)
     if not match:
         raise ValueError('Invalid recorder version')
     version = match.group(1)
-    files = [source / name for name in ('definition.yml', 'options.yml', 'init.lua', 'README.md', 'CHANGELOG.md')]
-    for folder, pattern in (('code', '*.lua'), ('docs', '*.md'), ('docs/images', '*.jpg'), ('locale', '*.yml'), ('locale', '*.md')):
+    manifest = source / 'package-files.json'
+    if manifest.is_symlink() or not manifest.resolve().is_relative_to(source):
+        raise ValueError('Package manifest is outside the source tree')
+    rules = json.loads(manifest.read_text(encoding='utf-8')) if manifest.exists() else LEGACY_FILES
+    if rules['format'] != 1:
+        raise ValueError('Unsupported recorder package manifest')
+    files = [source / name for name in rules['required']]
+    for folder, pattern in rules['trees']:
         files.extend(sorted((source / folder).rglob(pattern)))
-    for name in ('compare_multiplayer.py', 'inspect_replay.py'):
-        tool = source / 'tools' / name
+    for name in rules['optional']:
+        tool = source / name
         if tool.exists():
             files.append(tool)
     if profile == 'release':
-        files = [path for path in files if not (
-            path.parent == source / 'code' and path.name in DIAGNOSTIC_MODULES
-            or path.parent == source / 'tools')]
+        files = [path for path in files if path.relative_to(source).as_posix() not in rules['diagnosticFiles']]
     # Validate the complete member list before creating an archive. This also
     # rejects directory links that resolve outside the trusted source root.
     for path in files:
@@ -62,7 +75,8 @@ def build_module(source: Path, destination: Path, *, profile: str | None = None)
                 options = path.read_text(encoding='utf-8')
                 # Preserve the source schema/text for every real playback option.
                 # Blocks are top-level '- url:' entries in the module format.
-                options = re.sub(r'^- url: recorder\.(?:singleplayerRngDiagnostics|multiplayerDiagnostics(?:StartTick|EndTick)?)\s*\n.*?(?=^- url:|\Z)',
+                diagnostic_options = '|'.join(re.escape(name) for name in rules['diagnosticOptions'])
+                options = re.sub(r'^- url: recorder\.(?:' + diagnostic_options + r')\s*\n.*?(?=^- url:|\Z)',
                                  '', options, flags=re.M | re.S)
                 archive.writestr(name, options)
             else:

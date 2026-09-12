@@ -44,3 +44,16 @@ assert(view:render(function() return memory[0x1a275dc] end)==1)
 r.mode='play'; multiplayer=true; assert(not view:available() and #view:players()==0)
 assert(view:render(function() return memory[0x1a275dc] end)==1)
 ''')
+
+    def test_seek_recovery_preserves_selection_but_new_playback_resets_it(self):
+        self.setup_view()
+        self.check('''
+r.snapshots={}; view:select(4)
+r.manifest={player=1}; assert(view:player()==4 and #view:players()==2)
+r.engine.networkState=function()
+ local roster={}; for i=1,8 do roster[i]={kind='empty'} end
+ return {roster=roster}
+end
+r.manifest={player=1}; view:players(); assert(view:player()==1)
+r.snapshots={}; assert(view:player()==1)
+''')

@@ -12,5 +12,8 @@
   "start_header": "Tick de début du diagnostic",
   "start_text": "Utiliser le même multiple de 64 sur les deux PC. Ignoré si le tick de fin vaut zéro. La capture automatique couvre toujours toute la partie.",
   "end_header": "Tick de fin du diagnostic",
-  "end_text": "Zéro journalise jusqu’à la sortie de la mission. Sinon, choisir un multiple de 64 ultérieur, identique sur les deux PC. La fin du diagnostic n’arrête ni la partie ni la capture automatique."
+  "end_text": "Zéro journalise jusqu’à la sortie de la mission. Sinon, choisir un multiple de 64 ultérieur, identique sur les deux PC. La fin du diagnostic n’arrête ni la partie ni la capture automatique.",
+  "tags.replay": "Rediffusions",
+  "tags.multiplayer": "Multijoueur",
+  "tags.tools": "Outils"
 }

@@ -126,13 +126,18 @@ def multiplayer_capture(folder):
     categories = {}
     footer = None
     last_tick = manifest['startTick']
-    next_checkpoint = (last_tick + 63) // 64 * 64
+    verification = manifest.get('verificationProfile')
+    if verification not in (None, 'state-digest-v1'):
+        raise ValueError('Unsupported replay verification profile')
+    interval = 1024 if verification else 64
+    next_checkpoint = (last_tick + interval - 1) // interval * interval
     with (folder / 'commands.jsonl').open('rb') as stream:
         header_line = stream.readline(1024 * 1024)
         header = json.loads(header_line)
         if (header.get('kind') != 'header' or header.get('format') != 5
                 or header.get('firstTick') != manifest['startTick']
                 or header.get('network') != manifest['initialNetwork']
+                or header.get('verificationProfile') != verification
                 or any(header.get(k) != manifest.get(k) for k in ('variant', 'executable', 'environmentHash'))):
             raise ValueError('Capture header differs from its manifest')
         valid_bytes = len(header_line)
@@ -164,7 +169,7 @@ def multiplayer_capture(folder):
                         previous_tick = row.get('details', {}).get('previousTick')
                         if type(previous_tick) is not int or tick >= previous_tick:
                             raise ValueError('Invalid timeline reset marker')
-                        next_checkpoint = (tick + 63) // 64 * 64
+                        next_checkpoint = (tick + interval - 1) // interval * interval
                         segments += 1
                     if kind == 'checkpoint' and tick != next_checkpoint:
                         raise ValueError('Missing checkpoint boundary')
@@ -176,7 +181,7 @@ def multiplayer_capture(folder):
                         key = str(row.get('category'))
                         categories[key] = categories.get(key, 0) + 1
                     elif kind == 'checkpoint':
-                        checkpoints += 1; next_checkpoint += 64
+                        checkpoints += 1; next_checkpoint += interval
                     else:
                         gaps += 1
                         if len(transitions) < 100 and 'immediate command' not in row.get('reason', ''):

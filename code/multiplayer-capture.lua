@@ -3,6 +3,7 @@ local Trace=require('code/multiplayer-trace')
 local files=require('code/capture-files')
 local store=require('code/sessions')
 local tr=require('code/locale').text
+local verification=require('code/replay-verification')
 local M={ROOT='ucp/replays',MAX_BYTES=256*1024*1024,MAX_TICK_BYTES=128*1024*1024}
 setmetatable(M,{__index=Trace})
 
@@ -12,6 +13,7 @@ function M.new(engine,config)
   self.root=M.ROOT
   self.fileMode='wb' -- byte offsets must not change through Windows CRLF translation
   self.rngAttribution=config and config.multiplayerDiagnostics==true
+  self.verificationProfile=verification.recordingProfile()
   return setmetatable(self,{__index=M})
 end
 
@@ -22,15 +24,19 @@ function M:write(value)
   self.bytes=(self.bytes or 0)+#line
 end
 
-function M:open()
+function M:open(snapshotOrigin)
   if self.file then return end
   self.bytes=0
   self.lastNamedCopy=nil
   self.clock=nil
   self.pendingTick=nil; self.tickBytes=0
+  self.boundary=self.boundary or self.engine:newRecordingBoundary()
+  self.boundary:clear()
   self.recoveryPending=nil; self.boundaryEvents=nil
   Trace.open(self)
   self.capture=files.begin(self.path,self.engine,store.settings())
+  self.snapshots=require('code/multiplayer-snapshots').new(self,snapshotOrigin)
+  self.capture.verificationProfile=self.verificationProfile
   if self.engine.battle then self.engine.battle:begin() end
   self.tickFile=assert(io.open(self.path..'/ticks.bin','wb'))
   self.capture.tickProfile='native-tick-rng-v1'
@@ -66,15 +72,20 @@ function M:onTick()
   end
   self.clock=self.engine:tick()
   self.observedTick=self.clock
-  Trace.onTick(self,true)
   assert(not self.pendingTick,'Native simulation tick did not return to the game loop')
+  self.snapshots:observe()
   self.pendingTick={time=self.observedTick,before=require('code/tick-journal').state(self.engine)}
-  self.capture.finalRng=self.engine:rngState()
-  self.capture.finalResources=self.engine:resourceState()
   if self.engine.battle then self.engine.battle:observe() end
-  self.finalRngData=self.engine:rngData()
+  self.boundary:capture()
   require('code/required-state').observeBoundary()
+  Trace.onTick(self,true)
   self.boundaryEvents=self.events
+end
+
+function M:checkpoint(now)
+  local rng,resources=self.boundary:read()
+  return verification.capture(self.engine,self.verificationProfile,now,
+    self.boundary:rngState(),rng,resources)
 end
 
 function M:gap(reason,details)
@@ -93,7 +104,7 @@ function M:recover()
   local received=self.received
   previous.replayEvents=self.boundaryEvents or 0
   self:stop('native world or player roster changed')
-  self:open()
+  self:open(previous.snapshotOriginMonth)
   self.simulationObserved=true
   self.received=received
   self.capture.previousReplay=previous.id
@@ -123,12 +134,17 @@ function M:beforeCommand()
 end
 
 function M:sealBoundary()
+  if self.observedTick then self.capture.finalExtensionState=require('code/required-state').boundaryIntegrity() end
   assert(not self.pendingTick,'Cannot save inside a simulation tick')
   if self.tickFile then assert(self.tickFile:flush()) end
   self.capture.tickBytes=self.tickBytes
   if self.recoveryPending then self.capture.replayEvents=self.boundaryEvents or 0 end
-  if self.finalRngData then self.capture.finalRngHash=sha.sha256(self.finalRngData) end
-  if self.observedTick then self.capture.finalExtensionState=require('code/required-state').boundaryIntegrity() end
+  if self.boundary and self.boundary.valid then
+    local rng,resources=self.boundary:read()
+    self.capture.finalRng=self.boundary:rngState()
+    self.capture.finalRngHash=require('code/native-hash').sha256(rng)
+    self.capture.finalResources=self.engine:resourceState(resources)
+  end
   if self.engine.battle and self.observedTick then
     self.capture.lastObservedTick=self.observedTick
     self.engine.battle:write(self.capture)
@@ -136,6 +152,7 @@ function M:sealBoundary()
 end
 
 function M:captureFailure(reason)
+  if self.snapshots then self.snapshots:close() end
   if not self.capture then return end
   self.capture.status='interrupted'; self.capture.reason=reason
   self.capture.bytes=self.bytes; self.capture.lastObservedTick=self.observedTick
@@ -158,6 +175,7 @@ function M:saveCopy(name)
 end
 
 function M:stop(reason)
+  if self.snapshots then self.snapshots:close() end
   local capture=self.capture
   local hadFile=self.file~=nil
   local wasFailed=self.failed
@@ -177,7 +195,8 @@ function M:stop(reason)
     self.lastReplay=files.seal(capture)
     self.lastCapture=capture
   end
-  self.capture=nil; self.observedTick=nil; self.pendingTick=nil; self.finalRngData=nil
+  self.capture=nil; self.snapshots=nil; self.observedTick=nil; self.pendingTick=nil
+  if self.boundary then self.boundary:clear() end
   assert(ok,err)
 end
 

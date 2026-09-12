@@ -13,14 +13,32 @@ function M:status()
   local r=self.recorder
   if r.status=='error' then return tostring(r.error or tr('Playback failed.')) end
   if r.status=='finished' then return tr('Playback finished.') end
+  if r.snapshots and r.snapshots.error then return tostring(r.snapshots.error):match('[^\r\n]+') end
+  if r.snapshots and r.snapshots.target then
+    local position=r.snapshots:progress(r.snapshots.target)
+    return tr('Seeking to tick %d',position)
+  end
   if r.engine:isPaused() then return tr('Playback paused.') end
   return tr('Checks matching')
 end
 
 function M:progress()
   local r=self.recorder
-  local first,last=r.manifest.startTick,r.manifest.lastTick
-  return tr('Replay: %d / %d ticks',math.max(0,math.min(r.engine:tick(),last)-first),last-first)
+  local now=require('code/platform').milliseconds()
+  -- Loading a restore point replaces the native command journal even when the
+  -- manifest/status stay the same. Never paint a cached pre-seek fill on it.
+  if self.progressManifest~=r.manifest or self.progressStatus~=r.status or self.progressWorld~=r.engine.journal
+    or not self.progressAt or (now-self.progressAt)%4294967296>=250 then
+    local first,last=r.manifest.startTick,r.manifest.lastTick
+    local elapsed=math.max(0,math.min(r.engine:tick(),last)-first)
+    local total=last-first
+    if r.snapshots then elapsed,total=r.snapshots:progress() end
+    self.progressLabel=tr('Replay: %d / %d ticks',elapsed,total)
+    self.progressFraction=total>0 and elapsed/total or (r.status=='finished' and 1 or 0)
+    self.progressAt=now; self.progressManifest=r.manifest; self.progressStatus=r.status
+    self.progressWorld=r.engine.journal
+  end
+  return self.progressLabel,self.progressFraction
 end
 
 -- Native RenderPlayerAvatars uses 72x72 images. Reserve the native bottom
@@ -45,13 +63,20 @@ function M:install(ui)
         if slot==self.view:player() then ui:border(x-2,y-2,76,76) end
       end}
   end
-  items[#items+1]={x=-410,y=12,width=398,height=58,enabled=false,
+  items[#items+1]={x=-560,y=12,width=548,height=58,enabled=false,
     render=function(x,y)
-      ui:hudText(self:progress(),x+398,y,-1,398)
-      ui:hudText(self:status(),x+398,y+18,-1,398)
-      ui:hudText(tr('F3: replay information'),x+398,y+36,-1,398)
+      local label,fraction=self:progress()
+      ui:hudText(label,x+548,y,-1,292)
+      ui:hudText(self:status(),x+548,y+18,-1,548)
+      ui:hudText(tr('F3: replay information'),x+548,y+36,-1,548)
     end}
-  items[#items+1]={x=54,y=12,width=320,height=180,enabled=false,
+  items[#items+1]={x=54,y=112,width=320,height=180,enabled=false,
+    position=function(_,height)
+      -- Keep metadata below the progress/speed strip and beside every portrait
+      -- column, including the wrapped layout in short windows.
+      local x=M.portraitPosition(math.max(1,#self.view:players()),height)
+      return x+80,112
+    end,
     visible=function() return self.details and self.recorder.playbackInfo~=nil end,
     render=function(x,y)
       if self.info~=self.recorder.playbackInfo then
@@ -78,6 +103,15 @@ function M:install(ui)
     visible=function() return self.recorder.status=='finished' and self.recorder.manifest
       and self.recorder.manifest.battle~=nil end,
     action=function() self.showStatistics() end}
+  items[#items+1]={x=-560,y=12,width=254,height=18,
+    enabled=function() return self.recorder.snapshots~=nil and
+      (self.recorder.status=='playing' or self.recorder.status=='finished') end,
+    render=function(x,y)
+      local _,fraction=self:progress(); ui:progressBar(x,y,fraction)
+    end,
+    action=function(x)
+      self.recorder.snapshots:request(math.max(0,math.min(1,(x-2)/250)))
+    end}
   ui:attachOverlay({14,16},items,function() return self.view:available() and ui:activeDialog()==-1 end,true)
 end
 

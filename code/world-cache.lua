@@ -24,8 +24,8 @@ function M.load(path,reader,profile,limit)
   local ok,value=pcall(function()
     assert(entry.bytes<=limit)
     local size=0
-    local hash=require('code/native-hash').file(path..'/world-native.sav',limit,
-      function(_,count) size=count end)
+    local hash=require('code/native-hash').file(path..'/world-native.sav',limit,nil,
+      function(count) size=count end)
     assert(size==entry.bytes and hash==entry.sha256)
     return copy(entry)
   end)

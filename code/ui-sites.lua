@@ -2,6 +2,13 @@
 -- Signatures and ABI: UCP ui module ui/game.lua and ui/headers/latest/ui.h.
 return {
   SHC = {
+    updateMenu = {address=0x004F6470,bytes={86,87,139,241,51,255}},
+    menuHit = {address=0x004F6485,bytes={137,61,204,179,242,0},value=0x00F2B3CC},
+    mouse = {address=0x004F4349,bytes={185,176,201,242,0},value=0x00F2C9B0},
+    missionBar = {address=0x004D7DDA,bytes={106,4,104,164,0,0,0,185,144,160,254,1,232,181,214,247,255},value=0x01FEA090},
+    spriteClip = {address=0x00454990,bytes={139,68,36,4,139,84,36,8,137,129,84,200}},
+    clippedSprite = {address=0x004554A0,bytes={139,68,36,4,139,84,36,8,83,85,86,87}},
+    maskedSprite = {address=0x004557B0,bytes={81,131,61,228,160,254,1,0,139,21,188,199}},
     reportPause = {address=0x00444EB3, bytes={131,61,84,160,254,1,0}, kind='raw', patch='equalFlags'},
     mapViewport = {address=0x00454FA4, bytes={139,61,92,236,26,2,3,207,3,206,105,201,216,15,0,0,3,202,3,13,88,236,26,2}, value=0x021AEC58},
     avatar = {address=0x004D8AE0, bytes={83,139,92,36,8,85,86,51,237}},
@@ -28,6 +35,13 @@ return {
     modalStack = {address=0x004A9E40, bytes={139,21,164,66,223,0,137,80,36}, value=0x00DF42A4},
   },
   Extreme = {
+    updateMenu = {address=0x004F6800,bytes={86,87,139,241,51,255}},
+    menuHit = {address=0x004F6815,bytes={137,61,76,184,242,0},value=0x00F2B84C},
+    mouse = {address=0x004F46D9,bytes={185,48,206,242,0},value=0x00F2CE30},
+    missionBar = {address=0x004D816A,bytes={106,4,104,164,0,0,0,185,144,213,167,2,232,85,213,247,255},value=0x02A7D590},
+    spriteClip = {address=0x00454BC0,bytes={139,68,36,4,139,84,36,8,137,129,84,200}},
+    clippedSprite = {address=0x004556D0,bytes={139,68,36,4,139,84,36,8,83,85,86,87}},
+    maskedSprite = {address=0x004559E0,bytes={81,131,61,228,213,167,2,0,139,21,60,204}},
     reportPause = {address=0x004450E3, bytes={131,61,84,213,167,2,0}, kind='raw', patch='equalFlags'},
     mapViewport = {address=0x004551D4, bytes={139,61,92,33,196,2,3,207,3,206,105,201,216,15,0,0,3,202,3,13,88,33,196,2}, value=0x02C42158},
     avatar = {address=0x004D8E70, bytes={83,139,92,36,8,85,86,51,237}},

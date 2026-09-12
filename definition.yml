@@ -1,6 +1,6 @@
 name: recorder
 display-name: UCP-Recorder
-version: 0.48.4
+version: 0.50.3
 type: module
 author: Corax
 dependencies:
@@ -8,3 +8,7 @@ dependencies:
   ui: "^1.0.1"
 meta:
   version: 1.0.0
+tags:
+  - replay
+  - multiplayer
+  - tools

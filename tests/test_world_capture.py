@@ -15,6 +15,29 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorldCaptureTests(unittest.TestCase):
+    def test_initial_and_frozen_worlds_share_required_state_export(self):
+        self.lua.execute('''
+local count=0
+require('code/required-state').capture=function(entries)
+ count=count+1; entries['aic/state.bin']='state-'..count; return true
+end
+local captured=world.capture(test_path,engine)
+assert(captured.extensions and capturedExtensions['aic/state.bin']=='state-1')
+assert(json:decode(store.read(test_path..'/world.json')).extensions.requiredState)
+engine.commandsPending=function() return false end
+core.allocate=function() return 0x8000000 end
+core.copyMemory=function() end; core.deallocate=function() end
+package.loaded['code/binary-memory']={write=function() end}
+package.loaded['code/codec-worker']={MAX_BYTES=1000000,new=function()
+ return {close=function() end}
+end}
+package.loaded['code/world-codec']={compressorAddress=function() return 0x10000 end}
+local frozen=world.freeze(engine)
+assert(frozen.extensions=='zip bytes' and capturedExtensions['aic/state.bin']=='state-2')
+assert(count==2)
+frozen:close()
+''')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

@@ -6,6 +6,95 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_required_state_keeps_owner_checkpoint_cadence_and_retained_boundary(self):
+        self.check('''
+local required=require('code/required-state')
+for _,diagnostics in ipairs({false,true}) do
+ require('code/build-profile').diagnostics=diagnostics
+ local current,observed,observations,hashes=0,nil,0,0
+ required.observeBoundary=function() observed=current; observations=observations+1 end
+ required.integrity=function() hashes=hashes+1; return {aic={digest=tostring(current)}} end
+ required.boundaryIntegrity=function() return {aic={digest=tostring(assert(observed))}} end
+ local r=session(); now=0; r:startRecording(); r:activateRecording()
+ local checkpoints={}
+ r.rngFile.write=function(_,line) checkpoints[#checkpoints+1]=lastEncoded; return true end
+ for tick=1,1025 do now=tick; current=tick; r:onTick() end
+ assert(observations==1025 and hashes==(diagnostics and 16 or 1))
+ assert(#checkpoints==hashes and checkpoints[#checkpoints].extensionState.aic.digest=='1024')
+ if diagnostics then assert(checkpoints[1].resources and checkpoints[1].rngHash)
+ else assert(checkpoints[1].stateHash and not checkpoints[1].resources) end
+ current=9999; r:reset()
+ assert(savedManifest.lastTick==1025 and savedManifest.finalExtensionState.aic.digest=='1025')
+end
+''')
+
+    def test_prepared_recovery_segment_reuses_validated_data_without_rescanning(self):
+        self.check('''
+local preparation=require('code/replay-preparation')
+local store=require('code/sessions')
+store.load=function() error('Already admitted recovery metadata') end
+store.preflight=function() error('Already validated command streams') end
+store.read=function() error('Already retained environment and RNG') end
+local world={manifest={id='recovery'},path='recovery.sav',hash=string.rep('a',64),rng=string.rep('x',0x9c50)}
+local first={worlds={recovery=world},info={title='Recorded settings'}}
+local ready=preparation.segment(first,'recovery')
+assert(ready.manifest==world.manifest and ready.rng==world.rng and ready.worlds==first.worlds)
+assert(ready.snapshotPath==world.path and ready.snapshotHash==world.hash and ready.info==first.info)
+assert(not pcall(preparation.segment,first,'missing'))
+world.manifest={id='wrong'}; assert(not pcall(preparation.segment,first,'recovery'))
+world.manifest={id='recovery'}; world.rng=nil
+assert(not pcall(preparation.segment,first,'recovery'))
+''')
+
+    def test_release_keeps_sparse_fingerprints_and_decodes_only_on_save(self):
+        self.check('''
+require('code/build-profile').diagnostics=false
+local r=session(); r:startRecording(); r:activateRecording()
+assert(r.manifest.verificationProfile=='state-digest-v1')
+local reads,hashes,writes=0,0,0
+r.rngFile.write=function() writes=writes+1; return true end
+engine.resourceState=function(_,data)
+ assert(data==string.rep('r',800),'Must decode the retained boundary'); reads=reads+1
+ return resourceState(7)
+end
+package.loaded['code/native-hash'].sha256=function(data)
+ hashes=hashes+1
+ assert(#data==0x9c50+800 or #data==0x9c50)
+ return string.rep('a',64)
+end
+for tick=1,2049 do now=tick; r:onTick() end
+assert(reads==0 and hashes==2 and writes==2)
+assert(lastEncoded.time==2048 and lastEncoded.stateHash and not lastEncoded.resources and not lastEncoded.rngHash)
+engine.resourceData=function() error('Must not resample after exit') end
+engine.rngData=function() error('Must not resample after exit') end
+r:reset()
+assert(reads==1 and hashes==3 and savedManifest.finalResources[200]==7)
+assert(not r.boundary.valid)
+''')
+
+    def test_compact_playback_observes_without_writing_state_and_stops_on_mismatch(self):
+        self.lua.globals().hash_string = lambda value: hashlib.sha256(value.encode()).hexdigest()
+        self.check('''
+sha.sha256=hash_string
+local verification=require('code/replay-verification')
+local expected=verification.capture(engine,verification.COMPACT,1024)
+for _,mutation in ipairs({'none','resources','rng'}) do
+ engine.resourceData=function() return string.rep('r',800) end
+ engine.rngData=function() return string.rep('x',0x9c50) end
+ local r=session(); r.mode='play'; r.status='playing'; r.active=true
+ r.manifest={id='test',lastTick=2048,verificationProfile=verification.COMPACT}
+ local reads=0
+ r.rngFile={read=function() reads=reads+1; return expected end}
+ now=64; r:onTick(); assert(reads==0)
+ if mutation=='resources' then engine.resourceData=function() return 's'..string.rep('r',799) end end
+ if mutation=='rng' then engine.rngData=function() return 'y'..string.rep('x',0x9c50-1) end end
+ now=1024; local ok=pcall(r.onTick,r)
+ assert(ok==(mutation=='none') and reads==1)
+ if not ok then assert(r.firstDesync.kind=='state' and r.firstDesync.time==1024) end
+ assert(not memory[engine.rng] and not memory[engine.rng+0x9c4c])
+end
+''')
+
     def test_starting_save_is_hashed_without_loading_it_into_lua(self):
         self.check('''
 local store=require('code/sessions'); local read=store.read
@@ -22,6 +111,23 @@ local r=session(); r:startRecording(); r:activateRecording()
 assert(hashed and r.active and r.manifest.snapshotHash==string.rep('b',64))
 ''')
 
+    def test_initial_rng_is_sampled_once_and_hashed_from_the_written_bytes(self):
+        self.check('''
+local store=require('code/sessions'); local written,reads=0,0
+local sample=string.rep('r',0x9c50)
+engine.rngData=function() reads=reads+1; return sample end
+store.write=function(path,data)
+ if path:find('/rng.bin',1,true) then assert(data==sample); written=written+1 end
+end
+store.read=function() error('Activation must not read its RNG file back') end
+sha.sha256=function() error('RNG hashing must not run in the interpreter') end
+package.loaded['code/native-hash'].sha256=function(data) assert(data==sample); return string.rep('c',64) end
+local r=session(); r:startRecording(); r:activateRecording()
+assert(reads==1 and written==1 and r.manifest.rngHash==string.rep('c',64))
+local messages=#printed
+r:activateRecording(); assert(reads==1 and #printed==messages)
+''')
+
     def test_results_timer_hold_survives_completion_and_failure_until_exit(self):
         self.check('''
 for _,fail in ipairs({false,true}) do
@@ -32,6 +138,10 @@ for _,fail in ipairs({false,true}) do
  store.load=function() return manifest end
  store.compatible=function() return true end; store.preflight=function() end
  store.read=function(path) return path:find('rng.bin',1,true) and string.rep('x',0x9c50) or 'snapshot' end
+ package.loaded['code/world-reader']={read=function(path,limit)
+  assert(path=='ucp/replays/test/rng.bin' and limit==0x9c50)
+  return string.rep('x',limit)
+ end}
  engine.loadSnapshot=function()
   assert(memory[r.resultsHold]==1 and memory[r.playbackActive]==0); now=1
  end
@@ -43,6 +153,32 @@ for _,fail in ipairs({false,true}) do
  r:startRecording(); assert(memory[r.resultsHold]==0 and memory[r.playbackActive]==0)
  r:reset()
 end
+''')
+
+    def test_cached_restore_keeps_absolute_command_counts_and_prefetch_owner(self):
+        self.check('''
+local r=session(); local store=require('code/sessions'); local hash=string.rep('a',64)
+local manifest={id='test',startTick=1,lastTick=1000,player=1,commandCount=20,
+ snapshotHash=hash,rngHash=hash,startResources=resourceState()}
+store.compatible=function() return true end
+engine.loadSnapshot=function(_,path) assert(path=='cached.sav'); now=400 end
+local bookmark={positions={}}
+local restored=false
+r.restoreBookmark=function(self,value) assert(value==bookmark and self.mode=='play'); restored=true end
+local ready={manifest=manifest,snapshotPath='start.sav',rng=string.rep('x',0x9c50)}
+r:startPlayback('test',nil,ready,{snapshotPath='cached.sav',rng=ready.rng,
+ point={tick=400,commands=8,rngHash=hash,stateHash=hash,bookmark=bookmark}})
+assert(restored and r.playedCommands==8 and engine.journal.executed==8 and engine.journal.nextSequence==9)
+assert(r.status=='playing' and memory[r.playbackActive]==1)
+''')
+
+    def test_seek_stop_does_not_consume_multiplayer_frame_before_clock_advance(self):
+        self.check('''
+local r=session(); r.mode='play'; r.active=true; r.status='playing'
+r.manifest={id='test',multiplayer={},lastTick=1000}
+r.snapshots={observe=function() end,atBoundary=function(_,tick) assert(tick==500); return true end}
+r.tickFile={read=function() error('Target halt must not consume a frame') end}
+now=500; r:onTick(); assert(not r.pendingTick)
 ''')
 
     def test_return_from_results_seals_last_observed_tick_and_selects_full_match(self):
@@ -83,6 +219,10 @@ local manifest={id='test',startTick=1,lastTick=65,player=1,commandCount=0,
 store.load=function()return manifest end;store.compatible=function()return true end
 store.preflight=function()end
 store.read=function(path)return path:find('rng.bin',1,true) and string.rep('x',0x9c50) or 'snapshot' end
+package.loaded['code/world-reader']={read=function(path,limit)
+ assert(path=='ucp/replays/test/rng.bin' and limit==0x9c50)
+ return string.rep('x',limit)
+end}
 engine.loadSnapshot=function()now=1 end
 state.check=function(expected)assert(expected.aic.digest==current,'ending extension divergence')end
 r:startPlayback('test');now=65;current='different'
@@ -257,8 +397,9 @@ sha.sha256=hash_string
 local r=session(); r:startRecording(); r:activateRecording(); now=65; r:onTick()
 local expected=sha.sha256(engine:rngData())
 engine.rngData=function() error('Must not read game state after leaving match') end
+engine.rngState=function() error('Ending counters also belong to the retained boundary') end
 r:reset()
-assert(savedManifest.finalRngHash==expected and not r.finalRngData)
+assert(savedManifest.finalRngHash==expected and savedManifest.finalRng[4]==4 and not r.boundary.valid)
 ''')
 
     def setUp(self):
@@ -266,7 +407,8 @@ assert(savedManifest.finalRngHash==expected and not r.finalRngData)
         self.check('''
 json.encode=function(_,value) lastEncoded=value; return 'json' end
 sha={sha256=function(value) return string.rep('a',64) end}
-package.loaded['code/native-hash']={file=function() return string.rep('a',64) end}
+package.loaded['code/native-hash']={file=function() return string.rep('a',64) end,
+ sha256=function(data) return sha.sha256(data) end}
 savedManifest=nil
 package.loaded['code/sessions']={
   new=function() return {id='test',variant='SHC',commandCount=0,lastTick=0} end,
@@ -279,6 +421,7 @@ Session=require('code/session-recorder')
 now=0; snapshots=0; space=true
 engine={rng=0x1a279c0,
  rngData=function() return string.rep('x',0x9c50) end,
+ resourceData=function() return string.rep('r',800) end,
  resourceState=function() return resourceState() end,
  resetCommands=function(self) self.journal={executed=0} end,
  journal={executed=0},
@@ -286,6 +429,7 @@ engine={rng=0x1a279c0,
  singlePlayer=function() return true end,
  localSession=function(self) return self.offline~=nil or self:singlePlayer() end,
  tick=function() return now end,
+ calendarMonth=function() return 12000 end,
  player=function() return 1 end,
  rngState=function() return {11,22,3,4} end,
  saveSnapshot=function() snapshots=snapshots+1 end,
@@ -296,6 +440,7 @@ engine={rng=0x1a279c0,
  scheduleCommand=function(_,c) scheduled=scheduled+1 end,
 }
 core.readString=function() return string.rep('x',0x9c50) end
+engine.newRecordingBoundary=require('tests/recording_boundary_fixture')
 function session()
  local r=Session:new(engine)
  r.openFiles=function(self)

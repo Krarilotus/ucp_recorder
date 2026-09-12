@@ -26,6 +26,10 @@ core = {
   readSmallInteger = function(a) return memory[a] or 0 end,
   writeSmallInteger = function(a,v) memory[a]=v end,
   readBytes = function(a,n) local t={}; for i=1,n do t[i]=bytes[a+i-1] or 0 end; return t end,
+  readString = function(a,n)
+    local t={}; for i=1,n do t[i]=string.char(bytes[a+i-1] or 0) end
+    return table.concat(t)
+  end,
   writeBytes = function(a,t) for i,v in ipairs(t) do bytes[a+i-1]=v end end,
   writeCode = function() end, copyMemory = function() end,
   AssemblyLambda = function(s,vars) return {assembly=s, variables=vars} end,
@@ -36,6 +40,7 @@ core = {
 utils = {createLuaFunctionWrapper=function() return 0 end}
 json = {encode=function(_,value) return value end, decode=function(_,value) return value end}
 io.open = function(path,mode)
+  mode=mode:gsub('b','')
   if path==failPath then return nil, 'injected failure' end
   if mode=='r' and not files[path] then return nil, 'missing' end
   if mode=='w' then files[path]={} end
@@ -52,6 +57,8 @@ end
 os.remove=function(path) files[path]=nil; return true end
 realNative = require('code/native')
 realNative.profile={addresses=setmetatable({}, {__index=function(_,a) return a end})}
+-- Session/dispatch fixtures replace the OS hashing boundary; native-hash has its own real API tests.
+require('code/native-hash').sha256=function(data) return sha.sha256(data) end
 Recorder = require('code/replay-streams')
 function fixture(name)
   local r=Recorder:new({name=name,rngLogMethod='trace'})

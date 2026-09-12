@@ -73,6 +73,8 @@ def check_load(reader, lua, root, variant):
     base=0x191d768 if variant=='SHC' else 0x23547d8
     player=0x1a275dc if variant=='SHC' else 0x24baadc
     switch=0x46b340 if variant=='SHC' else 0x46b560
+    # Native menu switching writes requestedView, not the currently drawn view.
+    assert reader(switch+0x18,6)==bytes.fromhex('89 6e 18 89 46 04')
     queue=sites.queue.address
     game=sites.gameCore
     m=Uc(UC_ARCH_X86,UC_MODE_32); m.mem_map(0x400000,0x4000000)
@@ -84,18 +86,20 @@ def check_load(reader, lua, root, variant):
     def observe_tail(machine,address,size,unused):
         sp=machine.reg_read(UC_X86_REG_ESP)
         if address==queue: commands.append(integer(sp+4))
-        if address==switch: menus.append(integer(sp+4)); put(game+12,integer(sp+4))
+        if address==switch: menus.append(integer(sp+4)); put(game+0x18,integer(sp+4))
     m.hook_add(UC_HOOK_CODE,observe_tail)
     for mode in (0,99,1,2):
         for local in range(9):
             for icon in (0,1,2,7):
                 commands.clear(); menus.clear()
                 for i in range(9): put(base+0x6a8+i*4,100+i); put(base+0x714+i*4,3+i)
-                put(game+12,14); put(base+0x618,mode); put(player,local); put(game+0x22e8,icon)
+                put(game+12,41); put(game+0x18,41)
+                put(base+0x618,mode); put(player,local); put(game+0x22e8,icon)
                 m.reg_write(UC_X86_REG_EBX,0); m.reg_write(UC_X86_REG_EDI,0xffffffff)
                 m.reg_write(UC_X86_REG_EBP,1); m.reg_write(UC_X86_REG_ESP,stack)
                 m.emu_start(start,end,count=1000)
                 assert m.reg_read(UC_X86_REG_EIP)==end
+                assert integer(game+12)==41 and integer(game+0x18)==(14 if mode in (0,99) else 33)
                 handles=[integer(base+0x6a8+i*4) for i in range(9)]
                 if mode in (0,99):
                     expected=[-1]*9; expected[local or 1]=1

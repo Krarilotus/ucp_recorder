@@ -37,14 +37,14 @@ function M.check(manifest,path,progress)
     count=count+1; previous=c.time
   end,progress)
   assert(count==manifest.commandCount,'Replay command count differs')
-  local tick=math.ceil(manifest.startTick/64)*64
+  local verification=require('code/replay-verification')
+  local interval=verification.interval(manifest.verificationProfile)
+  local tick=math.ceil(manifest.startTick/interval)*interval
   scan(path..'/stream-rng-sync.json',manifest.checkpointsHash,function(checkpoint)
     assert(type(checkpoint)=='table' and checkpoint.time==tick and tick<=manifest.lastTick,'Invalid replay checkpoint timeline')
-    validation.rng(checkpoint.rng)
-    validation.resources(checkpoint.resources)
-    validation.hash(checkpoint.rngHash,'checkpoint RNG hash')
+    verification.validate(checkpoint,manifest.verificationProfile)
     require('code/required-state').validate(checkpoint.extensionState)
-    tick=tick+64
+    tick=tick+interval
   end,progress)
   assert(tick>manifest.lastTick,'Replay verification data ended early')
   local info=''

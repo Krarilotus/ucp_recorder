@@ -4,6 +4,7 @@ local native=require('code/native')
 local validation=require('code/validation')
 local utils=require('code/utils')
 local tr=require('code/locale').text
+local verification=require('code/replay-verification')
 local unpack=table.unpack or unpack
 local M={ROOT='ucp/replay-diagnostics'}
 
@@ -37,7 +38,7 @@ function M:open()
   self.network=self.engine:networkState()
   self:write({kind='header',format=self.window and 6 or 5,window=self.window,
     variant=native.profile.name,executable=native.profile.sha256,
-    environmentHash=environmentHash,
+    environmentHash=environmentHash,verificationProfile=self.verificationProfile,
     network=self.network,rngAttribution=self.rngAttribution~=false,immediatePayloadSource='native-fixed-v1',
     nativeWorldHashes=self.nativeWorldHashes,
     localPlayer=self.engine:player(),firstTick=self.engine:tick()})
@@ -184,13 +185,21 @@ end
 function M:onTick(networkChecked)
   local now=self.engine:tick()
   if self.file and not networkChecked then self:checkNetwork() end
-  if now%64~=0 or now==self.lastTick then return end
+  if now%verification.interval(self.verificationProfile)~=0 or now==self.lastTick then return end
   self:open()
   self.lastTick=now
-  self:record({kind='checkpoint',time=now,rng=self.engine:rngState(),resources=self.engine:resourceState(),
-    rngHash=sha.sha256(self.engine:rngData()),rngCalls=self:rngEvidence(),worldHashes=self:worldHashEvidence(),
-    extensionState=require('code/required-state').integrity()})
+  local checkpoint=self:checkpoint(now)
+  checkpoint.extensionState=require('code/required-state').integrity()
+  checkpoint.kind='checkpoint'
+  if not self.verificationProfile then
+    checkpoint.rngCalls=self:rngEvidence(); checkpoint.worldHashes=self:worldHashEvidence()
+  end
+  self:record(checkpoint)
   if self.window and now==self.window.endTick then self:finishWindow() end
+end
+
+function M:checkpoint(now)
+  return verification.capture(self.engine,self.verificationProfile,now)
 end
 
 function M:finishWindow()
@@ -238,7 +247,7 @@ function M:afterCommand()
   self.received[event.slot]=nil
   self.count=self.count+1
   event.rng=self.engine:rngState()
-  event.resources=self.engine:resourceState()
+  if not self.verificationProfile then event.resources=self.engine:resourceState() end
   self:record(event)
 end
 

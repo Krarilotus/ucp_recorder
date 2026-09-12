@@ -1,4 +1,4 @@
--- Binary transfers for startup/library work, not simulation ticks. Older RPS
+-- Binary transfers for snapshots/library work, not command dispatch. Older RPS
 -- releases implement writeString as a C string copy and truncate embedded NULs.
 local M={CHUNK=4096}
 local writer

@@ -5,16 +5,94 @@ import test_recorder as fixture
 class NativeUITests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
-    def test_gameplay_overlay_input_uses_root_view_when_native_dispatches_a_subtab(self):
+    def test_overlay_click_offsets_share_native_rectangles_at_every_window_size(self):
+        self.check('''
+local callbacks={}; local serial=1000; local clicked
+utils.createLuaFunctionWrapper=function(fn) serial=serial+1; callbacks[serial]=fn; return serial end
+local item={x=-410,y=12,width=96,height=18,action=function(x,y) clicked={x,y} end}
+ui.overlays={[7000]={visible=function() return true end,items={item}}}
+for _,width in ipairs({800,1280,1920,2560}) do
+ memory[ui:windowAddress()+0x18]=width
+ local overlay=ui:updateOverlay(7000)
+ for _,x in ipairs({0,47,95}) do
+  memory[overlay.menu+0x1c]=-1000; memory[overlay.menu+0x20]=-1000 -- tooltip anchors
+  memory[sites.mouse.value+0x10]=memory[overlay.array+4]+x
+  memory[sites.mouse.value+0x14]=memory[overlay.array+8]+9
+  callbacks[memory[overlay.array+20]]({})
+  assert(clicked[1]==x and clicked[2]==9 and overlay.consumed)
+ end
+end
+''')
+
+    def test_progress_reuses_mission_sprites_and_restores_clip_on_failure(self):
+        self.check('''
+local calls={}; local texture=sites.missionBar.value; local clip=texture+0x16c854
+memory[texture+4]=1; memory[texture+8]=0; memory[texture+12]=123
+for i=0,3 do memory[clip+i*4]=100+i end
+modules={ui={access=function() return {game={Rendering={textureRenderCore=texture,
+ renderGMWithBlending=function(t,gm,id,x,y,blend)
+  error('Unfilled progress must not repaint or blend into the retained terrain')
+ end}}} end}}
+ui.spriteClipNative=function(t,x,y,right,bottom)
+ assert(t==texture and x==22 and y==32 and bottom==44)
+ calls[#calls+1]=right; for i=0,3 do memory[clip+i*4]=0 end
+end
+ui.clippedSpriteNative=function(t,gm,id,x,y)
+  assert(t==texture and gm==164 and id==4 and x==22 and y==32)
+  assert(memory[t+8]==1); memory[t+12]=456
+ if broken then error('sprite failure') end
+end
+ui.maskedSpriteNative=function(t,gm,id,x,y,mask,maskId,blend)
+ assert(t==texture and gm==164 and id==1 and x==20 and y==30 and mask==164 and maskId==3 and blend==0)
+end
+for _,fraction in ipairs({-1,0,0.5,1,2}) do
+ calls={}; ui:progressBar(20,30,fraction)
+ assert(#calls==(fraction>0 and 1 or 0))
+ if fraction>0 then assert(calls[1]==22+math.floor(250*math.min(fraction,1))) end
+ for i=0,3 do assert(memory[clip+i*4]==100+i) end
+ assert(memory[texture+8]==0 and memory[texture+12]==123)
+end
+broken=true; assert(not pcall(ui.progressBar,ui,20,30,.5))
+for i=0,3 do assert(memory[clip+i*4]==100+i) end
+assert(memory[texture+8]==0 and memory[texture+12]==123)
+''')
+
+    def test_loaded_text_manager_marker_and_codepage_share_the_native_font_path(self):
+        self.check('''
+local calls=0
+memory[sites.textManager.value+0x10]=1251
+modules={ui={}}
+modules.ui.access=function() return {game={Rendering={textManager=sites.textManager.value,
+ getTextStringInGroupAtOffset=function(manager,group,entry)
+  assert(manager==sites.textManager.value and group==6 and entry==0); calls=calls+1; return 5000
+ end}}} end
+modules.cffi={cffi=function() return {cast=function(_,value) return value end,tonumber=tonumber,
+ string=function(address) assert(address==5000); return 'RUSSIAN' end} end}
+data={version={getGameLanguage=function() return 'english' end}}
+local l=require('code/locale'); local language,codepage=l.context()
+assert(language=='ru' and codepage==1251 and calls==1)
+require('code/text-encoding').encode=function(text,page) assert(page==1251); return 'encoded' end
+local drawn,measured
+ui.widthNative=function(_,_,font) measured=font; return 30 end
+ui.textNative=function(...) drawn={...} end
+ui:text(l.text('Play'),50,60,1,18,false,100)
+assert(drawn[7]==18 and measured==18 and drawn[5]==1)
+ui:header(l.text('Replays'),10,20,400)
+assert(drawn[7]==15 and measured==15 and drawn[5]==1)
+''')
+
+    def test_decorative_overlay_rows_have_no_native_hitbox_and_subtabs_do_not_recurse(self):
         self.check('''
 local visible=true
-ui.overlays={[7000]={visible=function() return visible end,items={{x=10,y=160,width=72,height=72}}}}
+ui.overlays={[7000]={visible=function() return visible end,items={{x=10,y=160,width=72,height=72,enabled=false}}}}
 ui.inputOverlays={[14]=7000,[16]=7000}
 memory[0x1fe7d1c]=14; memory[ui:windowAddress()+0x18]=1920
 assert(not ui:updateOverlay(7100,1)) -- unrelated subtab rendering stays native
-local overlay=ui:updateOverlay(7100,0)
+assert(not ui:updateOverlay(7100,0)) -- routing belongs to the complete input step
+local overlay=ui:updateOverlay(7000,0)
 assert(overlay==ui.overlays[7000] and memory[overlay.array+12]==72)
-memory[0x1fe7d1c]=16; assert(ui:updateOverlay(7200,0)==overlay)
+assert(memory[overlay.array]==0) -- render normally, skip hit testing
+memory[0x1fe7d1c]=16; assert(not ui:updateOverlay(7200,0))
 visible=false; assert(not ui:updateOverlay(7200,0)) -- modal/ordinary play excluded
 visible=true; memory[0x1fe7d1c]=58; assert(not ui:updateOverlay(7200,0))
 ''')
@@ -61,6 +139,8 @@ local hook; local target={[0]=2}; local fail=false; local frontEnd=false
 modules={ui={access=function() return {game={Rendering={pDrawBufferChoiceValue=target}}} end}}
 ui.updateOverlay=function(_,parent) return {menu=0x6000,items={{frontEnd=frontEnd}}} end
 local text=sites.textManager.value
+local pencil=sites.pencil.value
+memory[pencil+4]=101; memory[pencil+8]=202; memory[pencil+12]=2
 memory[text]=31; memory[text+8]=560; memory[text+12]=1360; memory[text+28]=2
 memory[ui:windowAddress()+0x18]=1920
 memory[sites.mapViewport.value]=181; memory[sites.mapViewport.value+4]=24
@@ -70,6 +150,8 @@ core.hookCode=function(callback)
  return function(parent,action)
   if parent==0x6000 then
    assert(action==1)
+   assert(memory[pencil+12]==(frontEnd and 0 or 1))
+   memory[pencil+4]=303; memory[pencil+8]=404
    ui:renderOverlayItem({frontEnd=frontEnd,render=function(x,y)
     assert(target[0]==(frontEnd and 0 or 1))
     local origin=frontEnd and 0 or 181
@@ -85,9 +167,11 @@ memory[0x8000+0x4c]=0x7000; memory[0x8000+20]=123
 memory[0x7000]=0x9000; memory[0x9000]=0x66
 ui:trackVisibility({0x8000},function() return true end)
 hook(0x7000,3); assert(target[0]==2)
+assert(memory[pencil+4]==101 and memory[pencil+8]==202 and memory[pencil+12]==2)
 assert(memory[text]==31 and memory[text+8]==560 and memory[text+12]==1360 and memory[text+28]==2)
 frontEnd=true; hook(0x7000,1); assert(target[0]==2)
 fail=true; assert(not pcall(hook,0x7000,1) and target[0]==2)
+assert(memory[pencil+4]==101 and memory[pencil+8]==202 and memory[pencil+12]==2)
 assert(memory[text]==31 and memory[text+8]==560 and memory[text+12]==1360 and memory[text+28]==2)
 assert(ui.overlayOriginX==nil and ui.overlayOriginY==nil)
 ''')
@@ -113,10 +197,10 @@ end
 
     def test_hud_text_is_opaque_with_a_dark_shadow(self):
         self.check('''
-local calls={}; ui.widthNative=function() return 80 end
+local calls={}; local measured=0; ui.widthNative=function() measured=measured+1; return 80 end
 ui.textNative=function(...) calls[#calls+1]={...} end
 ui:hudText('Replay: 20 / 100 ticks',788,12,-1,398)
-assert(#calls==2)
+assert(#calls==2 and measured==1)
 assert(calls[1][3]==789 and calls[1][4]==13 and calls[1][6]==0 and calls[1][9]==0)
 assert(calls[2][3]==788 and calls[2][4]==12 and calls[2][6]==0xCCF4FF and calls[2][9]==0)
 assert(calls[1][5]==-1 and calls[2][5]==-1)

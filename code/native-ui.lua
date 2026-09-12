@@ -21,11 +21,25 @@ function M.new(sites,onError)
   o.widthNative=core.exposeCode(sites.textWidth.address,3,1)
   o.headerNative=core.exposeCode(sites.header.address,5,1)
   o.borderNative=core.exposeCode(sites.border.address,6,1)
+  o.spriteClipNative=core.exposeCode(sites.spriteClip.address,5,1)
+  o.clippedSpriteNative=core.exposeCode(sites.clippedSprite.address,5,1)
+  o.maskedSpriteNative=core.exposeCode(sites.maskedSprite.address,8,1)
   o.buttonNative=core.exposeCode(sites.basicButton.address,3,1)
   o.menuConstructor=core.exposeCode(sites.menuConstructor.address,2,1)
   o.modalConstructor=core.exposeCode(sites.modalConstructor.address,10,1)
   o.activateNative=core.exposeCode(sites.activateModal.address,3,1)
   o.avatarNative=core.exposeCode(sites.avatar.address,3,0)
+  require('code/locale').bind(function()
+    -- TextManager::codePage belongs to the loaded CR.TEX/font setup. The UI
+    -- module's getter also respects textResourceModifier's replacement strings.
+    local codepage=core.readInteger(sites.textManager.value+0x10)
+    if codepage<=0 then return end
+    local rendering=modules.ui:access().game.Rendering
+    local ffi=modules.cffi:cffi()
+    local marker=rendering.getTextStringInGroupAtOffset(rendering.textManager,6,0)
+    if marker==nil or ffi.tonumber(ffi.cast('unsigned long',marker))==0 then return nil,codepage end
+    return ffi.string(marker),codepage
+  end)
   return o
 end
 
@@ -48,12 +62,39 @@ function M:attachOverlay(menuIDs,items,visible,screenInput)
   for _,id in ipairs(menuIDs) do
     local pointer=manager.lookupMenu(id)
     local menu=assert(ffi.tonumber(ffi.cast('unsigned long',pointer)))
-    self.overlays[menu]={items=items,visible=visible}
+    self.overlays[menu]={items=items,visible=visible,screenInput=screenInput}
     if screenInput then
       self.inputOverlays=self.inputOverlays or {}
       self.inputOverlays[id]=menu
     end
   end
+  if screenInput and not self.overlayInputInstalled then
+    require('code/overlay-input').install(self)
+    self.overlayInputInstalled=true
+  end
+end
+
+-- Reuse the mission's green strip and masked frame at native size. Leave the
+-- unfilled interior transparent: repeatedly blending its empty sprite into the
+-- retained map surface would accumulate opacity between map refreshes.
+function M:progressBar(x,y,fraction)
+  local texture=self.sites.missionBar.value
+  local pixels=math.floor(250*math.max(0,math.min(1,fraction)))
+  if pixels>0 then
+    local clip=texture+0x16c854
+    local surface,buffer=core.readInteger(texture+8),core.readInteger(texture+12)
+    local saved={}; for i=0,3 do saved[i]=core.readInteger(clip+i*4) end
+    local ok,reason=pcall(function()
+      -- Clipped TGX uses +8, unlike ordinary sprites' +4 selector.
+      core.writeInteger(texture+8,core.readInteger(texture+4))
+      self.spriteClipNative(texture,x+2,y+2,x+2+pixels,y+14)
+      self.clippedSpriteNative(texture,164,4,x+2,y+2)
+    end)
+    for i=0,3 do core.writeInteger(clip+i*4,saved[i]) end
+    core.writeInteger(texture+8,surface); core.writeInteger(texture+12,buffer)
+    assert(ok,reason)
+  end
+  self.maskedSpriteNative(texture,164,1,x,y,164,3,0)
 end
 
 function M:renderOverlayItem(item)
@@ -92,7 +133,13 @@ function M:renderOverlay(overlay,render)
   local cursor=core.readInteger(text)
   local left,right=core.readInteger(text+8),core.readInteger(text+12)
   local textSurface=core.readInteger(text+28)
+  -- Pencil has its own surface selector; the texture/text selectors above do
+  -- not affect fills or frames. Restore its cached pointer and stride as well.
+  local pencil=self.sites.pencil.value
+  local pencilBuffer,pencilStride,pencilSurface=core.readInteger(pencil+4),
+    core.readInteger(pencil+8),core.readInteger(pencil+12)
   target[0]=surface
+  core.writeInteger(pencil+12,surface)
   core.writeInteger(text+28,surface)
   core.writeInteger(text+8,x)
   core.writeInteger(text+12,x+core.readInteger(self:windowAddress()+0x18))
@@ -100,18 +147,14 @@ function M:renderOverlay(overlay,render)
   core.writeInteger(text,cursor)
   core.writeInteger(text+8,left); core.writeInteger(text+12,right)
   core.writeInteger(text+28,textSurface)
+  core.writeInteger(pencil+4,pencilBuffer); core.writeInteger(pencil+8,pencilStride)
+  core.writeInteger(pencil+12,pencilSurface)
   target[0]=previous
   self.overlayOriginX,self.overlayOriginY=oldX,oldY
   assert(ok,reason)
 end
 
 function M:updateOverlay(menu,action)
-  -- Gameplay renders the root view, but sends input to its selected build/book
-  -- tab. Resolve screen-wide controls from that root before native tab input;
-  -- attaching them only to the root renderer never receives gameplay clicks.
-  if action==0 and self.inputOverlays then
-    menu=self.inputOverlays[core.readInteger(native.addr(0x1fe7d1c))] or menu
-  end
   local overlay=self.overlays and self.overlays[menu]
   if not overlay or not overlay.visible() then return end
   if not overlay.array then
@@ -121,7 +164,11 @@ function M:updateOverlay(menu,action)
       local address=array+(index-1)*self.ITEM_SIZE
       self:button(address,item.x,item.y,item.width,item.height,item.label or '',function()
         overlay.consumed=true
-        if item.action then item.action() end
+        if item.action then
+          local mouse=self.sites.mouse.value
+          item.action(core.readInteger(mouse+0x10)-core.readInteger(address+4),
+            core.readInteger(mouse+0x14)-core.readInteger(address+8))
+        end
       end,nil,nil,item.enabled==false and function() return false end or item.enabled)
       core.writeInteger(address+0x4c,overlay.menu)
       if item.render then core.writeInteger(address+28,self:callback(function()
@@ -142,7 +189,9 @@ function M:updateOverlay(menu,action)
   local frontY=core.readInteger(window+0x24)
   for index,item in ipairs(overlay.items) do
     local address=overlay.array+(index-1)*self.ITEM_SIZE
-    local kind=(not item.visible or item.visible()) and 3 or -2147483645
+    -- Type zero renders normally without a hitbox, so decorative labels cannot
+    -- terminate the native click scan before an overlapping control.
+    local kind=(not item.visible or item.visible()) and (item.enabled==false and 0 or 3) or -2147483645
     local x,y=item.x,item.y
     if item.position then x,y=item.position(width,height) end
     if x<0 then x=width+x end
@@ -167,19 +216,17 @@ function M:callback(callback)
   end)
 end
 
-function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend,color)
-  label=require('code/locale').native(label)
-  label=tostring(label):gsub('[\r\n%z]',' '):sub(1,150)
-  core.writeString(self.textBuffer,label..'\0')
-  if maxWidth then
-    local function width() return self.widthNative(self.sites.textManager.value,self.textBuffer,font or 18) end
-    if width()>maxWidth then
-      repeat
-        label=label:sub(1,-2)
-        core.writeString(self.textBuffer,label..'...\0')
-      until #label==0 or width()<=maxWidth
-    end
+local function prepareText(self,label,font,maxWidth)
+  local measure=maxWidth and function(bytes)
+    core.writeString(self.textBuffer,bytes..'\0')
+    return self.widthNative(self.sites.textManager.value,self.textBuffer,font or 18)
   end
+  label=require('code/locale').fit(label,150,measure,maxWidth)
+  core.writeString(self.textBuffer,label..'\0')
+end
+
+function M:text(label,x,y,alignment,font,hover,maxWidth,disabled,blend,color)
+  prepareText(self,label,font,maxWidth)
   -- Match native OptionsMenu_Buttons: font18, BGR24 colors and native blending.
   -- Alignment1 is centered on x; a positive width centers inside that width.
   self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,
@@ -189,8 +236,10 @@ end
 
 -- Terrain needs opaque lettering with a dark edge, unlike shaded menu panels.
 function M:hudText(label,x,y,alignment,maxWidth)
-  self:text(label,x+1,y+1,alignment,18,false,maxWidth,false,0,0)
-  self:text(label,x,y,alignment,18,false,maxWidth,false,0,0xCCF4FF)
+  -- Both passes draw the same glyphs: convert and measure only once.
+  prepareText(self,label,18,maxWidth)
+  self.textNative(self.sites.textManager.value,self.textBuffer,x+1,y+1,alignment or 0,0,18,0,0)
+  self.textNative(self.sites.textManager.value,self.textBuffer,x,y,alignment or 0,0xCCF4FF,18,0,0)
 end
 
 function M:header(label,x,y,width)
@@ -372,6 +421,7 @@ function M:trackVisibility(referenceItems,predicate)
   local original
   original=core.hookCode(function(this,action)
     local overlay=self:updateOverlay(this,action)
+    if overlay and action==0 and overlay.screenInput then overlay=nil end
     for _,group in ipairs(self.visibilityGroups) do
       if this==core.readInteger(group.items[1]+0x4c) then
         local ok,reason=pcall(function()
@@ -398,7 +448,7 @@ function M:trackVisibility(referenceItems,predicate)
       original(overlay.menu,action)
     end
     if overlay and action==0 and overlay.consumed then
-      -- A portrait/history action owns this click; never also activate the
+      -- A history action owns this click; never also activate the
       -- native control underneath it (particularly the results Next arrow).
     elseif self.renderScope and (action==1 or action==3) then
       result=self.renderScope(function() return original(this,action) end)
@@ -410,9 +460,6 @@ function M:trackVisibility(referenceItems,predicate)
         self:renderOverlay(overlay,function() original(overlay.menu,1) end)
       else original(overlay.menu,action) end
     end
-    -- Input dispatch has unwound: same game-thread boundary as a native Play
-    -- action, outside rendering and outside every simulation tick.
-    if action==0 and self.onMenuUpdated then self.onMenuUpdated() end
     return result
   end,self.sites.handleMenu.address,2,1,#self.sites.handleMenu.bytes)
 end

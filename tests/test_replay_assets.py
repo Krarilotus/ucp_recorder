@@ -5,6 +5,31 @@ from lupa.luajit21 import LuaRuntime
 
 
 class ReplayAssetsTests(unittest.TestCase):
+    def test_directory_enumeration_yields_and_can_be_cancelled_before_hashing(self):
+        self.lua.execute('''
+local hashes=0
+local digest=require('code/native-hash')
+local original=digest.file
+digest.file=function(...) hashes=hashes+1; return original(...) end
+local root='maps/empty'
+snapshot.roots[root]=true; listing[root..'/']={}; children[root..'/']={}
+for i=1,200 do
+ local path=root..'/'..i..'/'
+ children[root..'/'][i]=path; listing[path]={}; children[path]={}
+end
+local now=0
+local task=require('code/preparation-task').new(function(progress)
+ assets.verify(snapshot,function(message) now=now+1; progress(message) end)
+ return true
+end,function() return now end)
+task:step()
+assert(task.status=='pending' and hashes==0)
+task:cancel(); task:step()
+assert(task.status=='cancelled' and hashes==0)
+assets.verify(snapshot) -- cancellation changes neither inventory nor future verification
+assert(hashes==5)
+''')
+
     def setUp(self):
         self.lua=LuaRuntime(unpack_returned_tuples=True)
         self.lua.globals().source_root=Path(__file__).resolve().parents[1].as_posix()

@@ -1,6 +1,13 @@
 local native = require('code/native')
 local allSites = require('code/engine-sites')
 local M = {}
+-- Lua 5.4 decodes directly in C; the LuaJIT-compatible path retains the same
+-- signed little-endian representation without building intermediate tables.
+local unpackResource=string.unpack or function(_,data,offset)
+  local a,b,c,d=data:byte(offset,offset+3)
+  local value=a+b*256+c*65536+d*16777216
+  return value>=2147483648 and value-4294967296 or value
+end
 
 function M.verify()
   local sites = assert(allSites[native.profile.name])
@@ -49,6 +56,10 @@ function M:resetCommands()
 end
 
 function M:tick() return core.readInteger(native.addr(0x1fe7da8)) end
+function M:calendarMonth()
+  local address=self.sites.calendar.value
+  return require('code/snapshot-cadence').month(core.readInteger(address+4),core.readInteger(address))
+end
 function M:player() return core.readInteger(native.addr(0x1a275dc)) end
 function M:singlePlayer()
   local mode=core.readInteger(self.base+0x618)
@@ -56,7 +67,9 @@ function M:singlePlayer()
 end
 function M:localSession() return self.offline~=nil or self:singlePlayer() end
 function M:loadedSkirmish()
-  return self:singlePlayer() and core.readInteger(self.sites.gameCore+0xc)==14
+  -- The load handler requests the game view before returning. currentView (+0xc)
+  -- remains the load dialog until the menu loop commits requestedView (+0x18).
+  return self:singlePlayer() and core.readInteger(self.sites.gameCore+0x18)==14
     and core.readInteger(self.sites.gameCore+0x68)==3
 end
 function M:setScope(active)
@@ -101,16 +114,26 @@ function M:rngData()
   return data
 end
 
-function M:resourceState()
-  local values={}
+function M:newRecordingBoundary()
+  return require('code/recording-boundary').new(self)
+end
+
+function M:resourceData()
+  local blocks={}
   for player=1,8 do
-    local bytes=core.readBytes(self.sites.playerResources+player*0x39f4,100)
-    for resource=0,24 do
-      local i=resource*4+1
-      local value=bytes[i]+bytes[i+1]*256+bytes[i+2]*65536+bytes[i+3]*16777216
-      values[#values+1]=value>=2147483648 and value-4294967296 or value
-    end
+    -- Read each native block once without allocating an intermediate byte table.
+    local data=core.readString(self.sites.playerResources+player*0x39f4,100)
+    assert(type(data)=='string' and #data==100,'Incomplete native resource state')
+    blocks[player]=data
   end
+  return table.concat(blocks)
+end
+
+function M:resourceState(data)
+  data=data or self:resourceData()
+  assert(type(data)=='string' and #data==800,'Incomplete native resource state')
+  local values={}
+  for offset=1,800,4 do values[#values+1]=unpackResource('<i4',data,offset) end
   return values
 end
 

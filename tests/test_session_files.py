@@ -35,6 +35,46 @@ for _,slot in ipairs({-1,9,0.5}) do
 end
 ''')
 
+    def test_sealing_preserves_byte_offsets_and_prefetched_command(self):
+        self.lua.execute('''
+local m=recording(); local path=store.path(m.id)
+local work=require('code/maintenance-journal'); m.phaseProfile=work.PROFILE
+local before=json:encode({time=5,commands=0,kind=1,count=2})
+local after=json:encode({time=65,commands=1,kind=1,count=1})
+-- Keep a CRLF journal alongside an LF command stream. Both prefixes must
+-- retain exact offsets when future rows are trimmed by their sealers.
+local f=assert(io.open(path..'/'..work.FILE,'wb'))
+assert(f:write(before..'\\r\\n'..after..'\\r\\n')); assert(f:close())
+local r=require('code/replay-streams'):new({name=path..'/stream'})
+r:openFiles('r'); r.mode='play'
+r.phaseFile=assert(io.open(path..'/'..work.FILE,'rb'))
+assert(json:decode(r.phaseFile:read()).time==5)
+assert(r:peekCommand().time==10)
+local bookmark=r:bookmark(); r:reset()
+store.finish(m)
+r:openFiles('r'); r.mode='play'; r.phaseFile=assert(io.open(path..'/'..work.FILE,'rb'))
+r:restoreBookmark(bookmark)
+assert(r:consumeSavedCommand().time==10)
+assert(r:peekCommand()==nil and r.phaseFile:read()==nil)
+r:reset()
+''')
+
+    def test_native_metadata_hashing_keeps_identity_and_rejects_modified_files(self):
+        self.lua.execute('''
+local m=recording(); store.finish(m)
+local path=store.path(m.id)
+-- Admission must not fall back to the framework's interpreter hash.
+sha.sha256=function() error('Unexpected Lua metadata hashing') end
+assert(store.load(m.id,profile).environmentHash==m.environmentHash)
+for _,file in ipairs({'ucp-config.yml','environment.json'}) do
+ local filename=path..'/'..file; local original=store.read(filename)
+ store.write(filename,original..'changed')
+ assert(not pcall(store.load,m.id,profile))
+ store.write(filename,original)
+ assert(store.load(m.id,profile).id==m.id)
+end
+''')
+
     def test_named_snapshot_and_sealing_never_read_whole_large_payloads(self):
         self.lua.execute('''
 local m=recording(); local p=store.path(m.id)
@@ -232,13 +272,16 @@ package.path=source_root..'/?.lua;'..package.path
 json={encode=function(_,v) return encode_json(v) end,decode=function(_,v) return decode_json(v) end}
 sha={sha256=hash_string}
 -- Keep real Lua streaming/decoding; replace only the Windows hashing boundary.
-package.loaded['code/native-hash']={file=function(path,limit,onChunk)
+package.loaded['code/native-hash']={sha256=hash_string,file=function(path,limit,onChunk,onProgress)
  if onChunk then
   local f=assert(io.open(path,'rb'))
   local ok,reason=pcall(function()
    while true do local chunk=f:read(65536); if not chunk then break end; onChunk(chunk) end
   end)
   assert(f:close()); assert(ok,reason)
+ end
+ if onProgress then
+  local f=assert(io.open(path,'rb')); local size=assert(f:seek('end')); assert(f:close()); onProgress(size)
  end
  return hash_file(path,limit)
 end}
@@ -272,6 +315,30 @@ assert(store.compatible(loaded))
 store.write(CONFIG_FILE,'changed settings')
 assert(not store.compatible(loaded))
 assert(store.list()[1].id==m.id)
+''')
+
+    def test_compact_verification_roundtrip_and_malformed_profiles(self):
+        self.lua.execute('''
+for _,start in ipairs({0,1,1024,1025}) do
+ local m=recording(); m.startTick=start; m.lastTick=start+1000; m.verificationProfile='state-digest-v1'
+ local path=store.path(m.id); local rows={}
+ store.write(path..'/stream-commands.json','')
+ for tick=math.ceil(start/1024)*1024,m.lastTick,1024 do
+  rows[#rows+1]=json:encode({time=tick,rng={1,2,3,4},stateHash=string.rep('a',64)})..'\\n'
+ end
+ store.write(path..'/stream-rng-sync.json',table.concat(rows))
+ store.finish(m); store.preflight(store.load(m.id,profile))
+ local original=m.verificationProfile
+ m.verificationProfile='unknown'; assert(not pcall(store.preflight,m)); m.verificationProfile=original
+ if #rows>0 then
+  store.write(path..'/stream-rng-sync.json',''); store.hashStreams(m,path)
+  assert(not pcall(store.preflight,m),'Missing compact checkpoint must fail')
+ end
+ store.write(path..'/stream-rng-sync.json',json:encode({time=math.ceil(start/1024)*1024,
+  rng={1,2,3,4},resources=resourceState(),rngHash=string.rep('a',64)})..'\\n')
+ store.hashStreams(m,path)
+ assert(not pcall(store.preflight,m),'Detailed rows cannot stand in for compact fingerprints')
+end
 ''')
 
     def test_repeated_recordings_never_overwrite_existing_files(self):

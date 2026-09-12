@@ -8,13 +8,14 @@ There is no multiplayer replay session to join or host.
 **Experimental test build:** the code supports Crusader and Extreme. The new
 offline multiplayer path completed both the host (288,568 ticks) and independent
 client (288,592 ticks) captures from one physical Steam match, each with 3,951
-commands and matching RNG/resource checkpoints. Recovery, Extreme live acceptance
-and broader testing remain. See the [remaining work](docs/roadmap.md).
+commands and matching RNG/resource checkpoints. An Extreme recording also completed
+playback (36,598 ticks). Multiple physical multiplayer matches, connection-loss
+recovery and broader testing remain. See the [remaining work](docs/roadmap.md).
 
 ## Install and play
 
 1. Follow the **[fresh-machine setup guide](docs/setup.md)**. Download
-   `recorder-0.48.4.zip` from this PR's test release, rather than GitHub's source
+   `recorder-0.50.3.zip` from this PR's test release, rather than GitHub's source
    archive. Links appear on the [pull requests](https://github.com/Corax34/ucp_recorder/pulls)
    and [publishing fork's releases](https://github.com/Krarilotus/ucp_recorder/releases).
 2. Enable recorder in a separate UCP3 test installation. Keep Graphics API
@@ -36,6 +37,11 @@ and broader testing remain. See the [remaining work](docs/roadmap.md).
    policy, including UCP2-Legacy's extended limits. At completion, **Statistics**
    leaves the world and opens this recording's native history statistics.
 
+The 0.50.3 preview adds [clickable seeking](docs/replay-seeking.md), compressed
+restore points every 25 game years, and a bounded yearly cache during playback.
+These new restoration paths still need live acceptance testing. Earlier completed
+replays above do not certify seeking or its capture latency.
+
 All new recordings are stored under `ucp/replays`. Earlier multiplayer diagnostic
 captures remain under their original directories; they lack the new tick data
 and are not converted into playable recordings. Do not terminate the process to
@@ -44,6 +50,12 @@ and [menu controls](docs/replay-menus.md).
 
 See the [in-game previews](docs/replay-menus.md#in-game-previews) for native history,
 player portraits and playback information.
+
+The `3.0.7` extension-store integration is being prepared for wider testing. Once
+published there, choose **UCP-Recorder 0.50.3** through the store; the store build
+uses the same release file selection and includes all nine UCP languages. Its
+signed ZIP may have a different archive fingerprint from a PR download. Keep the
+exact package used for each recording; do not substitute it during playback.
 
 ## Recorded settings
 
@@ -66,8 +78,10 @@ download unavailable releases. See [recorded settings](docs/recorded-settings.md
   not update the module.
 - `ucp/recorder-startup.txt` records loaded versions/order and startup status.
   **READY** means initialization succeeded, not that a replay has been verified.
-- Launcher options cover all nine UCP languages. In-game text currently supports
-  English/German; the original bitmap fonts limit additional script coverage.
+- Launcher options cover all nine UCP languages. In-game labels support English,
+  German, French, Russian, Hungarian, Turkish, Chinese, Spanish, Persian, Italian
+  and Polish, using the loaded game's language and codepage. See
+  [font requirements and fallback](docs/replay-menus.md#language-and-native-fonts).
 
 Further details: [compatibility](docs/extension-compatibility.md),
 [RNG diagnosis](docs/rng-attribution.md), [command coverage](docs/command-coverage.md),
@@ -86,3 +100,6 @@ python tools/build.py
 
 The builder creates `dist/recorder-VERSION.zip` with a flat module layout.
 The extension version and `meta.version: 1.0.0` (definition schema) are separate.
+
+Runtime ownership, current costs and Linux limitations are described in
+[runtime and performance](docs/runtime-and-performance.md).

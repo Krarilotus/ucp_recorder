@@ -1,5 +1,156 @@
 # Changelog
 
+## 0.50.3 (recording boundary efficiency)
+
+- Leave the replay bar's unfilled interior transparent while retaining its native
+  green fill and frame. Refresh the progress cache immediately after restoring
+  a world, without increasing its normal four-updates-per-second cadence.
+- Add the GUI discovery proposal's replay, multiplayer and tools tags with
+  labels in all nine launcher languages. Recorder remains an independent package.
+- Retain the exact last observed RNG and resource state in a reusable native
+  buffer. Singleplayer and multiplayer share one copy routine; Lua strings and
+  counter tables are created only for verification or publication. Native game
+  state, journal inputs, checkpoint intervals and replay formats are unchanged.
+- Verify emitted x86 memory bounds, preserved registers/flags, boundary lifetime,
+  post-exit sealing and the real Lua 5.4/RPS byte emitter. An isolated shipped-
+  runtime benchmark reduced median retention from 6.05 to 0.94 microseconds per
+  tick. This does not establish a whole-game speed improvement or explain the
+  reported high-speed ceiling; see `docs/runtime-and-performance.md`.
+
+## 0.50.2 (replay HUD input correction)
+
+- Route HUD input through the complete native menu update. Use the native hit
+  flag to keep hover, press, drag and release away from the underlying map;
+  physical mouse state and ordinary gameplay input remain owned by the game.
+- Decorative labels no longer stop the native click scan. Seeking reads current
+  MouseState coordinates instead of the menu's stored tooltip anchors.
+- Scope the clipped TGX renderer's independent surface selector as well as its
+  clipping rectangle, so the green fill is drawn beside its frame on the map.
+  Draw the empty native strip opaquely to avoid accumulating translucent passes
+  between map refreshes.
+- Original SHC/Extreme raster and button-dispatch checks cover these regressions.
+  Live seeking acceptance is still pending; 0.50.1 clicks did not reach the bar.
+
+## 0.50.1 (asynchronous seeking preview)
+
+- Replace blocking yearly saves with a frozen copy of the checked native world
+  and a single native compression worker. The worker runs the original PKWARE
+  codec on private buffers, without Lua, game-state access or transport calls.
+  Freeze and final publication remain on the game thread and are timed separately.
+- Bound in-flight work to one world, poll without waiting, and defer cancellation
+  cleanup until the thread exits. Leaving or seeking never frees live worker memory.
+- Reuse the green mission-progress sprites and alpha-masked frame at native size,
+  beside the persistent counter. Preserve clipping and each renderer's surface.
+- Remove the obsolete synchronous periodic-save implementation. Native save/load
+  still owns the initial singleplayer recording and ordinary world restoration.
+- Live 0.50.0 measurements showed 547–922 ms yearly save stalls, up to 1062 ms
+  for the recording point. Updated freeze/publication timings need live comparison.
+
+## 0.50.0 (seeking preview)
+
+- Click the persistent progress bar to seek, including backwards after playback
+  finishes. Reuse the nearest restore point or continue the current world when
+  it is closer. The remaining distance still needs normal simulation.
+- Save compressed embedded points every 25 game years in singleplayer and on
+  each multiplayer peer. Cache yearly points during offline playback, with a
+  256 MiB per-viewer limit, crash cleanup and independent process leases.
+- Reuse the original native container and codec for multiplayer points without
+  native save or transport calls. Preserve recovery segments, named prefixes,
+  recorded extension state, RNG and exact command/tick stream positions.
+- Reuse admitted recovery data instead of rescanning every command and asset on
+  transitions. Release compression omits the diagnostic decode-and-compare pass.
+  Disk failure disables optional points without stopping command recording.
+- Preserve pause and selected-player state across seeking. Use binary stream
+  offsets so sealing on Windows does not invalidate saved command bookmarks.
+- Native SHC/Extreme codec, container and loader checks pass. Live restore
+  equivalence, capture stalls and rendered controls still require acceptance;
+  this preview makes no sub-100 ms loading guarantee.
+
+## 0.49.4
+
+- Show a native-style progress bar beside the persistent replay tick counter.
+  Sample progress four times per second and refresh completion immediately.
+  The bar is display-only; seeking still requires world-restoration work.
+- Avoid copying native file buffers into Lua for progress-only hash callbacks.
+  Keep byte-consuming readers, integrity checks, size limits and cancellation.
+- Cover progress throttling, clock wrap, completion, native drawing bounds and
+  count-only hashing cleanup. Document measured gains and seeking requirements.
+
+## 0.49.3
+
+- Fix automatic recording after loading a saved skirmish: check the native
+  requested game view, which is set before the load dialog disappears. Keep
+  snapshot capture at the first simulation boundary and preserve loaded RNG.
+- Use the existing native SHA-256 service for settings metadata and starting RNG
+  checks, preserving hashes and corruption rejection.
+- Yield during replay asset directory enumeration, allowing preparation to be
+  cancelled before hashing. Keep asset membership and integrity verification.
+- Correct native load-test menu semantics and cover the observed load-dialog
+  transition. Only skip the package symlink test for missing Windows privilege.
+
+## 0.49.2
+
+- Remove 35 obsolete labels from each translation catalog and load German lazily,
+  like the other languages. English requires no translation catalog.
+- Skip the fallback executable-language lookup when the loaded TextManager marker
+  identifies the language. Keep unknown-marker and uninitialized-game fallbacks.
+- Convert and clip each HUD label once, sharing its bytes between the shadow and
+  foreground draw calls. Replay inputs, checks, recovery and controls are unchanged.
+
+## 0.49.1
+
+- In-game text follows the game language, never `UCP_GUI_LANGUAGE`. Translated
+  installations use the loaded TextManager language marker and codepage.
+- Add French, Russian, Hungarian, Turkish, Chinese, Spanish, Persian, Italian
+  and Polish catalogs alongside English/German, preserving format arguments.
+- Convert UTF-8 through native codepage APIs and clip whole characters using the
+  same native font metrics as drawing. Unrepresentable labels fall back to English.
+- Cover launcher/game language disagreement, all catalogs, real Windows encoding,
+  native font selection and multibyte clipping with regression tests. Visual font
+  acceptance in the additional translated installations remains pending.
+
+## 0.49.0
+
+- Separate replay inputs from verification evidence. Release records one compact
+  RNG/resource fingerprint per 1,024 ticks; diagnostics retain detailed 64-tick
+  checkpoints. Old recordings remain readable, with their original checking cadence.
+- Keep ending resources as native bytes; decode only when saving or diagnosing.
+  Omit redundant multiplayer command resource snapshots in Release, while keeping
+  all command/RNG inputs, tick boundaries, recovery data and ending verification.
+- Use the existing native SHA-256 service for RNG buffers and a time budget for
+  cooperative preparation. No new runtime language or checkpoint binary format.
+- Offline preflight on a representative long-match fixture drops from 7.6 seconds
+  to 67 ms and verification bytes by 98.6%; this is not a live loading-time claim.
+  Release detects divergence less precisely; see `docs/runtime-and-performance.md`.
+
+## 0.48.7
+
+- Read player resource blocks without intermediate byte tables, using the built-in
+  signed integer decoder on Lua 5.4 and an equivalent LuaJIT-compatible fallback.
+- Reuse the captured RNG bytes when hashing the initial recording state, and reuse
+  the current tick's RNG counters when writing a checkpoint. No replay-format,
+  native scheduling or simulation changes; all integrity checks remain.
+- These remove redundant capture work. Overall game-speed and loading-time gains
+  still require measurements in the game; Linux/Wine acceptance remains open.
+
+## 0.48.6
+
+- Remove Python from the extension-store build. Use the existing PowerShell/.NET
+  toolchain and a shared package-file manifest for store and preview file selection.
+- Verify both profiles through the real PowerShell entry point, including rebuilding
+  Release after Debug. Python remains only in existing developer tests/PR publishing;
+  the game and the store build do not require it for Recorder.
+
+## 0.48.5
+
+- Prepare the UCP extension-store build through the same packager as downloadable
+  releases. Store Release builds omit optional diagnostics and analysis tools;
+  Debug builds retain them. Both include menus, documentation and all nine languages.
+- Limit store packaging to the prepared module files, excluding development tests
+  and source tooling. Verify matching file contents and repeated profile builds.
+- Document store installation and the remaining multiplayer/recovery acceptance
+  limits. This release does not change simulation hooks or the replay format.
+
 ## 0.48.4
 
 - Finalize automatic recordings when the native victory/defeat results open,

@@ -3,6 +3,7 @@ local store = require('code/sessions')
 local native = require('code/native')
 local validation = require('code/validation')
 local work=require('code/maintenance-journal')
+local verification=require('code/replay-verification')
 local Session = setmetatable({}, {__index=Base})
 
 function Session:new(engine,config)
@@ -39,10 +40,19 @@ function Session:saveCopy(name)
   assert(self.engine:singlePlayer() and self.mode=='record' and self.status=='recording'
     and self.active and self.observedTick,'No active recording to save yet')
   for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do assert(self[key]:flush()) end
-  assert(self.finalRngData,'Missing ending RNG state')
-  self.manifest.finalExtensionState=require('code/required-state').boundaryIntegrity()
   if self.engine.battle then self.engine.battle:write(self.manifest) end
-  return store.copy(self.manifest,name,sha.sha256(self.finalRngData))
+  self:sealBoundary()
+  return store.copy(self.manifest,name,self.manifest.finalRngHash)
+end
+
+-- Decode the retained ending boundary only when publishing a replay. Native
+-- menu transitions may already have changed the world, so never resample it.
+function Session:sealBoundary()
+  self.manifest.finalExtensionState=require('code/required-state').boundaryIntegrity()
+  local rng,resources=self.boundary:read()
+  self.manifest.finalRng=self.boundary:rngState()
+  self.manifest.finalResources=self.engine:resourceState(resources)
+  self.manifest.finalRngHash=require('code/native-hash').sha256(rng)
 end
 
 function Session:guard(callback)
@@ -95,17 +105,19 @@ function Session:startRecording()
   assert(self.engine:singlePlayer(),'Recording currently supports single-player Skirmish')
   local automarket=require('code/automarket-replay').current()
   self.manifest=store.new(native.profile)
+  self.manifest.verificationProfile=verification.recordingProfile()
   self.manifest.automarket=automarket
   self:setName(store.path(self.manifest.id)..'/stream')
   self:openFiles('w')
   if self.phaseNative then
     self.manifest.phaseProfile=work.PROFILE
-    self.phaseFile=assert(io.open(store.path(self.manifest.id)..'/'..work.FILE,'w'))
+    self.phaseFile=assert(io.open(store.path(self.manifest.id)..'/'..work.FILE,'wb'))
   end
   self.mode='record'; self.status='armed'; self.active=false
   self.error=nil; self.observedTick=false
   self.firstDesync=nil
-  self.finalRngData=nil
+  self.boundary=self.boundary or self.engine:newRecordingBoundary()
+  self.boundary:clear()
   self.executedTick=nil; self.executedBatchSize=0
   self.engine:resetCommands()
   self.engine:setScope(true)
@@ -117,12 +129,14 @@ function Session:activateRecording()
   if self.mode~='record' or self.status~='armed' then return end
   local path=store.path(self.manifest.id)
   self.engine:saveSnapshot(path..'/start.sav')
-  store.write(path..'/rng.bin',self.engine:rngData())
+  local rng=self.engine:rngData()
+  store.write(path..'/rng.bin',rng)
   self.manifest.snapshotHash=require('code/native-hash').file(path..'/start.sav',1024*1024*1024)
-  self.manifest.rngHash=sha.sha256(store.read(path..'/rng.bin'))
+  self.manifest.rngHash=require('code/native-hash').sha256(rng)
   self.manifest.player=self.engine:player()
   self.manifest.startTick=self.engine:tick()
   self.manifest.lastTick=self.manifest.startTick
+  self.manifest.snapshotOriginMonth=self.engine:calendarMonth()
   self.manifest.startResources=self.engine:resourceState()
   self.manifest.finalResources=self.manifest.startResources
   local r=self.engine:rngState()
@@ -130,6 +144,7 @@ function Session:activateRecording()
   self:saveInfo(0,seed,seed,r[1],r[2],r[4],r[3])
   self.manifest.status='recording'; store.save(self.manifest)
   self.active=true; self.status='recording'
+  self.snapshots=require('code/replay-snapshots').new(self)
   if self.phaseNative then self.phaseNative:start() end
   if self.engine.battle then self.engine.battle:begin() end
   if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'record') end
@@ -148,7 +163,7 @@ function Session:preparePlayback(id,prepared,progress)
   return require('code/replay-preparation').prepare(id,self.engine,prepared,progress)
 end
 
-function Session:startPlayback(id,prepared,ready)
+function Session:startPlayback(id,prepared,ready,cached)
   assert(self.mode=='none','A replay session is already active')
   assert(self.engine:singlePlayer(),'Replay playback is single-player only')
   if not id then
@@ -164,10 +179,11 @@ function Session:startPlayback(id,prepared,ready)
   assert(store.compatible(manifest),'Replay requires its recorded UCP settings')
   local path=store.path(id)
   local snapshotPath,rng=ready.snapshotPath,ready.rng
+  if cached then snapshotPath,rng=cached.snapshotPath,cached.rng end
   self:setName(path..'/stream')
   self:openFiles('r')
   if manifest.multiplayer then self.tickFile=assert(io.open(path..'/ticks.bin','rb')) end
-  if manifest.phaseProfile then self.phaseFile=assert(io.open(path..'/'..work.FILE,'r')) end
+  if manifest.phaseProfile then self.phaseFile=assert(io.open(path..'/'..work.FILE,'rb')) end
   self.nextWork=nil; self.workEnded=nil
   self.manifest=manifest
   self.firstDesync=nil
@@ -192,14 +208,21 @@ function Session:startPlayback(id,prepared,ready)
   else self.engine:loadSnapshot(snapshotPath) end
   local bytes={}; for i=1,#rng do bytes[i]=rng:byte(i) end
   core.writeBytes(self.engine.rng,bytes)
-  self:checkRngData(manifest.rngHash,'starting save')
-  assert(self.engine:tick()==manifest.startTick,'Loaded save has a different starting tick')
+  self:checkRngData(cached and cached.point.rngHash or manifest.rngHash,'starting save')
+  assert(self.engine:tick()==(cached and cached.point.tick or manifest.startTick),'Loaded save has a different starting tick')
   assert(self.engine:player()==manifest.player,'Loaded save has a different player slot')
-  self:checkResources(manifest.startResources,'starting save')
+  if cached then
+    assert(require('code/native-hash').sha256(self.engine:rngData()..self.engine:resourceData())==cached.point.stateHash,
+      'Restored snapshot state differs')
+    self:restoreBookmark(cached.point.bookmark)
+    self.engine.journal.executed=cached.point.commands
+    self.engine.journal.nextSequence=cached.point.commands+1
+  else self:checkResources(manifest.startResources,'starting save') end
   self.active=true; self.status='playing'; self.playedCommands=0
+  if cached then self.playedCommands=cached.point.commands end
+  self.snapshots=require('code/replay-snapshots').new(self,ready)
   core.writeInteger(self.playbackActive,1)
   if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'play') end
-  self.nextCheckpoint=nil
   self:playbackResult('playing')
   print('Playing '..id)
 end
@@ -256,20 +279,24 @@ function Session:onTick()
   elseif self.status=='playing' then work.play(self) end
   local now=self.engine:tick()
   -- Flush before replay checks can halt at the first mismatch.
+  if self.snapshots then
+    self.snapshots:observe()
+    if self.mode=='play' and self.snapshots:atBoundary(now) then return end
+  end
   if self.rngTrace and now%64==0 then self.rngTrace:observe('checkpoint') end
   if self.status=='recording' then
     if self.engine.battle then self.engine.battle:observe() end
     self.manifest.lastTick=now
-    self.manifest.finalRng=self.engine:rngState()
-    self.manifest.finalResources=self.engine:resourceState()
     -- Keep the exact last observed boundary; quitting may already change native state.
-    -- Hash only checkpoints and completion, not every simulation tick.
-    self.finalRngData=self.engine:rngData()
+    self.boundary:capture()
     require('code/required-state').observeBoundary()
     self.observedTick=true
-    if now%64==0 then
-      local line=json:encode({time=now,rng=self.engine:rngState(),resources=self.manifest.finalResources,
-        rngHash=sha.sha256(self.finalRngData),extensionState=require('code/required-state').integrity()})
+    if now%verification.interval(self.manifest.verificationProfile)==0 then
+      local rng,resources=self.boundary:read()
+      local checkpoint=verification.capture(self.engine,self.manifest.verificationProfile,
+        now,self.boundary:rngState(),rng,resources)
+      checkpoint.extensionState=require('code/required-state').integrity()
+      local line=json:encode(checkpoint)
       assert(self.rngFile:write(line..'\n')); assert(self.rngFile:flush())
     end
   elseif self.status=='playing' then
@@ -285,7 +312,7 @@ function Session:onTick()
         self.pendingTick=frame
       end
     end
-    if now%64==0 then
+    if now%verification.interval(self.manifest.verificationProfile)==0 then
       local line=self.rngFile:read()
       assert(line,'Replay verification data ended early')
       local expected=json:decode(line)
@@ -298,9 +325,18 @@ function Session:onTick()
           error('RNG divergence at tick '..now..' (field '..i..')')
         end
       end
-      self:checkResources(expected.resources,'checkpoint')
-      self:checkRngData(expected.rngHash,'checkpoint')
       require('code/required-state').check(expected.extensionState)
+      if self.manifest.verificationProfile==verification.COMPACT then
+        local actualHash=verification.capture(self.engine,verification.COMPACT,now,actual).stateHash
+        if actualHash~=expected.stateHash then
+          self.firstDesync={kind='state',time=now,expected=expected.stateHash,actual=actualHash}
+          store.write(store.path(self.manifest.id)..'/desync.json',json:encode(self.firstDesync))
+          error('Replay state divergence at tick '..now)
+        end
+      else
+        self:checkResources(expected.resources,'checkpoint')
+        self:checkRngData(expected.rngHash,'checkpoint')
+      end
     end
     if now>=self.manifest.lastTick then
       work.finished(self)
@@ -326,12 +362,13 @@ function Session:onTick()
 end
 
 function Session:afterTick()
+  if self.snapshots and self.snapshots:afterTick() then return end
   if self.nextReplay then
     -- processGameTick has unwound. Outer-loop callbacks still follow this point;
     -- their replacement-world safety remains part of the execution-phase audit.
     local id,prepared=self.nextReplay,self.preparedWorlds
-    self:reset()
-    self:startPlayback(id,prepared)
+    if self.snapshots then self.snapshots:transition(id)
+    else self:reset(); self:startPlayback(id,prepared) end
     return
   end
   local frame=self.pendingTick
@@ -343,7 +380,7 @@ end
 
 function Session:checkRngData(expected,phase)
   validation.hash(expected,'full RNG hash')
-  local actual=sha.sha256(self.engine:rngData())
+  local actual=require('code/native-hash').sha256(self.engine:rngData())
   if actual~=expected then
     self.firstDesync={kind='rng-state',time=self.engine:tick(),phase=phase,expected=expected,actual=actual}
     store.write(store.path(self.manifest.id)..'/desync.json',json:encode(self.firstDesync))
@@ -367,6 +404,7 @@ function Session:checkResources(expected,phase)
 end
 
 function Session:reset()
+  if self.snapshots then self.snapshots:close(); self.snapshots=nil end
   if self.phaseNative then self.phaseNative:stop() end
   self.nextWork=nil; self.workEnded=nil
   core.writeInteger(self.playbackActive,0)
@@ -391,10 +429,8 @@ function Session:reset()
   if manifest then
     if complete and closed then
       local ok,finishError=pcall(function()
-        assert(self.finalRngData,'Missing ending RNG state')
-          manifest.finalExtensionState=require('code/required-state').boundaryIntegrity()
-          manifest.finalRngHash=sha.sha256(self.finalRngData)
-          if self.engine.battle then self.engine.battle:write(manifest) end
+        self:sealBoundary()
+        if self.engine.battle then self.engine.battle:write(manifest) end
         store.finish(manifest)
         self.lastCompletedReplay=manifest.id
       end)
@@ -408,9 +444,9 @@ function Session:reset()
     end
   end
   assert(closed,reason)
-  self.status='idle'; self.manifest=nil; self.nextCheckpoint=nil
+  self.status='idle'; self.manifest=nil
   self.observedTick=false; self.error=nil
-  self.finalRngData=nil
+  if self.boundary then self.boundary:clear() end
   core.writeInteger(self.halt,0)
   assert(reportOk,reportError)
 end

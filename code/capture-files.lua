@@ -25,7 +25,7 @@ function M.begin(path,engine,settings)
   if settings.restartSettings then store.write(path..'/replay-config.yml',settings.restartSettings) end
   local rng=engine:rngData()
   store.write(path..'/initial-rng.bin',rng)
-  capture.rngHash=sha.sha256(rng)
+  capture.rngHash=require('code/native-hash').sha256(rng)
   capture.initialResources=engine:resourceState()
   -- World evidence is independent of command persistence: an unsupported
   -- layout or failed world write must not discard the useful command journal.
@@ -71,6 +71,7 @@ function M.copy(source,name,bytes,events,commands,tick)
     end
     prefix(source.path..'/commands.jsonl',path..'/commands.jsonl',bytes)
     if source.tickProfile then prefix(source.path..'/ticks.bin',path..'/ticks.bin',source.tickBytes) end
+    require('code/multiplayer-snapshots').copy(source,copy)
     copy.status='snapshot'; M.save(copy)
   end)
   if not ok then copy.status='interrupted'; pcall(M.save,copy); error(err) end

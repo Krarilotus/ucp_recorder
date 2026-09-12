@@ -5,10 +5,17 @@ automatic recording, named snapshots, exact settings, integrity checks, native
 history/statistics, player portraits and the playback HUD. F3 information is a
 viewer feature and stays available in release.
 
+Release recordings keep a combined RNG/resource SHA-256 fingerprint every 1,024
+ticks, plus full starting and ending verification. They do not store 200 resource
+amounts per checkpoint or per multiplayer command. Diagnostic builds retain the
+detailed 64-tick checkpoints. This trades precise first-divergence location for
+less recording and preparation work; it does not change replay inputs. Neither
+kind of checkpoint is a saved world that can restore or seek the simulation.
+
 For a targeted investigation, download `recorder-VERSION-diagnostics-bundle.zip`,
 extract it, and install the inner `recorder-VERSION.zip` instead. This includes
 optional RNG caller/spawn/fire attribution and the offline analysis tools.
-Diagnostics are off by default; enable only the requested diagnostic settings.
+Optional caller attribution is off by default; enable only the requested settings.
 The common network journal is required for multiplayer recording, despite its
 historical `multiplayer-trace.lua` filename, and remains in both builds.
 
@@ -37,8 +44,11 @@ Metadata supplied alongside a recording is not a conversion proof. A fresh game
 launch rebuilds the derived save; repeated loads in that process can reuse it.
 Every reuse verifies the source sections and prepared file digest. Missing or
 damaged derived saves are rebuilt; damaged
-original recordings are rejected. Conversion still round-trips the original
-native compressor, and files are published only after complete writes.
+original recordings are rejected. Diagnostic conversion round-trips the original
+native compressor; release conversion retains native status, bounds and checksum
+validation. The background snapshot worker uses the original compressor in both
+profiles, with independent native round-trip coverage in the offline suite.
+Files are published only after complete writes.
 
 These changes reduce unnecessary work; they do not promise a 100 ms cold load.
 Measure recorder startup, replay preparation, and the native world-load phase
