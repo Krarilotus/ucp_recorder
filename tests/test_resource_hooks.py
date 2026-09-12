@@ -16,7 +16,7 @@ class ResourceHookTests(unittest.TestCase):
         lua.globals().root = ROOT.as_posix()
         lua.execute("package.path=root..'/?.lua;'..package.path")
         emitter = lua.eval("require('code/resource-hooks')")
-        sites = lua.eval("require('code/engine-sites')")
+        sites = lua.eval("require('tests/fixtures/engine-sites')")
         original = {
             'mapName': bytes.fromhex('8b4424043df40100007c0533c0c2040069c0e90300008d8408c80b0000c20400'),
             'fileName': bytes.fromhex('8b81c40b000069c0e90300008d8408e0ae0700c3'),

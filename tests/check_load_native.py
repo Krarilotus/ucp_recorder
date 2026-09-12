@@ -11,7 +11,7 @@ from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
 
 
 def check_load(reader, lua, root, variant):
-    sites=lua.execute((root/'code/engine-sites.lua').read_text())[variant]
+    sites=lua.execute((root/'tests/fixtures/engine-sites.lua').read_text())[variant]
     owner=native_save_fixture(variant)
     sites.packager=owner['packager']; sites.sections=owner['sections']
     shift=0 if variant=='SHC' else 0x230

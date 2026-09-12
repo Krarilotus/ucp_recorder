@@ -370,3 +370,35 @@ coordinator cases through the production phase binding, covering passive
 recording, viewer pause, halt, maintenance-only and unclocked world replay,
 native navigation countdown/reset, unchanged match clock and restored pause.
 Other subsystem callees are observable stand-ins; this is not a full match.
+
+## Engine command hooks
+
+Recorder 0.50.19 replaces seven fixed hook entries and three variant-specific
+command offsets with Protocol 1.1.4 metadata and decoded native contexts.
+Protocol `game/interface.lua` at 10001be already resolves queue/scheduler entries;
+its public API now exposes those entries and their captured 69/79-byte guards.
+The guards are immutable strings because the framework's nested table proxy
+does not implement array length. Recorder materializes them locally for its
+existing `hook-check` validation; it does not copy Protocol's signatures or scan
+those functions again.
+
+The maintenance binding's existing main-loop caller supplies the dispatcher.
+Recorder verifies its original selection call, payload-copy contexts and
+completed-dispatch tail. Decoded actor, selection, count, tick and write-index
+operands must agree with Protocol and the confirmed native layout. The seven
+existing 5/6/8/10-byte hook spans retain their displaced instructions and
+existing callbacks. All captured guards are checked before installation,
+including both owner entry contexts. The dispatcher context ends before
+Protocol's adjacent seven-byte patch; no hook or dispatch service is added.
+There are only two consumer discovery calls, belonging to the already shared
+maintenance caller, and none during command processing.
+
+Validation: 504 portable tests pass (one existing skip), including relocated
+owner/context checks in both Lua 5.4 and LuaJIT. All
+six local/official EFIGS/Polish SHC 1.41 and Extreme 1.41.1-E fixtures resolve
+ten bindings, reject 24 invalid/late-change cases each and accept Protocol's
+adjacent patch through the actual framework extension proxy. Each fixture also
+passes 600 original SP dispatches, 1200 offline replay dispatches and 600 local
+captures through the production binding, including ring wrap and rollback.
+Native bridge, transport, memory-helper and test-command boundaries remain
+stand-ins. Other engine/native profiles and full live acceptance are unfinished.

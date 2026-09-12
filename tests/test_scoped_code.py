@@ -89,7 +89,7 @@ class ScopedCodeTests(unittest.TestCase):
         self.lua.globals().source_root=ROOT.as_posix()
         self.lua.execute("package.path=source_root..'/?.lua;'..package.path")
         fixes=self.lua.eval("require('code/fixes')")
-        engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
+        engines=self.lua.execute((ROOT/'tests/fixtures/engine-sites.lua').read_text())
         for engine in engines.values():
             site=fixes.tickEntry(engine,0x60010c,0x600114)
             for flags in (0x202,0xa83):
@@ -127,7 +127,7 @@ class ScopedCodeTests(unittest.TestCase):
                             self.assertEqual(active[7],0x4108000)
 
     def test_offline_tick_can_halt_without_enabling_single_player_rng_fixes(self):
-        engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
+        engines=self.lua.execute((ROOT/'tests/fixtures/engine-sites.lua').read_text())
         for engine in engines.values():
             tick=engine['tick']; tick['patch']='tick'; tick['kind']='raw'
             tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=engine['tickExit']['address']
@@ -165,7 +165,7 @@ class ScopedCodeTests(unittest.TestCase):
                             self.assertEqual(result[8],0x202)
 
     def test_multiplayer_tick_ignores_stale_halt_and_does_not_call_recorder(self):
-        engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
+        engines=self.lua.execute((ROOT/'tests/fixtures/engine-sites.lua').read_text())
         for variant,engine in engines.items():
             tick=engine['tick']; tick['patch']='tick'; tick['kind']='raw'
             tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=engine['tickExit']['address']
@@ -208,7 +208,7 @@ class ScopedCodeTests(unittest.TestCase):
                         if not skip: self.assertEqual(machine.reg_read(UC_X86_REG_ECX),0x12345678)
 
     def test_optional_tick_diagnostics_preserve_native_multiplayer_execution(self):
-        engines=self.lua.execute((ROOT/'code/engine-sites.lua').read_text())
+        engines=self.lua.execute((ROOT/'tests/fixtures/engine-sites.lua').read_text())
         for variant,engine in engines.items():
             tick=engine['tick']; tick['patch']='tick'; tick['kind']='raw'
             tick['halt']=0x60010c; tick['callback']=0x4f0000; tick['skipTick']=engine['tickExit']['address']

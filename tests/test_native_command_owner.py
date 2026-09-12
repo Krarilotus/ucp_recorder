@@ -34,7 +34,7 @@ modules.protocol=owner
 local binding=require('code/native-command')
 assert(not pcall(binding.bind,{})) -- enable ordering reaches the actual owner
 owner:enable({})
-local original=require('code/native-save').bind(require('code/engine-sites').SHC)
+local original=require('code/native-save').bind(require('tests/fixtures/engine-sites').SHC)
 local sites=binding.bind(original)
 assert(original.commands==nil and original.writeIndexOffset==nil)
 assert(sites.commands==interface and sites.writeIndexOffset==0x109ee0 and ownerCalls==1)

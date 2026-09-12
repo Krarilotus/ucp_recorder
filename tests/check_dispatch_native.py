@@ -53,8 +53,8 @@ def check_dispatch(reader,variant):
             write(a,reader(a,size))
         local_queue=0x489100 if shc else 0x489210
         transmit=0x487c50 if shc else 0x487d60
+        write(local_queue,reader(local_queue,0x1e3))
         if capture:
-            write(local_queue,reader(local_queue,0x1e3))
             write(transmit,b'\xc2\x14\x00') # transport is outside this queue test
         write(fill,b'\xc2\x0c\x00'); write(copy,b'\xc2\x0c\x00'); write(handler,b'\xc3')
         put(table+15*4,handler)
@@ -74,7 +74,7 @@ def check_dispatch(reader,variant):
             return lambda *args: 0x7f00 # ask the emulator to run the original body
         g=lua.globals()
         g.source_root=ROOT.as_posix(); g.variant=variant
-        g.protocol_root=Path(os.environ.get('UCP_PROTOCOL_TEST_ROOT',ROOT.parent/'aic-tactics-protocol-native')).as_posix()
+        g.protocol_root=Path(os.environ.get('UCP_PROTOCOL_TEST_ROOT',ROOT.parent/'aic-tactics-protocol-entry-points')).as_posix()
         g.framework_root=Path(os.environ.get('UCP_FRAMEWORK_CODE',ROOT.parent/'UnofficialCrusaderPatch3/content/ucp/code')).as_posix()
         g.scan=scan
         g.image_read_integer=lambda a:struct.unpack('<i',reader(a,4))[0]
@@ -114,8 +114,9 @@ hooks={registerHookCallback=function() end}
 local protocol=dofile(protocol_root..'/init.lua');protocol:enable({})
 modules={protocol=protocol,['map-extensions']={getNativeSaveInterface=function() return map_save_fixture end}}
 require('code/rng-bindings').resolve()
+local sites=require('code/engine-command-sites').bind(require('tests/fixtures/engine-sites')[variant])
+sites=require('code/native-command').bind(require('code/native-save').bind(sites))
 core.readInteger=read_integer;core.readBytes=read_bytes
-local sites=require('code/native-command').bind(require('code/native-save').bind(require('code/engine-sites')[variant]))
 engine=require('code/engine').new(sites)
 engine.haltingMenuNative=function() return 0 end -- UI query checked separately
 recorder={mode='play',status='playing',active=true,engine=engine,manifest={player=3,variant=variant}}

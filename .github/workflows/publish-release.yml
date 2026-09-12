@@ -72,7 +72,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Krarilotus/ucp-extension-protocol
-          ref: 175d7a96ad5add2627b7244826586026b618a504
+          ref: 10001beced6a59ef75fbb9ced91d80c1755bc95a
           path: protocol-reference
           persist-credentials: false
       - run: python -m unittest discover -s tests -v

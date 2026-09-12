@@ -17,7 +17,7 @@ from native_image import load_image
 
 
 def check_tick_boundary(path, lua, root, variant):
-    sites = lua.execute((root / 'code/engine-sites.lua').read_text())[variant]
+    sites = lua.execute((root / 'tests/fixtures/engine-sites.lua').read_text())[variant]
     emitter = lua.execute((root / 'code/scoped-code.lua').read_text())
     lua.globals().source_root = root.as_posix()
     lua.execute("package.path=source_root..'/?.lua;'..package.path")

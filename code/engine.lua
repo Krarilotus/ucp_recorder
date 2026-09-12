@@ -10,7 +10,7 @@ local unpackResource=string.unpack or function(_,data,offset)
 end
 
 function M.verify()
-  local sites = assert(allSites[native.profile.name])
+  local sites = require('code/engine-command-sites').bind(assert(allSites[native.profile.name]))
   local adapter=require('code/automarket-replay')
   if adapter.version('protocol') then
     assert(core.readByte(sites.execute.address+8)==0xE9,
@@ -18,9 +18,7 @@ function M.verify()
   end
   for name, site in pairs(sites) do
     if type(site)=='table' then
-      local actual=core.readBytes(site.address, #site.bytes)
-      require('code/hook-check').verify(site,'Recorder session hook conflicts at '..name,
-        actual)
+      require('code/hook-check').verify(site.guard or site,'Recorder session hook conflicts at '..name)
     end
   end
   require('code/rng-bindings').resolve()
@@ -298,6 +296,7 @@ function M:afterCommand(recorder)
 end
 
 function M:install(recorder)
+  require('code/engine-command-sites').verify()
   local originalQueue
   -- Extra recorded work precedes command-context initialization. Running it
   -- beside the handler would let world updates overwrite its actor/parameters.
