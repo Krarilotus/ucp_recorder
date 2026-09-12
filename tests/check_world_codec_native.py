@@ -11,6 +11,7 @@ import sys
 import zlib
 import tempfile
 import os
+import re
 from native_save_fixture import native_save_fixture
 
 from native_image import load_image
@@ -24,6 +25,15 @@ def check_codec(path,source_root,variant):
     machine = Uc(UC_ARCH_X86, UC_MODE_32)
     load_image(machine, path)
     reader = image_reader(path)
+    image=pefile.PE(str(path)).get_memory_mapped_image()
+    image_base=pefile.PE(str(path)).OPTIONAL_HEADER.ImageBase
+    scans=[]
+    def scan(pattern,start=None):
+        expression=b''.join(b'.' if t=='?' else re.escape(bytes([int(t,16)])) for t in pattern.split())
+        offset=max(0,(start or image_base)-image_base)
+        found=re.search(expression,image[offset:],re.DOTALL)
+        scans.append((pattern,start))
+        return image_base+offset+found.start() if found else 0
     encode, decode = 0x4724c0 + delta, 0x4725a0 + delta
     assert reader(encode, 6) == bytes.fromhex('83 ec 34 55 56 57')
     assert reader(decode, 5) == bytes.fromhex('83 ec 34 53 56')
@@ -136,6 +146,7 @@ def check_codec(path,source_root,variant):
     lua.globals().allocate = allocate
     lua.globals().release = release
     lua.globals().expose = expose
+    lua.globals().scan = scan
     lua.globals().readBytes = lambda address, size: lua.table_from(list(machine.mem_read(address, size)))
     lua.globals().readString = lambda address, size: bytes(machine.mem_read(address, size))
     # Match the shipped RPS C-string writer, including truncation at embedded NUL.
@@ -148,9 +159,10 @@ package.path=source_root..'/?.lua;'..package.path
 package.loaded['code/native']={profile={name=variant}}
 modules={['map-extensions']={getNativeSaveInterface=function() return nativeSaveFixture end}}
 package.loaded['code/native-hash']={prepare=function() end}
-core={allocate=allocate,deallocate=release,exposeCode=expose,readBytes=readBytes,
+core={AOBScan=scan,scanForAOB=scan,allocate=allocate,deallocate=release,exposeCode=expose,readBytes=readBytes,
  readString=readString,writeString=writeString,writeBytes=writeBytes,readInteger=readInteger,writeInteger=writeInteger}
 codec=require('code/world-codec')
+assert(codec.compressorAddress()>0)
 function encodeSection(data)
  return codec.withBuffers(#data,function(work) retained=work; return work:compress(data) end)
 end
@@ -301,7 +313,8 @@ frozen=require('code/world-capture').freeze(engine)
         print(f'PASS: {variant} all 122 native world sections and header round-trip through the actual Lua container and original codec',flush=True)
         from check_world_load_native import check_world_load
         check_world_load(machine, folder, variant, call, imports)
-    report=dict(variant=variant,cases=outcomes,actualLuaWrapper=True,buffersReleased=True,
+    assert len(scans)==4, 'Codec discovery repeated during compression'
+    report=dict(variant=variant,cases=outcomes,actualLuaWrapper=True,buffersReleased=True,frameworkScans=len(scans),
         allocationAndLockFailure=True,abi=True,liveGame=False)
     print(f'PASS: {variant} original PKWARE primitives and actual Lua codec, round trips, failure cleanup and ABI',flush=True)
     return report
