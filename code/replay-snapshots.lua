@@ -164,8 +164,10 @@ function Snapshots:load(ready,cached)
   if self.pending then self.pending:cancel(); self.pending=nil end
   r.snapshots=nil -- preserve this cache across the internal reset/load
   local ok,reason=xpcall(function()
-    r:reset()
-    r:startPlayback(ready.manifest.id,nil,ready,cached)
+    r.input:transition(function()
+      r:reset()
+      r:startPlayback(ready.manifest.id,nil,ready,cached)
+    end)
   end,debug.traceback)
   if r.snapshots then r.snapshots:close() end
   r.snapshots=self
