@@ -6,12 +6,21 @@ branches are original SHC/Extreme instructions. No live process is accessed.
 """
 from pathlib import Path
 import struct
+import re
+import pefile
+from native_command_fixture import native_command_fixture
 from lupa.luajit21 import LuaRuntime
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn import x86_const as reg
 
 
 def check_immediate(reader, variant):
+    image=pefile.PE(data=reader.image).get_memory_mapped_image()
+    def scan(pattern,start=None):
+        expression=b''.join(b'.' if t=='?' else re.escape(bytes([int(t,16)])) for t in pattern.split())
+        offset=(start or 0x400000)-0x400000
+        found=re.search(expression,image[offset:],re.DOTALL)
+        return 0x400000+offset+found.start() if found else 0
     shc = variant == 'SHC'
     base = 0x191d768 if shc else 0x23547d8
     actor = 0x109e70 if shc else 0x166300
@@ -49,14 +58,24 @@ def check_immediate(reader, variant):
         g.base=base; g.actor=actor; g.variant=variant
         g.read_integer=get; g.read_byte=lambda a: read(a,1)[0]
         g.read_bytes=lambda a,n: lua.table_from(list(read(a,n)))
+        g.image_bytes=lambda a,n:lua.table_from(reader(a,n))
+        g.image_int=lambda a:struct.unpack('<i',reader(a,4))[0]
+        g.scan=scan;g.commandFixture=lua.table_from(native_command_fixture(variant))
         lua.execute('''
 package.path=source_root..'/?.lua;'..package.path
 package.loaded['code/native']={profile={name=variant}}
 package.loaded['code/sessions']={}; package.loaded['code/platform']={}
 core={readInteger=read_integer,readByte=read_byte,readBytes=read_bytes}
-trace=require('code/multiplayer-trace').new({base=base,sites={actorOffset=actor},tick=function() return 64 end})
-trace.file=true; trace.checkNetwork=function() end
+trace=require('code/multiplayer-trace').new({base=base,sites={actorOffset=actor},tick=function() return 64 end,
+ singlePlayer=function() return false end})
+trace.file=true; trace.simulationObserved=true; trace.checkNetwork=function() end
 trace.gap=function(_,reason,details) captured=details end
+core.AOBScan=scan;core.scanForAOB=scan
+core.readBytes=image_bytes;core.readInteger=image_int
+modules={protocol={getNativeCommandInterface=function() return commandFixture end}}
+callbacks={};core.detourCode=function(callback,address,size) callbacks[address]=callback end
+require('code/network-observer').install(trace)
+core.readBytes=read_bytes;core.readInteger=read_integer
 ''')
         payload=b''; observed=[]; executions=[]; transmitted=[]
         def at_instruction(uc,address,size,data):
@@ -83,7 +102,9 @@ trace.gap=function(_,reason,details) captured=details end
                 put(base+0x2d828,0) # stand-in for local delivery by transport
             elif address in (remote,local):
                 before={n: uc.reg_read(r) for n,r in registers.items()}
-                g.trace.immediateCommand(g.trace,origin)
+                result=g.callbacks[address](lua.table_from(before))
+                assert dict(result.items())==before
+                assert not g.trace.failed,g.trace.failureReason
                 assert before=={n: uc.reg_read(r) for n,r in registers.items()}
                 observed.append(dict(g.captured.items()))
         machine.hook_add(UC_HOOK_CODE,at_instruction)

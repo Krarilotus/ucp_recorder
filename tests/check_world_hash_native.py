@@ -6,6 +6,9 @@ The UCP bridge is a stand-in: invoke its Lua callback then execute the relocated
 """
 from pathlib import Path
 import struct
+import re
+import pefile
+from native_command_fixture import native_command_fixture
 
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 from lupa.luajit21 import LuaRuntime
@@ -29,7 +32,23 @@ def check_world_hash(path, variant):
     lua.globals().variant = variant
     lua.globals().base = base
     lua.execute("package.path=rootPath..'/?.lua;'..package.path")
-    site = lua.eval("require('code/world-hash-sites')[variant]")
+    image=pefile.PE(data=path.read_bytes()).get_memory_mapped_image()
+    scans=[]
+    def scan(pattern,start=None):
+        scans.append((pattern,start))
+        expression=b''.join(b'.' if t=='?' else re.escape(bytes([int(t,16)])) for t in pattern.split())
+        offset=(start or 0x400000)-0x400000
+        found=re.search(expression,image[offset:],re.DOTALL)
+        return 0x400000+offset+found.start() if found else 0
+    lua.globals().scan=scan
+    lua.globals().readBytes=lambda a,n:lua.table_from(machine.mem_read(a,n))
+    lua.globals().readInteger=lambda a:struct.unpack('<i',machine.mem_read(a,4))[0]
+    lua.globals().commandFixture=lua.table_from(native_command_fixture(variant))
+    lua.execute('''
+core={AOBScan=scan,scanForAOB=scan,readBytes=readBytes,readInteger=readInteger}
+modules={protocol={getNativeCommandInterface=function() return commandFixture end}}
+''')
+    site = lua.eval("require('code/world-hash-sites').resolve()")
     address = site['address']
     original = bytes(site['bytes'].values())
     assert bytes(machine.mem_read(address, len(original))) == original
@@ -133,4 +152,5 @@ require('code/world-hash-observer').install(trace)
                 put(base+0x7a8e0+(player+1)*48,old^0xffffffff)
                 assert samples[1]['domains'][13]==old # Lua owns an immediate copy
             pairs+=1
+    assert len(scans)==2,'World hash observation repeated discovery'
     print(f'PASS: {variant} {pairs} native world-hash observer pairs; 14 stores, all slots, skip paths, ABI and writes')
