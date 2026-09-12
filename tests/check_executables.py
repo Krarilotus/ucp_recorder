@@ -122,8 +122,8 @@ def check(folder):
         from check_rng_observer_native import check_rng_observer
         check_rng_observer(reader,lua,native,root,name)
         from check_spawn_context_native import check_spawn_context, check_menu_pause, check_fire_context
-        check_spawn_context(reader,lua,root,name)
-        check_fire_context(reader,lua,root,name)
+        check_spawn_context(reader,lua,root,name,reference=True)
+        check_fire_context(reader,lua,root,name,reference=True)
         check_menu_pause(reader,lua,root,name)
         from check_results_native import check_results
         from check_tick_boundary_native import check_tick_boundary
