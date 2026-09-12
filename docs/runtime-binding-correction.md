@@ -193,3 +193,27 @@ stale-cache cases before exposing any native call. The original-instruction
 codec/container/restore harness is also retained and now drives the production
 AoB path; its run status is recorded with the PR rather than inferred from these
 binding checks.
+
+## Native world header
+
+Framework 02a7a6b and Map Extensions 1.1.1 at 9d35dfb provide no read-only
+save-header snapshot API. Map's `getNativeSaveInterface()` wraps inner section
+read/write; it does not expose the outer file writer's non-section metadata.
+Recorder's existing `world-header.read`, used by `world-capture.capture` and
+`freeze`, remains the owner for that snapshot. It now derives all 18 pointers
+from five verified writer blocks with framework AoBs, preserving the native
+field sizes/order and existing 2141-byte format. No writer or decoder is called,
+and Map's hooks remain intact.
+
+The blocks include encoded field sizes and writer argument order; contiguous
+operands are cross-checked. Missing, ambiguous, modified or invalid bindings
+fail before any header data is read. Resolution runs once. Each snapshot
+rechecks the captured instruction context, including decoded pointer operands,
+before reading any field. There are no per-tick scans or fixed-address fallbacks.
+
+Validation: 491 portable tests pass (one existing skip), including Lua 5.4 and
+LuaJIT with relocated code/data, strict pre-read rejection and no repeat scans.
+Each private SHC/Extreme image captures the independently checked 18 fields
+byte-for-byte, repeats capture without discovery and rejects 33 invalid-binding
+cases. The original-instruction container/restore checks are recorded in the PR;
+neither these checks nor signature presence establishes live-match acceptance.

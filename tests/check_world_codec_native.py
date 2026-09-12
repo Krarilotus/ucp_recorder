@@ -313,7 +313,7 @@ frozen=require('code/world-capture').freeze(engine)
         print(f'PASS: {variant} all 122 native world sections and header round-trip through the actual Lua container and original codec',flush=True)
         from check_world_load_native import check_world_load
         check_world_load(machine, folder, variant, call, imports)
-    assert len(scans)==4, 'Codec discovery repeated during compression'
+    assert len(scans)==14, 'Codec/header discovery repeated during capture or compression'
     report=dict(variant=variant,cases=outcomes,actualLuaWrapper=True,buffersReleased=True,frameworkScans=len(scans),
         allocationAndLockFailure=True,abi=True,liveGame=False)
     print(f'PASS: {variant} original PKWARE primitives and actual Lua codec, round trips, failure cleanup and ABI',flush=True)
