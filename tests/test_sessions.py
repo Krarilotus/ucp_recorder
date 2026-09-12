@@ -6,6 +6,28 @@ import test_recorder as fixture
 class SessionTests(unittest.TestCase):
     check = fixture.RecorderTests.check
 
+    def test_required_state_keeps_owner_checkpoint_cadence_and_retained_boundary(self):
+        self.check('''
+local required=require('code/required-state')
+for _,diagnostics in ipairs({false,true}) do
+ require('code/build-profile').diagnostics=diagnostics
+ local current,observed,observations,hashes=0,nil,0,0
+ required.observeBoundary=function() observed=current; observations=observations+1 end
+ required.integrity=function() hashes=hashes+1; return {aic={digest=tostring(current)}} end
+ required.boundaryIntegrity=function() return {aic={digest=tostring(assert(observed))}} end
+ local r=session(); now=0; r:startRecording(); r:activateRecording()
+ local checkpoints={}
+ r.rngFile.write=function(_,line) checkpoints[#checkpoints+1]=lastEncoded; return true end
+ for tick=1,1025 do now=tick; current=tick; r:onTick() end
+ assert(observations==1025 and hashes==(diagnostics and 16 or 1))
+ assert(#checkpoints==hashes and checkpoints[#checkpoints].extensionState.aic.digest=='1024')
+ if diagnostics then assert(checkpoints[1].resources and checkpoints[1].rngHash)
+ else assert(checkpoints[1].stateHash and not checkpoints[1].resources) end
+ current=9999; r:reset()
+ assert(savedManifest.lastTick==1025 and savedManifest.finalExtensionState.aic.digest=='1025')
+end
+''')
+
     def test_prepared_recovery_segment_reuses_validated_data_without_rescanning(self):
         self.check('''
 local preparation=require('code/replay-preparation')
@@ -178,6 +200,34 @@ for _,view in ipairs({14,16,58}) do r:onMenuView(view); assert(r.active and r.st
 engine.loading=true
 for _,view in ipairs({20,41,61}) do r:onMenuView(view); assert(r.active and r.status=='recording') end
 engine.loading=false; r:onMenuView(20); assert(r.mode=='none')
+''')
+
+    def test_ending_between_checkpoints_uses_observed_extension_state(self):
+        self.check('''
+local state=require('code/required-state')
+local current,observed='state-1',nil
+state.observeBoundary=function()observed=current end
+state.boundaryIntegrity=function()return {aic={digest=assert(observed)}} end
+local r=session();r:beginMatch();r:prepareRecording();now=1;r:onTick()
+now=65;current='state-65';r:onTick()
+now=999;current='transition';r:onMenuView(20)
+assert(savedManifest.lastTick==65 and savedManifest.finalExtensionState.aic.digest=='state-65')
+local store=require('code/sessions');local hash=string.rep('a',64)
+local manifest={id='test',startTick=1,lastTick=65,player=1,commandCount=0,
+ snapshotHash=hash,rngHash=hash,finalRngHash=hash,finalRng={11,22,3,4},
+ startResources=resourceState(),finalResources=resourceState(),finalExtensionState={aic={digest='state-65'}}}
+store.load=function()return manifest end;store.compatible=function()return true end
+store.preflight=function()end
+store.read=function(path)return path:find('rng.bin',1,true) and string.rep('x',0x9c50) or 'snapshot' end
+package.loaded['code/world-reader']={read=function(path,limit)
+ assert(path=='ucp/replays/test/rng.bin' and limit==0x9c50)
+ return string.rep('x',limit)
+end}
+engine.loadSnapshot=function()now=1 end
+state.check=function(expected)assert(expected.aic.digest==current,'ending extension divergence')end
+r:startPlayback('test');now=65;current='different'
+assert(not r:guard(function()r:onTick()end))
+assert(r.status=='error' and r.error:find('ending extension divergence',1,true))
 ''')
 
     def test_attribution_starts_after_snapshot_and_flushes_before_desync(self):

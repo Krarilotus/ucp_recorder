@@ -48,6 +48,7 @@ end
 -- Decode the retained ending boundary only when publishing a replay. Native
 -- menu transitions may already have changed the world, so never resample it.
 function Session:sealBoundary()
+  self.manifest.finalExtensionState=require('code/required-state').boundaryIntegrity()
   local rng,resources=self.boundary:read()
   self.manifest.finalRng=self.boundary:rngState()
   self.manifest.finalResources=self.engine:resourceState(resources)
@@ -288,11 +289,14 @@ function Session:onTick()
     self.manifest.lastTick=now
     -- Keep the exact last observed boundary; quitting may already change native state.
     self.boundary:capture()
+    require('code/required-state').observeBoundary()
     self.observedTick=true
     if now%verification.interval(self.manifest.verificationProfile)==0 then
       local rng,resources=self.boundary:read()
-      local line=json:encode(verification.capture(self.engine,self.manifest.verificationProfile,
-        now,self.boundary:rngState(),rng,resources))
+      local checkpoint=verification.capture(self.engine,self.manifest.verificationProfile,
+        now,self.boundary:rngState(),rng,resources)
+      checkpoint.extensionState=require('code/required-state').integrity()
+      local line=json:encode(checkpoint)
       assert(self.rngFile:write(line..'\n')); assert(self.rngFile:flush())
     end
   elseif self.status=='playing' then
@@ -321,6 +325,7 @@ function Session:onTick()
           error('RNG divergence at tick '..now..' (field '..i..')')
         end
       end
+      require('code/required-state').check(expected.extensionState)
       if self.manifest.verificationProfile==verification.COMPACT then
         local actualHash=verification.capture(self.engine,verification.COMPACT,now,actual).stateHash
         if actualHash~=expected.stateHash then
@@ -342,6 +347,7 @@ function Session:onTick()
       for i=1,4 do assert(actual[i]==self.manifest.finalRng[i],'Final RNG state differs at tick '..now) end
       self:checkResources(self.manifest.finalResources,'ending state')
       self:checkRngData(self.manifest.finalRngHash,'ending state')
+      require('code/required-state').check(self.manifest.finalExtensionState)
       core.writeInteger(self.halt,1)
       if self.manifest.multiplayer and self.manifest.nextReplay
         and self.preparedWorlds[self.manifest.nextReplay] then

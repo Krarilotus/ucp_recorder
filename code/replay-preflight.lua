@@ -26,6 +26,7 @@ local function scan(path,expected,consume,progress)
 end
 
 function M.check(manifest,path,progress)
+  require('code/required-state').validate(manifest.finalExtensionState)
   require('code/maintenance-journal').preflight(manifest,path,scan,progress)
   local count,previous,batchSize=0,manifest.startTick,0
   scan(path..'/stream-commands.json',manifest.commandsHash,function(value)
@@ -42,6 +43,7 @@ function M.check(manifest,path,progress)
   scan(path..'/stream-rng-sync.json',manifest.checkpointsHash,function(checkpoint)
     assert(type(checkpoint)=='table' and checkpoint.time==tick and tick<=manifest.lastTick,'Invalid replay checkpoint timeline')
     verification.validate(checkpoint,manifest.verificationProfile)
+    require('code/required-state').validate(checkpoint.extensionState)
     tick=tick+interval
   end,progress)
   assert(tick>manifest.lastTick,'Replay verification data ended early')

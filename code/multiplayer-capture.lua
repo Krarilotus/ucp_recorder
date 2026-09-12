@@ -77,6 +77,7 @@ function M:onTick()
   self.pendingTick={time=self.observedTick,before=require('code/tick-journal').state(self.engine)}
   if self.engine.battle then self.engine.battle:observe() end
   self.boundary:capture()
+  require('code/required-state').observeBoundary()
   Trace.onTick(self,true)
   self.boundaryEvents=self.events
 end
@@ -89,7 +90,8 @@ end
 
 function M:gap(reason,details)
   Trace.gap(self,reason,details)
-  if not require('code/multiplayer-session').presentationOrTransport({reason=reason,details=details}) then
+  if not require('code/multiplayer-session').presentationOrTransport({reason=reason,details=details},
+      self.capture and self.capture.admission) then
     self.recoveryPending=reason
   end
 end
@@ -132,6 +134,7 @@ function M:beforeCommand()
 end
 
 function M:sealBoundary()
+  if self.observedTick then self.capture.finalExtensionState=require('code/required-state').boundaryIntegrity() end
   assert(not self.pendingTick,'Cannot save inside a simulation tick')
   if self.tickFile then assert(self.tickFile:flush()) end
   self.capture.tickBytes=self.tickBytes

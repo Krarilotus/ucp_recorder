@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.50.5 (required-state integration preview)
+
+- Capture required Map Extensions state in initial and frozen worlds; verify its
+  identity and checkpoint/final-boundary digest through existing replay owners.
+- Preserve the current owner's compact verification cadence, native boundary
+  buffer, snapshot seeking and saved-game admission fix.
+- Admit Protocol 1.1 lobby transport and commandless single-player observer saves.
+- Native replay/restore, physical multiplayer and game performance acceptance for
+  this integration remain pending. This preview is not a store release.
+
 ## 0.50.3 (recording boundary efficiency)
 
 - Leave the replay bar's unfilled interior transparent while retaining its native

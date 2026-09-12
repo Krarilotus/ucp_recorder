@@ -12,6 +12,29 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFileTests(unittest.TestCase):
+    def test_ai_only_spectator_can_seal_but_cannot_own_commands_or_mp(self):
+        self.lua.execute('''
+local m=recording(); local path=store.path(m.id)
+m.player=0
+store.write(path..'/stream-commands.json','')
+store.write(path..'/start.sav','snapshot'); m.snapshotHash=sha.sha256('snapshot')
+store.write(path..'/rng.bin','rng'); m.rngHash=sha.sha256('rng')
+local copy=store.copy(m,'AI-only spectator',m.finalRngHash)
+assert(copy.player==0 and copy.commandCount==0 and copy.status=='complete')
+store.preflight(store.load(copy.id,profile))
+store.finish(m); store.preflight(store.load(m.id,profile))
+local validation=require('code/validation')
+for slot=0,8 do
+ local command={commandCategory=34,player=slot,time=10,size=1,data='01'}
+ assert(not pcall(validation.sessionCommand,command,m))
+end
+m.commandCount=1; assert(not pcall(validation.manifest,m)); m.commandCount=0
+m.multiplayer={}; assert(not pcall(validation.manifest,m)); m.multiplayer=nil
+for _,slot in ipairs({-1,9,0.5}) do
+ m.player=slot; assert(not pcall(validation.manifest,m))
+end
+''')
+
     def test_sealing_preserves_byte_offsets_and_prefetched_command(self):
         self.lua.execute('''
 local m=recording(); local path=store.path(m.id)

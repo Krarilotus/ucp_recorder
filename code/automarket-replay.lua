@@ -12,7 +12,8 @@ function M.version(name)
 end
 
 function M.saveHookAvailable()
-  return M.version('map-extensions')=='1.0.0' and modules and modules['map-extensions']~=nil
+  local version=M.version('map-extensions')
+  return (version=='1.0.0' or version=='1.1.0') and modules and modules['map-extensions']~=nil
 end
 
 function M.current()
@@ -20,8 +21,9 @@ function M.current()
   for _,extension in ipairs(allActiveExtensions or {}) do versions[extension.name]=extension.version end
   if not versions.automarket then return nil end
   assert(versions.automarket=='1.1.0','Replay adapter requires Automarket 1.1.0')
-  assert(versions.protocol=='1.0.0' and versions['map-extensions']=='1.0.0',
-    'Automarket replay adapter requires protocol and map-extensions 1.0.0')
+  assert((versions.protocol=='1.0.0' or versions.protocol=='1.1.0')
+    and (versions['map-extensions']=='1.0.0' or versions['map-extensions']=='1.1.0'),
+    'Automarket replay adapter requires protocol 1.0.0 or 1.1.0 and map-extensions 1.0.0 or 1.1.0')
   local protocol=assert(modules and modules.protocol,'Automarket replay protocol is unavailable')
   local id=protocol:getProtocolNumber('automarket','commitSingle')
   integer(id,130,2147483647,'Automarket protocol number')

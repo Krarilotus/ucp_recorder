@@ -16,6 +16,7 @@ function M.begin(path,engine,settings)
     initialNetwork=engine:networkState(),settingsHash=settings.hash,
     environmentHash=settings.environmentHash,restartSettingsHash=settings.restartSettingsHash,
     settingsCapture=settings.settingsCapture,automarket=require('code/automarket-replay').current(),
+    admission=require('code/admission-replay').current(),
     missing={'initial-world-snapshot','offline-network-identity','immediate-and-system-playback','resynchronization-restoration'}}
   -- Commit a non-playable manifest first; interrupted setup remains identifiable.
   M.save(capture)

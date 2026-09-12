@@ -4,6 +4,7 @@ import itertools
 import json
 import hashlib
 import struct
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -16,6 +17,23 @@ def integer(value, lo, hi):
 def hash_value(value):
     if not isinstance(value, str) or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
         raise ValueError('Missing or invalid SHA256 evidence')
+
+
+def extension_state(value):
+    if value is None:
+        return
+    if not isinstance(value, dict) or len(value) > 256:
+        raise ValueError('Invalid extension state checkpoint')
+    for name, provider in value.items():
+        if (not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', name)
+                or not isinstance(provider, dict)):
+            raise ValueError('Invalid extension state provider')
+        hash_value(provider.get('fingerprint'))
+        for field, limit in (('format', 128), ('digest', 256)):
+            text = provider.get(field)
+            if not isinstance(text, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,' + str(limit) + '}', text):
+                raise ValueError('Invalid extension state ' + field)
+
 
 
 def checkpoint_interval(profile):
@@ -165,6 +183,7 @@ def evidence(records, format_version, first_tick=0, network=None, window=None, p
             raise ValueError('Missing, repeated or invalid checkpoint boundary')
         else:
             next_checkpoint += interval
+            extension_state(record.get('extensionState'))
             if format_version >= 3:
                 hash_value(record.get('stateHash' if profile else 'rngHash'))
         for key, length in ([('rng', 4)] if profile else [('rng', 4), ('resources', 200)]):
@@ -198,7 +217,9 @@ def compare(left, right):
                 if av['kind'] == bv['kind'] == 'command':
                     fields += ('scheduledTime', 'player', 'category', 'size', 'data')
                 elif av['kind'] == bv['kind'] == 'checkpoint' and ah['format'] >= 3:
-                    fields += ('stateHash' if profile else 'rngHash',)
+                    fields += ('stateHash' if profile else 'rngHash', 'extensionState')
+                    av.setdefault('extensionState', None)
+                    bv.setdefault('extensionState', None)
                 for key in fields + (('rng',) if profile else ('rng', 'resources')):
                     if av[key] == bv[key]:
                         continue

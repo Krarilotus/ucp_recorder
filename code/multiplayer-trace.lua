@@ -189,6 +189,7 @@ function M:onTick(networkChecked)
   self:open()
   self.lastTick=now
   local checkpoint=self:checkpoint(now)
+  checkpoint.extensionState=require('code/required-state').integrity()
   checkpoint.kind='checkpoint'
   if not self.verificationProfile then
     checkpoint.rngCalls=self:rngEvidence(); checkpoint.worldHashes=self:worldHashEvidence()

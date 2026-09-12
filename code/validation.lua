@@ -75,10 +75,13 @@ function M.manifest(value)
   end
   if value.displayName~=nil then M.displayName(value.displayName) end
   require('code/automarket-replay').descriptor(value.automarket)
-  M.integer(value.player,1,8,'player slot')
+  -- AI-only single-player uses native observer slot zero. It cannot own timed
+  -- commands; multiplayer still requires a recorded human slot from 1 to 8.
+  M.integer(value.player,value.multiplayer and 1 or 0,8,'player slot')
   M.integer(value.startTick,0,2147483647,'starting tick')
   M.integer(value.lastTick,value.startTick,2147483647,'ending tick')
   M.integer(value.commandCount,0,2147483647,'command count')
+  assert(value.player~=0 or value.commandCount==0,'Observer replay cannot contain player commands')
   M.rng(value.finalRng)
   M.resources(value.startResources)
   M.resources(value.finalResources)
