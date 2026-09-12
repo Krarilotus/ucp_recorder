@@ -372,42 +372,13 @@ function M:installInput(singlePlayer,handler)
 end
 
 function M:extendPause(label,action,predicate,isPlayback)
-  local size=10*self.ITEM_SIZE -- original nine entries plus sentinel
-  local array=core.allocate(size+self.ITEM_SIZE,true)
-  core.copyMemory(array,self.sites.pauseArray.value,size)
-  local restart,originalRestart,disabledRestart,restartDisabled
-  if isPlayback then
-    restart=array+5*self.ITEM_SIZE
-    originalRestart=core.allocate(self.ITEM_SIZE,true)
-    disabledRestart=core.allocate(self.ITEM_SIZE,true)
-    self:button(disabledRestart,100,206,300,27,function() return require('code/locale').text('Restart mission') end,
-      function() end,nil,nil,function() return false end)
-  end
-  local item=array+size-self.ITEM_SIZE
-  core.copyMemory(item+self.ITEM_SIZE,item,self.ITEM_SIZE)
-  self:button(item,100,342,300,27,label,action)
-  core.writeCode(self.sites.pauseArray.address,{
-    core.AssemblyLambda('push array',{array=array})
-  })
-  self:trackVisibility({item},predicate)
+  hooks.registerHookCallback('afterInit',function()
+    local ok,state=pcall(require('code/pause-menu').attach,self,label,action,predicate,isPlayback)
+    if ok then self.pauseMenu=state else self.onError(state) end
+  end)
   local original
   original=core.hookCode(function(this,id,retain)
-    if id==5 then
-      if restart then
-        if isPlayback() and not restartDisabled then
-          -- The constructor fills inherited action/render callbacks. Preserve
-          -- that initialized row, never the earlier static template (null callbacks).
-          core.copyMemory(originalRestart,restart,self.ITEM_SIZE)
-          core.copyMemory(restart,disabledRestart,self.ITEM_SIZE)
-          core.writeInteger(restart+0x4c,core.readInteger(item+0x4c))
-          restartDisabled=true
-        elseif not isPlayback() and restartDisabled then
-          core.copyMemory(restart,originalRestart,self.ITEM_SIZE)
-          restartDisabled=false
-        end
-      end
-      core.writeInteger(self.sites.pauseModal.value+0x10,predicate() and 405 or 357)
-    end
+    if id==5 and self.pauseMenu then self.pauseMenu.activate() end
     return original(this,id,retain)
   end,self.sites.activateModal.address,3,1,#self.sites.activateModal.bytes)
 end
