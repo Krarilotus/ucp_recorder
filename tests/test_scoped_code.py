@@ -35,7 +35,7 @@ class ScopedCodeTests(unittest.TestCase):
     def setUp(self):
         self.lua=LuaRuntime()
         self.emitter=self.lua.execute((ROOT/'code/scoped-code.lua').read_text())
-        self.profiles=self.lua.execute((ROOT/'code/scoped-sites.lua').read_text())
+        self.profiles=self.lua.execute((ROOT/'tests/fixtures/scoped-sites.lua').read_text())
 
     def run_code(self,site,enabled,mode,flags,gated,halt=0,offline=None,local_gate=False,
                  viewing=0,paused=0,modal=0):

@@ -578,3 +578,36 @@ The save branch suppresses synchronization only while offline, preserving mode.
 Relocated Lua 5.4/LuaJIT checks also cover all owner-field relationships and
 installation failure/idempotence. OS, network, module bridges and selected
 callees remain fixtures; these are not live multiplayer/replay acceptance.
+
+## Replay scope callers
+
+Recorder 0.50.25 replaces the scoped hook table with 16 unique framework AoB
+contexts. They identify the existing presentation RNG calls, native wedding and
+taunt selection, head placement, dust and mother gates. Each RNG root and call
+target must agree with `rng-bindings`; player, mode, tick and core operands must
+agree with Protocol and the existing game-state owner. The seven mood-music calls
+are checked within their complete native function. Dust retains its decoded
+native allocator and verified callee-cleanup ABI.
+
+The existing engine-state resolver supplies both pause gates, and the RNG owner
+supplies the optional seed wrapper. Its patch span is checked only when fixed
+seed is enabled. General RNG identification still checks the wrapper identity;
+an occupied disabled seed hook does not disable unrelated scope binding.
+RNG verification now shares `hook-check` instead of a second context/scanner
+helper. No emitter, hook count, RNG implementation or per-tick work is added.
+
+This follows inspection of Recorder's `fixes`, `scoped-code`, `engine-state-sites`
+and `rng-bindings` consumers at be4e634, Protocol 1.1.4 at 10001be and UI 1.0.2 at
+af31ceb. Scope remains Recorder-owned; the existing command/state/RNG owners
+supply shared identities. Reference addresses remain only in test fixtures.
+
+517 portable tests pass (one existing skip), including relocated bindings and
+owner disagreement in Lua 5.4 and LuaJIT. All six local/official EFIGS/Polish SHC
+1.41 and Extreme 1.41.1-E images pass 28 bindings, 104 rejection checks, both seed
+option cases, 224 passive gate comparisons, complete audio-caller inventories,
+56 native head-placement, 110 native taunt and 288 native wedding cases each.
+The 32 discovery calls occur once; 100 cached verifications add no scans.
+Native callees are executed where stated; gate helper callees, OS/transport and
+module bridges remain fixtures. Optional fire/spawn attribution bindings and the
+temporary identity gate remain unfinished. This is component evidence, not a
+live game, whole-world save/replay, physical multiplayer or performance claim.

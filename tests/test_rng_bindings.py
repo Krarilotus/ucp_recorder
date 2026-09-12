@@ -56,16 +56,28 @@ require('code/rng-observer').install({engine={rng=value.state}})
 
     def test_failure_before_binding_or_any_hook(self):
         for runtime in (Lua54,LuaJIT):
-            for case in ('missing','duplicate','modified','state','seed','owner','occupied_after_resolve'):
+            for case in ('missing','duplicate','modified','state','owner','occupied_after_resolve'):
                 with self.subTest(runtime=runtime,case=case):
                     self.prepare(runtime)
                     if case=='missing':self.lua.execute('core.AOBScan=function() return 0 end')
                     elif case=='duplicate':self.lua.execute('core.scanForAOB=function() return 42 end')
                     elif case=='modified':self.memory[0x10002020]=0xcc
                     elif case=='state':self.put(0x10000001,0)
-                    elif case=='seed':self.memory[0x1000300d]=0xcc
                     elif case=='owner':self.put(0x1000002b,0x32000000)
                     elif case=='occupied_after_resolve':
                         self.lua.execute('rng.resolve()');self.memory[0x10002020]=0xcc
                     self.lua.execute("assert(not pcall(require('code/rng-observer').install,{engine={rng=0x30000000}}))")
                     self.assertFalse(self.hooks)
+
+    def test_optional_seed_hook_is_checked_only_when_requested(self):
+        for runtime in (Lua54,LuaJIT):
+            with self.subTest(runtime=runtime):
+                self.prepare(runtime)
+                self.memory[0x1000300d]=0xcc
+                self.lua.execute('rng.resolve();assert(not pcall(rng.seed))')
+                self.assertEqual(len(self.scans),6)
+                self.memory[0x1000300d]=0x89
+                self.lua.execute('assert(rng.seed().address==0x10003000)')
+                self.assertEqual(len(self.scans),6)
+                self.memory[0x10003000]=0xcc
+                self.lua.execute('assert(not pcall(rng.seed))')

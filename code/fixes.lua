@@ -1,16 +1,9 @@
-local native=require('code/native')
 local profiles=require('code/scoped-sites')
 local emitter=require('code/scoped-code')
 local M={}
 
 function M.verify(seed)
-  local sites=assert(profiles[native.profile.name])
-  for _,site in ipairs(sites) do
-    if site.kind~='seed' or seed~=nil then
-      require('code/hook-check').verify(site,'Recorder simulation hook conflicts at '..site.name)
-    end
-  end
-  return sites
+  return profiles.verify(seed)
 end
 
 function M.install(sites,enabled,mode,seed,offline)

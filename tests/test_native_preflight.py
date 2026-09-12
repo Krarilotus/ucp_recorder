@@ -49,7 +49,7 @@ end
 local fixes=require('code/fixes')
 for _,profile in ipairs(profiles) do
  populate(profile); realNative.verify()
- local sites=require('code/scoped-sites')[profile.name]
+ local sites=require('tests/fixtures/scoped-sites')[profile.name]
  local seed
  for _,site in ipairs(sites) do
   core.writeBytes(site.address,site.bytes)
