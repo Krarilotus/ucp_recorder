@@ -52,3 +52,20 @@ def test_preflight_contract_checks_do_not_read_simulation_state():
       assert(not pcall(required.validate,expected))
       assert(not pcall(required.validate,{}))
     ''')
+
+
+def test_boundary_observation_defers_digest_until_completion():
+    runtime().execute('''
+      local observed,observations=nil,0
+      owner.observeRequiredStateBoundary=function()
+        observations=observations+1;observed=digest or 'state-1'
+      end
+      owner.requiredStateBoundaryIntegrity=function()
+        digests=digests+1
+        return {aic={format='state-7',fingerprint=string.rep('a',64),digest=assert(observed)}}
+      end
+      required.observeBoundary();assert(observations==1 and digests==0)
+      digest='state-2'
+      assert(required.boundaryIntegrity().aic.digest=='state-1')
+      version='1.0.0';required.observeBoundary();assert(required.boundaryIntegrity()==nil)
+    ''')

@@ -66,6 +66,30 @@ for _,view in ipairs({20,41,61}) do r:onMenuView(view); assert(r.active and r.st
 engine.loading=false; r:onMenuView(20); assert(r.mode=='none')
 ''')
 
+    def test_ending_between_checkpoints_uses_observed_extension_state(self):
+        self.check('''
+local state=require('code/required-state')
+local current,observed='state-1',nil
+state.observeBoundary=function()observed=current end
+state.boundaryIntegrity=function()return {aic={digest=assert(observed)}} end
+local r=session();r:beginMatch();r:prepareRecording();now=1;r:onTick()
+now=65;current='state-65';r:onTick()
+now=999;current='transition';r:onMenuView(20)
+assert(savedManifest.lastTick==65 and savedManifest.finalExtensionState.aic.digest=='state-65')
+local store=require('code/sessions');local hash=string.rep('a',64)
+local manifest={id='test',startTick=1,lastTick=65,player=1,commandCount=0,
+ snapshotHash=hash,rngHash=hash,finalRngHash=hash,finalRng={11,22,3,4},
+ startResources=resourceState(),finalResources=resourceState(),finalExtensionState={aic={digest='state-65'}}}
+store.load=function()return manifest end;store.compatible=function()return true end
+store.preflight=function()end
+store.read=function(path)return path:find('rng.bin',1,true) and string.rep('x',0x9c50) or 'snapshot' end
+engine.loadSnapshot=function()now=1 end
+state.check=function(expected)assert(expected.aic.digest==current,'ending extension divergence')end
+r:startPlayback('test');now=65;current='different'
+assert(not r:guard(function()r:onTick()end))
+assert(r.status=='error' and r.error:find('ending extension divergence',1,true))
+''')
+
     def test_attribution_starts_after_snapshot_and_flushes_before_desync(self):
         self.check('''
 local r=session(); local events={}

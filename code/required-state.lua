@@ -29,6 +29,19 @@ function M.integrity()
   return owner and owner:requiredStateIntegrity() or nil
 end
 
+function M.observeBoundary()
+  local owner=M.owner()
+  if not owner then return end
+  assert(type(owner.observeRequiredStateBoundary)=='function'
+    and type(owner.requiredStateBoundaryIntegrity)=='function','Missing required state boundary API')
+  owner:observeRequiredStateBoundary()
+end
+
+function M.boundaryIntegrity()
+  local owner=M.owner()
+  return owner and owner:requiredStateBoundaryIntegrity() or nil
+end
+
 function M.validate(expected)
   local owner=M.owner()
   local contracts=owner and owner:requiredStateContracts() or {}

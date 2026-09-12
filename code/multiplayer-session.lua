@@ -26,6 +26,7 @@ function M.seal(capture)
     startTick=capture.startTick,lastTick=capture.lastObservedTick,
     startResources=capture.initialResources,finalResources=capture.finalResources,
     finalRng=capture.finalRng,finalRngHash=capture.finalRngHash,rngHash=capture.rngHash,
+    finalExtensionState=capture.finalExtensionState,
     snapshotHash=capture.world and capture.world.hash,commandCount=0}
   local opened={}
   local ok,reason=xpcall(function()

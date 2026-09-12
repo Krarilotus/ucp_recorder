@@ -73,6 +73,7 @@ function M:onTick()
   self.capture.finalResources=self.engine:resourceState()
   if self.engine.battle then self.engine.battle:observe() end
   self.finalRngData=self.engine:rngData()
+  require('code/required-state').observeBoundary()
   self.boundaryEvents=self.events
 end
 
@@ -126,6 +127,7 @@ function M:sealBoundary()
   self.capture.tickBytes=self.tickBytes
   if self.recoveryPending then self.capture.replayEvents=self.boundaryEvents or 0 end
   if self.finalRngData then self.capture.finalRngHash=sha.sha256(self.finalRngData) end
+  if self.observedTick then self.capture.finalExtensionState=require('code/required-state').boundaryIntegrity() end
   if self.engine.battle and self.observedTick then
     self.capture.lastObservedTick=self.observedTick
     self.engine.battle:write(self.capture)

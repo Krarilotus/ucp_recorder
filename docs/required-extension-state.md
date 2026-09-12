@@ -14,9 +14,17 @@ The digest is supplied by the simulation owner; Recorder does not scan its units
 or recreate its RNG. Native-only recordings without providers retain their old
 checkpoint shape and behavior.
 
+The recorder also observes required state at each recorded boundary and seals
+`finalExtensionState` into SP and multiplayer replay manifests. Playback compares
+it at the exact ending tick, including endings between 64-tick checkpoints.
+The save owner permits paired observation/digest callbacks; AIC Tactics uses a
+fixed native memcpy snapshot and hashes it only when sealing/copying a recording.
+This avoids full state hashing every tick and retains the ending observation even
+when quit/recovery has already changed the live world. Snapshot and recorder
+overhead still need measured game acceptance.
+
 This integration does not establish a lobby content handshake or prove replay
-compatibility by itself. A non-checkpoint ending boundary still requires a final
-state comparison in acceptance testing. Validation must include native-only
+compatibility by itself. Validation must include native-only
 recordings, required-state captures, save/reload and recovery segments, differing
 provider content, physical peers and measured checkpoint cost. No such acceptance
 is claimed by these source changes.

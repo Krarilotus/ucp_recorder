@@ -26,6 +26,7 @@ local function scan(path,expected,consume,progress)
 end
 
 function M.check(manifest,path,progress)
+  require('code/required-state').validate(manifest.finalExtensionState)
   require('code/maintenance-journal').preflight(manifest,path,scan,progress)
   local count,previous,batchSize=0,manifest.startTick,0
   scan(path..'/stream-commands.json',manifest.commandsHash,function(value)

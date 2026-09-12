@@ -40,6 +40,7 @@ function Session:saveCopy(name)
     and self.active and self.observedTick,'No active recording to save yet')
   for _,key in ipairs({'commandsFile','rngFile','infoFile'}) do assert(self[key]:flush()) end
   assert(self.finalRngData,'Missing ending RNG state')
+  self.manifest.finalExtensionState=require('code/required-state').boundaryIntegrity()
   if self.engine.battle then self.engine.battle:write(self.manifest) end
   return store.copy(self.manifest,name,sha.sha256(self.finalRngData))
 end
@@ -264,6 +265,7 @@ function Session:onTick()
     -- Keep the exact last observed boundary; quitting may already change native state.
     -- Hash only checkpoints and completion, not every simulation tick.
     self.finalRngData=self.engine:rngData()
+    require('code/required-state').observeBoundary()
     self.observedTick=true
     if now%64==0 then
       local line=json:encode({time=now,rng=self.engine:rngState(),resources=self.manifest.finalResources,
@@ -309,6 +311,7 @@ function Session:onTick()
       for i=1,4 do assert(actual[i]==self.manifest.finalRng[i],'Final RNG state differs at tick '..now) end
       self:checkResources(self.manifest.finalResources,'ending state')
       self:checkRngData(self.manifest.finalRngHash,'ending state')
+      require('code/required-state').check(self.manifest.finalExtensionState)
       core.writeInteger(self.halt,1)
       if self.manifest.multiplayer and self.manifest.nextReplay
         and self.preparedWorlds[self.manifest.nextReplay] then
@@ -389,6 +392,7 @@ function Session:reset()
     if complete and closed then
       local ok,finishError=pcall(function()
         assert(self.finalRngData,'Missing ending RNG state')
+          manifest.finalExtensionState=require('code/required-state').boundaryIntegrity()
           manifest.finalRngHash=sha.sha256(self.finalRngData)
           if self.engine.battle then self.engine.battle:write(manifest) end
         store.finish(manifest)
