@@ -14,11 +14,14 @@ core=dofile(framework..'/core.lua')
 package.loaded.core=core
 utils=dofile(framework..'/utils.lua')
 local platform=require('code/platform')
--- The standalone host has no game import table. Resolve system symbols through
--- RPS, retaining the production stdcall wrapper and real CryptoAPI operations.
-platform.stdcall=function(library,name,count)
-  return platform.stdcallAddress(rps.getLibraryProcAddressA(library,name),count)
-end
+assert(platform.milliseconds()>=0 and platform.multimediaMilliseconds()>=0)
+local identity=platform.identity()
+assert(identity.processId>0 and #identity.executable>0)
+local resolve=ucp.internal.getLibraryProcAddressA
+ucp.internal.getLibraryProcAddressA=function() error('Repeated Windows symbol resolution') end
+assert(platform.milliseconds()>=0 and platform.multimediaMilliseconds()>=0)
+assert(platform.identity().processId==identity.processId)
+ucp.internal.getLibraryProcAddressA=resolve
 local binary=require('code/binary-memory')
 local byteWrites=0
 local writeBytes=core.writeBytes
