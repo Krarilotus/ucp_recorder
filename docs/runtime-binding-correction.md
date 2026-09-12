@@ -1,8 +1,11 @@
 # Runtime binding correction
 
-The existing fixed SHC/Extreme address profiles remain unfinished work. This
-branch corrects dependencies one complete path at a time; it does not yet claim
-an AoB-complete Recorder or installed-game/replay acceptance.
+This record follows the replacement of the former fixed SHC/Extreme runtime
+profiles by framework discovery and existing subsystem APIs. Versioned sections
+describe their checks at that revision, including approaches later superseded.
+Current Recorder uses the cached `core.AOBScan` shipped with UCP 3.0.7, without
+a newer API or second full-process scan. Installed-game/replay acceptance remains
+separate from the completed binding fixtures.
 
 ## Windows services
 
@@ -678,9 +681,10 @@ The complete portable suite passes: 519 tests, one existing skip and 6411
 subtests. Unsupported framework versions, failed file reads and malformed
 digests clear any previous identity before hook installation.
 
-## Shared main-executable uniqueness
+## Superseded 0.50.28 scanner experiment
 
-Recorder 0.50.28 prefers the existing `core.AOBScanUnique` capability when
+This historical experiment is superseded by 0.50.29 below and is not a runtime
+dependency. Recorder 0.50.28 preferred the `core.AOBScanUnique` capability when
 available. Framework PR149 at 1d78391 owns the cache/API; RPS PR16 at e958409 owns
 main-image executable-page selection, bounds and overlapping-match detection.
 This addresses the other worker's measured full-process ambiguity-scan cost

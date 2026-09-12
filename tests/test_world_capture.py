@@ -183,6 +183,9 @@ allActiveExtensions={{name='automarket',version='1.1.0'},
  {name='protocol',version='1.0.0'},{name='map-extensions',version='1.0.0'}}
 modules={automarket={pAutomarketData=0x5000000},
  protocol={getProtocolNumber=function() return 130 end}}
+-- This fixture isolates captured bytes; native owner metadata is verified by
+-- native-command and native-save owner tests.
+package.loaded['code/native-command']={bind=function() return {} end}
 ''')
         capture = self.capture()
         self.assertTrue(capture['world']['automarket'])

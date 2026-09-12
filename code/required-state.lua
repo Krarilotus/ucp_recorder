@@ -3,10 +3,9 @@
 local M={}
 
 function M.owner()
-  local version=require('code/automarket-replay').version('map-extensions')
-  if version~='1.1.0' then return nil end
-  local owner=assert(modules and modules['map-extensions'],'Required state owner is unavailable')
-  assert(type(owner.requiredStateVersion)=='function' and owner:requiredStateVersion()==1
+  local owner=modules and modules['map-extensions']
+  if not owner or type(owner.requiredStateVersion)~='function' then return nil end
+  assert(owner:requiredStateVersion()==1
     and type(owner.captureRequiredSections)=='function' and type(owner.requiredStateIntegrity)=='function'
     and type(owner.requiredStateContracts)=='function','Unsupported required state capture API')
   return owner

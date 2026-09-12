@@ -2,7 +2,7 @@
 local M={}
 
 function M.interface()
-  local owner=assert(modules and modules.winProcHandler,'Recorder requires WinProc Handler 1.0.0')
+  local owner=assert(modules and modules.winProcHandler,'Recorder requires WinProc Handler 1.0.1')
   local interface=owner:cinterface()
   for _,name in ipairs({'RegisterProc','CallNextProc'}) do
     local address=interface[name]

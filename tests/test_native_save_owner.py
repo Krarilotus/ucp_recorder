@@ -10,6 +10,41 @@ class NativeSaveOwnerTests(unittest.TestCase):
     setUp=fixture.RecorderTests.setUp
     check=fixture.RecorderTests.check
 
+    def test_required_capture_uses_the_actual_map_api_after_package_updates(self):
+        path=Path(os.environ.get('UCP_MAP_TEST_ROOT',
+            Path(__file__).resolve().parents[2]/'aic-tactics-map-native-interface'))
+        self.lua.globals().map_root=path.as_posix()
+        self.check('''
+package.path=map_root..'/?.lua;'..package.path
+package.loaded['mapextensions.game']={}
+package.loaded['mapextensions.memory']={}
+package.loaded['mapextensions.callbacks']={}
+package.loaded['mapextensions.registry']={registry={}}
+local owner=dofile(map_root..'/init.lua')
+modules={['map-extensions']=owner}
+owner:registerSection('aic-tactics',{
+ initialize=function() end,serialize=function() end,deserialize=function() end,
+ validate=function() end,capture=function(_,handle) handle:put('state.bin','saved') end,
+ integrity=function() return 'state-digest-1' end,
+ observeBoundary=function() end,boundaryIntegrity=function() return 'state-digest-1' end
+},{required=true,format='aic-state',fingerprint=string.rep('a',64)})
+local required=require('code/required-state')
+for _,version in ipairs({'1.1.0','1.1.1','1.2.0'}) do
+ allActiveExtensions={{name='map-extensions',version=version},{name='aic-tactics',version='0.0.7'}}
+ require('code/simulation-compatibility').verify()
+ local entries={};assert(required.capture(entries))
+ assert(entries['aic-tactics/state.bin']=='saved' and entries['framework/required-state.yml'])
+ required.observeBoundary()
+ local boundary=required.boundaryIntegrity();required.validate(boundary);required.check(boundary)
+ assert(boundary['aic-tactics'].digest=='state-digest-1')
+end
+owner.requiredStateVersion=function() return 2 end
+assert(not pcall(required.capture,{}))
+owner.requiredStateVersion=function() return 1 end
+owner.captureRequiredSections=nil
+assert(not pcall(required.capture,{}))
+''')
+
     def test_relocated_map_entries_retain_both_wrappers_and_custom_sections(self):
         path=Path(os.environ.get('UCP_MAP_TEST_ROOT',
             Path(__file__).resolve().parents[2]/'aic-tactics-map-native-interface'))
