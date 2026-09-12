@@ -1,5 +1,3 @@
-local native = require('code/native')
-local allSites = require('code/engine-sites')
 local M = {}
 -- Lua 5.4 decodes directly in C; the LuaJIT-compatible path retains the same
 -- signed little-endian representation without building intermediate tables.
@@ -10,7 +8,8 @@ local unpackResource=string.unpack or function(_,data,offset)
 end
 
 function M.verify()
-  local sites = require('code/engine-state-sites').bind(require('code/engine-command-sites').bind(assert(allSites[native.profile.name])))
+  local sites = require('code/engine-state-sites').bind(require('code/engine-command-sites').bind(
+    require('code/result-sites').bind({})))
   sites=require('code/load-sites').bind(sites)
   local adapter=require('code/automarket-replay')
   if adapter.version('protocol') then
@@ -29,6 +28,7 @@ end
 function M.new(sites)
   require('code/engine-state-sites').verify()
   require('code/load-sites').verify()
+  require('code/result-sites').verify()
   local commands=assert(sites.commands,'Verify the Protocol command interface before creating Recorder')
   local e={sites=sites,commands=commands,base=commands.handler,rng=require('code/rng-bindings').resolve().state}
   e.schedule=commands.scheduleCommand

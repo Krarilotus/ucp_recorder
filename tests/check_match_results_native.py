@@ -12,20 +12,27 @@ from unicorn.x86_const import UC_X86_REG_EBX, UC_X86_REG_ESP
 from native_image import load_image
 
 
-def check(folder):
+def check(folder, binding=None, variant_filter=None):
     root = Path(__file__).resolve().parents[1]
     lua = LuaRuntime(unpack_returned_tuples=True)
     lua.globals().root = root.as_posix()
     lua.execute("package.path=root..'/?.lua;'..package.path")
-    sites = lua.eval("require('code/match-results').sites")
+    sites = lua.eval("require('tests/fixtures/result-sites')")
     for variant, file, store, pack, writer, temporary, count_address in (
         ('SHC', 'Stronghold Crusader.exe', 0x4d52a0, 0x4d1700, 0x4d5180, 0xdf5658, 0xdf624c),
         ('Extreme', 'Stronghold_Crusader_Extreme.exe', 0x4d5630, 0x4d1950, 0x4d5520, 0xdf56f0, 0xdf62e4),
     ):
-        site = sites[variant]
+        if variant_filter and variant!=variant_filter:continue
+        site = binding.insertion if binding is not None else sites[variant].insertion
+        if binding is not None:
+            store=site.guard.address
+            pack=binding.statistics.pack;temporary=binding.statistics.temporary
+            count_address=binding.storedCount
         for count, score, accepted in ((0, 200, True), (3, 200, True), (250, 200, True), (250, 0, False)):
             machine = Uc(UC_ARCH_X86, UC_MODE_32)
             load_image(machine, folder/file)
+            if binding is not None:
+                writer=store+0xc8+struct.unpack('<i',machine.mem_read(store+0xc4,4))[0]
             assert bytes(machine.mem_read(site.address, len(site.bytes))) == bytes(site.bytes.values())
             assert bytes(machine.mem_read(site.address-7, 7)) == b'\xbe'+struct.pack('<I', temporary)+b'\xf3\xa5'
             assert bytes(machine.mem_read(store+5, 5)) == b'\xe8'+struct.pack('<i', pack-store-10)

@@ -1,19 +1,12 @@
 -- The native victory/defeat view ends simulation before presenting statistics.
 -- Seal at that transition. Link only a record actually inserted by SKMasters;
 -- never infer identity from a map name, date, score, or an old history entry.
-local native=require('code/native')
 local store=require('code/sessions')
 local stats=require('code/battle-statistics')
 local M={}
-M.sites={
-  SHC={address=0x4d534d,bytes={129,61,76,98,223,0,250,0,0,0},records=0xdf6250},
-  Extreme={address=0x4d56dd,bytes={129,61,228,98,223,0,250,0,0,0},records=0xdf62e8},
-}
 
 function M.verify()
-  local site=assert(M.sites[native.profile.name])
-  require('code/hook-check').verify(site,'Native battle result insertion conflicts')
-  return site
+  return require('code/result-sites').verify().insertion
 end
 
 function M.new(recorder,site)

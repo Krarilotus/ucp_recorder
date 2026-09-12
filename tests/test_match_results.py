@@ -11,10 +11,11 @@ class MatchResultTests(unittest.TestCase):
         test_sessions.SessionTests.setUp(self)
         self.check('''
 local Results=require('code/match-results')
+local site=require('tests/fixtures/result-sites').SHC.insertion
 core.detourCode=function(callback,address,size)
- assert(address==Results.sites.SHC.address and size==10); inserted=callback
+ assert(address==site.address and size==10); inserted=callback
 end
-r=session(); results=Results.new(r,Results.sites.SHC)
+r=session(); results=Results.new(r,site)
 ''')
 
     def test_natural_victory_and_defeat_seal_before_statistics_without_resampling(self):

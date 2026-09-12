@@ -75,7 +75,11 @@ function commandFixture()
 end
 commandOwner={getNativeCommandInterface=commandFixture}
 modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
-package.loaded['code/engine-sites']=require('tests/fixtures/engine-sites')
+package.loaded['code/result-sites']={bind=function(input)
+ local result={} for key,value in pairs(input) do result[key]=value end
+ for key,value in pairs(require('tests/fixtures/engine-sites')[realNative.profile.name or 'SHC']) do result[key]=value end
+ return result end,verify=function()
+ return require('tests/fixtures/result-sites')[realNative.profile.name or 'SHC'] end}
 package.loaded['code/load-sites']={bind=function(sites)
  local result={} for key,value in pairs(sites) do result[key]=value end
  local extreme=realNative.profile.name=='Extreme'
@@ -167,7 +171,7 @@ local history=require('code/history-sites').SHC
 for _,name in ipairs({'prepareList','prepare','action','frame','helpText'}) do local s=history[name]; core.writeBytes(s.address,s.bytes) end
 for _,s in ipairs(history.operands) do core.writeBytes(s.address,s.bytes) end
 core.writeBytes(0x4d1700,{139,68,36,4,163,88,86,223,0}); core.writeBytes(0x4d172a,{232})
-local result=require('code/match-results').sites.SHC; core.writeBytes(result.address,result.bytes)
+local result=require('tests/fixtures/result-sites').SHC.insertion; core.writeBytes(result.address,result.bytes)
 local world=require('code/world-hash-sites').SHC; core.writeBytes(world.address,world.bytes)
 core.hookCode=function() return function() return 0 end end
 core.writeString=function() end

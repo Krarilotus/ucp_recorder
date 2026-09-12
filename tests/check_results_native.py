@@ -4,8 +4,8 @@ from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EAX, UC_X86_REG_ECX
 
 
-def check_results(reader, lua, root, variant):
-    sites = lua.execute((root/'tests/fixtures/engine-sites.lua').read_text())[variant]
+def check_results(reader, lua, root, variant, sites=None):
+    sites = sites or lua.execute((root/'tests/fixtures/engine-sites.lua').read_text())[variant]
     site = sites.resultsTimer
     emitter = lua.execute((root/'code/scoped-code.lua').read_text())
     start, end = site.address, site.address+0x30
