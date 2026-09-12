@@ -1,7 +1,8 @@
 local native=require('code/native')
 local Engine=require('code/engine')
 local Session=require('code/session-recorder')
-local module={}
+local module={tickObserverApiVersion=1}
+local tickObservers=require('code/tick-observers').new()
 
 local function enable(self,config,stage,install)
   local multiplayerCapture=config.autoRecord~=false
@@ -76,6 +77,7 @@ local function enable(self,config,stage,install)
           recorder:reconcileMode()
           callback(registers)
         end)
+        if not recorder.active or recorder.status~='recording' then tickObservers:dispatch(recorder) end
         return registers
       end,address,size)
     end
@@ -119,6 +121,7 @@ local function enable(self,config,stage,install)
       if recorder.active and recorder.mode=='play' and recorder.afterTick then
         recorder:guard(function() recorder:afterTick() end)
       end
+      tickObservers:dispatch(recorder)
       return registers
     end,sites.tickReturned.address,#sites.tickReturned.bytes)
   end)
@@ -140,5 +143,8 @@ end
 
 function module:disable()
   if self.recorder then self.recorder:reset() end
+  if self.recorder then tickObservers:dispatch(self.recorder) end
 end
+function module:registerTickObserver(callback) return tickObservers:register(callback) end
+function module:unregisterTickObserver(token) tickObservers:remove(token) end
 return module
