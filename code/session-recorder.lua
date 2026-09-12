@@ -267,7 +267,7 @@ function Session:onTick()
     self.observedTick=true
     if now%64==0 then
       local line=json:encode({time=now,rng=self.engine:rngState(),resources=self.manifest.finalResources,
-        rngHash=sha.sha256(self.finalRngData)})
+        rngHash=sha.sha256(self.finalRngData),extensionState=require('code/required-state').integrity()})
       assert(self.rngFile:write(line..'\n')); assert(self.rngFile:flush())
     end
   elseif self.status=='playing' then
@@ -298,6 +298,7 @@ function Session:onTick()
       end
       self:checkResources(expected.resources,'checkpoint')
       self:checkRngData(expected.rngHash,'checkpoint')
+      require('code/required-state').check(expected.extensionState)
     end
     if now>=self.manifest.lastTick then
       work.finished(self)

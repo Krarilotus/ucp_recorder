@@ -73,7 +73,7 @@ function M.seal(capture)
           manifest.commandCount=manifest.commandCount+1
         elseif event.kind=='checkpoint' and event.time<=manifest.lastTick then
           assert(checkpoints:write(json:encode({time=event.time,rng=event.rng,rngHash=event.rngHash,
-            resources=event.resources})..'\n'))
+            resources=event.resources,extensionState=event.extensionState})..'\n'))
         elseif event.kind=='gap' then
           assert(M.presentationOrTransport(event),'Uncovered multiplayer event: '..tostring(event.reason))
         else assert(event.kind=='command','Untracked multiplayer command or event') end

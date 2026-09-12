@@ -188,7 +188,8 @@ function M:onTick(networkChecked)
   self:open()
   self.lastTick=now
   self:record({kind='checkpoint',time=now,rng=self.engine:rngState(),resources=self.engine:resourceState(),
-    rngHash=sha.sha256(self.engine:rngData()),rngCalls=self:rngEvidence(),worldHashes=self:worldHashEvidence()})
+    rngHash=sha.sha256(self.engine:rngData()),rngCalls=self:rngEvidence(),worldHashes=self:worldHashEvidence(),
+    extensionState=require('code/required-state').integrity()})
   if self.window and now==self.window.endTick then self:finishWindow() end
 end
 

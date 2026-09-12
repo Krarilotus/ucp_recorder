@@ -665,6 +665,20 @@ class CompareTraceTests(unittest.TestCase):
         b[1]['rng'][3] = 5
         self.assertEqual(self.compare(a, b)['firstDifference']['field'], 'rng')
 
+    def test_required_extension_state_is_compared_and_validated(self):
+        a = self.full_trace()
+        a[1]['extensionState'] = {'aic-tactics': {'format': 'aic-tactics-state-7',
+            'fingerprint': 'c' * 64, 'digest': 'state-v1-1234'}}
+        b = self.other_peer(a)
+        self.assertEqual(self.compare(a, b)['status'], 'matched')
+        b[1]['extensionState']['aic-tactics']['digest'] = 'state-v1-5678'
+        self.assertEqual(self.compare(a, b)['firstDifference']['field'], 'extensionState')
+        del b[1]['extensionState']
+        self.assertEqual(self.compare(a, b)['firstDifference']['field'], 'extensionState')
+        b = self.other_peer(a)
+        b[1]['extensionState']['aic-tactics']['fingerprint'] = 'wrong'
+        self.assertEqual(self.compare(a, b)['status'], 'incomplete')
+
     def test_missing_checkpoint_cannot_be_hidden_in_a_matching_pair(self):
         a = self.trace()
         a[0].update(format=2, firstTick=0)

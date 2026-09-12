@@ -65,10 +65,11 @@ function M.capture(path,engine)
       assert(custom[path]==nil,'Duplicate UCP2 state entry'); custom[path]=data
     end})
   end
+  local requiredState=require('code/required-state').capture(custom)
   if next(custom) then
     local raw=require('code/extension-container').encode(custom)
     store.write(path..'/extensions.zip',raw)
-    manifest.extensions={bytes=#raw,sha256=sha.sha256(raw),ucp2=legacy~=nil}
+    manifest.extensions={bytes=#raw,sha256=digest.sha256(raw),ucp2=legacy~=nil,requiredState=requiredState}
   end
   assert(engine:tick()==manifest.tick,'Simulation advanced during world capture')
   manifest.status='complete'

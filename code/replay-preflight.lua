@@ -42,6 +42,7 @@ function M.check(manifest,path,progress)
     validation.rng(checkpoint.rng)
     validation.resources(checkpoint.resources)
     validation.hash(checkpoint.rngHash,'checkpoint RNG hash')
+    require('code/required-state').validate(checkpoint.extensionState)
     tick=tick+64
   end,progress)
   assert(tick>manifest.lastTick,'Replay verification data ended early')
