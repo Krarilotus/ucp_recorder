@@ -23,12 +23,13 @@ function M.verify()
         actual)
     end
   end
+  require('code/rng-bindings').resolve()
   return require('code/native-command').bind(require('code/native-save').bind(sites))
 end
 
 function M.new(sites)
   local commands=assert(sites.commands,'Verify the Protocol command interface before creating Recorder')
-  local e={sites=sites,commands=commands,base=commands.handler,rng=native.addr(0x1a279c0)}
+  local e={sites=sites,commands=commands,base=commands.handler,rng=require('code/rng-bindings').resolve().state}
   e.schedule=commands.scheduleCommand
   e.saveNative=core.exposeCode(sites.save.address,2,1)
   e.loadNative=core.exposeCode(sites.load.address,1,0)

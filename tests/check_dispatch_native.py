@@ -80,7 +80,6 @@ def check_dispatch(reader,variant):
         g.image_read_integer=lambda a:struct.unpack('<i',reader(a,4))[0]
         g.image_read_bytes=lambda a,n:lua.table_from(reader(a,n))
         g.map_save_fixture=lua.table_from(native_save_fixture(variant))
-        g.native_address=lambda a: {0x1a279c0:0x1a279c0 if shc else 0x24baec0}[a]
         g.read_integer=get; g.write_integer=put
         g.read_short=lambda a: struct.unpack('<H',read(a,2))[0]
         g.write_short=lambda a,v: write(a,struct.pack('<H',int(v)&0xffff))
@@ -93,7 +92,7 @@ def check_dispatch(reader,variant):
         g.write_string=lambda a,s: write(a,s.encode())
         lua.execute('''
 package.path=source_root..'/?.lua;'..package.path
-package.loaded['code/native']={profile={name=variant},addr=native_address}
+package.loaded['code/native']={profile={name=variant}}
 core={allocate=allocate,allocateCode=allocate,exposeCode=expose,hookCode=hook,detourCode=detour,
  readInteger=read_integer,writeInteger=write_integer,readBytes=read_bytes,writeBytes=write_bytes,
  readSmallInteger=read_short,writeSmallInteger=write_short,
@@ -114,6 +113,7 @@ package.loaded['game.hooks']={setHooks=function() end}
 hooks={registerHookCallback=function() end}
 local protocol=dofile(protocol_root..'/init.lua');protocol:enable({})
 modules={protocol=protocol,['map-extensions']={getNativeSaveInterface=function() return map_save_fixture end}}
+require('code/rng-bindings').resolve()
 core.readInteger=read_integer;core.readBytes=read_bytes
 local sites=require('code/native-command').bind(require('code/native-save').bind(require('code/engine-sites')[variant]))
 engine=require('code/engine').new(sites)

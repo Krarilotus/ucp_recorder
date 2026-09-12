@@ -1,6 +1,7 @@
 """Execute the original player summary; only pixel/number drawing callees are stand-ins."""
 import struct
 from native_command_fixture import native_command_fixture
+from native_rng_fixture import native_rng_fixture
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
 from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
@@ -66,7 +67,7 @@ nativeView=viewModule.new(viewRecorder)
                 write32(base+0x4d0+60, gold if player==selected else 1)
             write32(slot, 1); write32(actor, 7)
             before = bytes(machine.mem_read(data, 9*0x39f4))
-            rng = native.addr(0x1a279c0)
+            rng = native_rng_fixture(variant)['state']
             before_rng = bytes(machine.mem_read(rng, 0x9c50))
             view.select(view, selected)
             drawn.clear(); writes.clear()
@@ -130,7 +131,7 @@ def check_book_resources(path, reader, lua, native, root, variant):
     for selected in range(1,9):
         put(slot,1);put(actor,7);put(tab,77);put(resolution,20)
         before=bytes(machine.mem_read(resources,9*0x39f4))
-        rng=native.addr(0x1a279c0); before_rng=bytes(machine.mem_read(rng,0x9c50))
+        rng=native_rng_fixture(variant)['state']; before_rng=bytes(machine.mem_read(rng,0x9c50))
         view.select(view,selected); drawn.clear()
         def render():
             put(stack,stop); machine.reg_write(UC_X86_REG_ESP,stack)
