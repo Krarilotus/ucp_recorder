@@ -10,31 +10,10 @@ end
 -- One traversal policy for capture and preflight. Hashing only the old file
 -- list would miss newly added scripts/assets that change directory lookup.
 local function walker(add,progress)
-  local visited,count={},0
-  local function directory(path,depth)
-    path=normalized(path)
-    if visited[path] then return end
-    assert(depth<=16,'Replay asset directory nesting is too deep')
-    count=count+1; assert(count<=M.MAX_FILES,'Too many replay asset directories')
-    visited[path]=true
-    if progress then progress('Checking recorded settings...') end
-    local present={}
-    for _,file in ipairs(ucp.internal.io.files(path..'/')) do
-      file=normalized(file)
-      assert(file:sub(1,#path+1)==path..'/','Asset file escaped its parent: '..file..' (parent '..path..')')
-      present[file]=true; add(file)
-    end
-    for _,child in ipairs(ucp.internal.io.directories(path..'/')) do
-      child=normalized(child)
-      assert(child:sub(1,#path+1)==path..'/','Asset directory escaped its parent: '..child..' (parent '..path..')')
-      -- Folder handles list ZIPs as synthetic directories, but listFiles on
-      -- such a child fails unless a physical folder of that name also exists.
-      -- Include that folder: its files can shadow the sibling archive.
-      local folder=not present[child..'.zip'] or pcall(ucp.internal.io.files,child..'/')
-      if child:sub(#path+2)~='.git' and folder then directory(child,depth+1) end
-    end
-  end
-  return function(path) directory(path,0) end
+  return modules.files:createFileWalker(add,{
+    maxEntries=M.MAX_FILES,excludeDirectories={'.git'},
+    onDirectory=progress and function() progress('Checking recorded settings...') end,
+  })
 end
 
 function M.capture(extensions,config)
