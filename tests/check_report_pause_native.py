@@ -5,7 +5,7 @@ from unicorn.x86_const import UC_X86_REG_ESI, UC_X86_REG_EAX, UC_X86_REG_ESP
 
 
 def check_report_pause(reader, lua, root, variant):
-    site=lua.execute((root/'code/ui-sites.lua').read_text())[variant].reportPause
+    site=lua.execute((root/'tests/fixtures/ui-sites.lua').read_text())[variant].reportPause
     engine=lua.execute((root/'code/engine-sites.lua').read_text())[variant]
     emitter=lua.execute((root/'code/scoped-code.lua').read_text())
     start=site.address-25

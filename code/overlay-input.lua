@@ -4,6 +4,7 @@ local native=require('code/native')
 local M={}
 
 function M.install(ui)
+  local site=ui:site('updateMenu')
   local original,dispatching,captured
   original=core.hookCode(function(menu)
     if dispatching then return original(menu) end
@@ -38,6 +39,6 @@ function M.install(ui)
     -- Seek/load and completed snapshot publication run after native input unwinds.
     if ui.onMenuUpdated then ui.onMenuUpdated() end
     return result
-  end,ui.sites.updateMenu.address,1,1,#ui.sites.updateMenu.bytes)
+  end,site.address,1,1,#site.bytes)
 end
 return M

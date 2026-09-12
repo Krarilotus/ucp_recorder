@@ -7,7 +7,7 @@ from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
 
 
 def check_replay_view(reader, lua, native, root, variant):
-    sites = lua.execute((root/'code/ui-sites.lua').read_text())[variant]
+    sites = lua.execute((root/'tests/fixtures/ui-sites.lua').read_text())[variant]
     engine = lua.execute((root/'code/engine-sites.lua').read_text())[variant]
     start = sites.playerSummary.address
     instructions = []
@@ -89,7 +89,7 @@ def check_book_resources(path, reader, lua, native, root, variant):
     """Native per-frame dispatch and resource book; only drawing callees stubbed."""
     from native_image import load_image
     machine=Uc(UC_ARCH_X86,UC_MODE_32); load_image(machine,path)
-    sites=lua.execute((root/'code/ui-sites.lua').read_text())[variant]
+    sites=lua.execute((root/'tests/fixtures/ui-sites.lua').read_text())[variant]
     engine=lua.execute((root/'code/engine-sites.lua').read_text())[variant]
     entry=sites.buildingAndStatus.address
     # Both original variants use the same tab dispatcher offsets/layout.

@@ -22,3 +22,18 @@ allocations, native callbacks and Windows services without launching or attachin
 to a game. They do not establish live input, simulation or replay acceptance.
 The pause check uses the actual UI 1.0.1 source extracted into that private test
 directory, exercising its insertion API rather than a replacement array owner.
+
+# UI binding discovery against private images
+
+`check_ui_bindings.py` runs without a game or desktop access. Supply a licensed
+Crusader 1.41 or Extreme 1.41 executable, the installed UI 1.0.1 `ui/game.lua`,
+and framework 3.0.7's code directory. It uses the actual UI Lua source and
+framework extractor, with numeric pointers at the CFFI boundary:
+
+```text
+python tests/check_ui_bindings.py --reference "path/to/Stronghold Crusader.exe" --variant SHC --ui-game "path/to/ui/game.lua" --framework-code "path/to/ucp/code" --output "path/to/evidence.json"
+```
+
+Repeat with the Extreme executable and `--variant Extreme`. Requirements:
+`pefile` and `lupa` (Lua 5.4). This verifies discovery/context and rejects conflicts;
+it does not establish installed-game, render, multiplayer or replay acceptance.

@@ -113,7 +113,15 @@ end
 for _,site in pairs(sites) do
  if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
 end
-for _,site in pairs(require('code/ui-sites').SHC) do core.writeBytes(site.address,site.bytes) end
+-- This test exercises lifecycle callback routing; binding resolution is covered
+-- separately with relocated fixtures and the actual native images/UI owner.
+require('code/ui-sites').resolve=function()
+ local result=dofile(source_root..'/tests/fixtures/ui-sites.lua').SHC
+ for _,site in pairs(result) do core.writeBytes(site.address,site.bytes) end
+ local b=result.buildingAndStatus.bytes
+ result.window={value=b[3]+b[4]*256+b[5]*65536+b[6]*16777216-0x5c}
+ return result
+end
 for _,site in ipairs(require('code/scoped-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 for _,site in pairs(require('code/network-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 local history=require('code/history-sites').SHC

@@ -1,5 +1,4 @@
-local native=require('code/native')
-local profiles=require('code/ui-sites')
+local bindings=require('code/ui-sites')
 local M={ITEM_SIZE=0x50}
 
 function M.verify()
@@ -7,13 +6,15 @@ function M.verify()
   -- Automarket's GUI-loaded callback). Resolve them before we wrap activation;
   -- the cached entry still points to the wrapper and retains both modules' UI.
   assert(modules and modules.ui,'Recorder menus require UI 1.0.1 and its dependencies')
-  modules.ui:access()
+  local api=modules.ui:access()
   require('code/input-chain').interface()
-  local sites=assert(profiles[native.profile.name])
-  for name,site in pairs(sites) do
-    require('code/hook-check').verify(site,'Recorder UI conflicts at '..name)
-  end
-  return sites
+  return bindings.resolve(api,modules.cffi:cffi())
+end
+
+function M:site(name)
+  local site=assert(self.sites[name])
+  require('code/hook-check').verify(site.guard or site,'Recorder UI conflicts at '..name)
+  return site
 end
 
 function M.new(sites,onError)
@@ -105,8 +106,7 @@ function M:renderOverlayItem(item)
 end
 
 function M:windowAddress()
-  local bytes=self.sites.buildingAndStatus.bytes
-  return bytes[3]+bytes[4]*256+bytes[5]*65536+bytes[6]*16777216-0x5c
+  return self.sites.window.value
 end
 
 -- Scope the complete overlay, not every glyph/portrait. FontSizeClass::renderText
@@ -336,7 +336,7 @@ function M:installViewRender()
   -- rendering owners outside handleMenuItems. Scope only these render calls;
   -- input callbacks and command execution retain the recorded actor.
   for _,name in ipairs({'playerSummary','buildingAndStatus'}) do
-    local site=self.sites[name]
+    local site=self:site(name)
     local original
     original=core.hookCode(function()
       return self.renderScope(function() return original() end)
@@ -372,6 +372,7 @@ function M:installInput(singlePlayer,handler)
 end
 
 function M:extendPause(label,action,predicate,isPlayback)
+  local site=self:site('activateModal')
   hooks.registerHookCallback('afterInit',function()
     local ok,state=pcall(require('code/pause-menu').attach,self,label,action,predicate,isPlayback)
     if ok then self.pauseMenu=state else self.onError(state) end
@@ -380,7 +381,7 @@ function M:extendPause(label,action,predicate,isPlayback)
   original=core.hookCode(function(this,id,retain)
     if id==5 and self.pauseMenu then self.pauseMenu.activate() end
     return original(this,id,retain)
-  end,self.sites.activateModal.address,3,1,#self.sites.activateModal.bytes)
+  end,site.address,3,1,#site.bytes)
 end
 
 function M:trackVisibility(referenceItems,predicate)
@@ -389,6 +390,7 @@ function M:trackVisibility(referenceItems,predicate)
   self.visibilityGroups=self.visibilityGroups or {}
   self.visibilityGroups[#self.visibilityGroups+1]={items=referenceItems,callbacks=callbacks,predicate=predicate}
   if self.visibilityInstalled then return end
+  local site=self:site('handleMenu')
   self.visibilityInstalled=true
   local original
   original=core.hookCode(function(this,action)
@@ -433,6 +435,6 @@ function M:trackVisibility(referenceItems,predicate)
       else original(overlay.menu,action) end
     end
     return result
-  end,self.sites.handleMenu.address,2,1,#self.sites.handleMenu.bytes)
+  end,site.address,2,1,#site.bytes)
 end
 return M

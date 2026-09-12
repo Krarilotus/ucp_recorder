@@ -6,7 +6,7 @@ from unicorn.x86_const import UC_X86_REG_ECX, UC_X86_REG_ESP
 
 
 def check_overlay_input(reader,lua,root,variant):
-    sites=lua.execute((root/'code/ui-sites.lua').read_text())[variant]
+    sites=lua.execute((root/'tests/fixtures/ui-sites.lua').read_text())[variant]
     delta=0 if variant=='SHC' else 0x390
     item_handler=0x4f4290+delta
     machine=Uc(UC_ARCH_X86,UC_MODE_32); machine.mem_map(0x400000,0x3000000)

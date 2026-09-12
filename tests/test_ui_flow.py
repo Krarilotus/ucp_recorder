@@ -83,7 +83,8 @@ recorder.preparePlayback=function(_,id,worlds,progress)
  progress('Checking replay data...')
  return {manifest={id=id}}
 end
-menu=require('code/ui'); menu.createButtons(recorder,{})
+menu=require('code/ui')
+menu.createButtons(recorder,{reportPause={address=123,bytes={0,0,0,0,0,0,0}}})
 function click(label)
  for _,item in ipairs(assert(dialogs[shown])) do
   local text=type(item.label)=='function' and item.label() or item.label
