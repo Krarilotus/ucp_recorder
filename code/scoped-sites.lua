@@ -1,63 +1,68 @@
--- Complete instructions for scope-gated simulation changes.
-return {
-  SHC = {
-    {name="weddingHusband",address=0x00539EAB,kind="call",patch="skip",bytes={232,80,9,243,255}, target=0x0046A800},
-    {name="weddingWife",address=0x00539EC6,kind="call",patch="skip",bytes={232,53,9,243,255}, target=0x0046A800},
-    {name="aiTauntReply",address=0x004D11F1,kind="call",patch="skip",bytes={232,10,150,249,255}, target=0x0046A800},
-    {name="headsSelection",address=0x00444868,kind="call",patch="skip",bytes={232,147,95,2,0}, target=0x0046A800},
-    {name="headsNextPreview",address=0x00445777,kind="tail",patch="return",bytes={233,132,80,2,0}, target=0x0046A800},
-    {name="ambientSound",address=0x0044C272,kind="call",patch="skip",bytes={232,137,229,1,0}, target=0x0046A800},
-    {name="resourceSpeech",address=0x0047176B,kind="call",patch="skip",bytes={232,144,144,255,255}, target=0x0046A800},
-    {name="audioLaunch",address=0x0047A157,kind="call",patch="skip",bytes={232,164,6,255,255}, target=0x0046A800},
-    {name="battleMusic1",address=0x0047AE06,kind="call",patch="skip",bytes={232,245,249,254,255}, target=0x0046A800},
-    {name="battleMusic2",address=0x0047AE5C,kind="call",patch="skip",bytes={232,159,249,254,255}, target=0x0046A800},
-    {name="ambientMusic",address=0x0047BE45,kind="call",patch="skip",bytes={232,182,233,254,255}, target=0x0046A800},
-    {name="moodMusic1",address=0x0047A34A,kind="call",patch="skip",bytes={232,177,4,255,255}, target=0x0046A800},
-    {name="moodMusic2",address=0x0047A3B0,kind="call",patch="skip",bytes={232,75,4,255,255}, target=0x0046A800},
-    {name="moodMusic3",address=0x0047A3CF,kind="call",patch="skip",bytes={232,44,4,255,255}, target=0x0046A800},
-    {name="moodMusic4",address=0x0047A3F3,kind="call",patch="skip",bytes={232,8,4,255,255}, target=0x0046A800},
-    {name="moodMusic5",address=0x0047A422,kind="call",patch="skip",bytes={232,217,3,255,255}, target=0x0046A800},
-    {name="moodMusic6",address=0x0047A446,kind="call",patch="skip",bytes={232,181,3,255,255}, target=0x0046A800},
-    {name="moodMusic7",address=0x0047A48E,kind="call",patch="skip",bytes={232,109,3,255,255}, target=0x0046A800},
-    {name="dustRNG",address=0x004FC4A3,kind="call",patch="skip",bytes={232,40,227,246,255}, target=0x0046A7D0},
-    {name="dustEntity",address=0x004FC627,kind="call",patch="cleanup",bytes={232,180,132,240,255}, target=0x00404AE0},
-    {name="motherSound",address=0x005474A3,kind="call",patch="skip",bytes={232,40,51,242,255}, target=0x0046A7D0},
-    {name="music1",address=0x0047A8D5,kind="call",patch="skip",bytes={232,38,255,254,255}, target=0x0046A800},
-    {name="music2",address=0x0047A86B,kind="call",patch="skip",bytes={232,144,255,254,255}, target=0x0046A800},
-    {name="music3",address=0x0047C348,kind="call",patch="skip",bytes={232,179,228,254,255}, target=0x0046A800},
-    {name="pause",address=0x0045CEFF,kind="branch",patch="fallthrough",bytes={117,45,161,84,160,254,1}, target=0x0045CF2E, condition=133},
-    {name="pausedCamera",address=0x0045CE2D,kind="raw",patch="equalFlags",bytes={131,61,168,122,254,1,8}},
-    {name="mothers",address=0x004582ED,kind="branch",patch="taken",bytes={117,43,131,60,16,0}, target=0x0045831A, condition=133},
-    {name="seed",address=0x0046A74A,kind="seed",patch="seed",bytes={131,196,4,137,70,4}},
-  },
-  Extreme = {
-    {name="weddingHusband",address=0x0053A2CB,kind="call",patch="skip",bytes={232,80,7,243,255}, target=0x0046AA20},
-    {name="weddingWife",address=0x0053A2E6,kind="call",patch="skip",bytes={232,53,7,243,255}, target=0x0046AA20},
-    {name="aiTauntReply",address=0x004D1441,kind="call",patch="skip",bytes={232,218,149,249,255}, target=0x0046AA20},
-    {name="headsSelection",address=0x00444A98,kind="call",patch="skip",bytes={232,131,95,2,0}, target=0x0046AA20},
-    {name="headsNextPreview",address=0x004459A7,kind="tail",patch="return",bytes={233,116,80,2,0}, target=0x0046AA20},
-    {name="ambientSound",address=0x0044C4A2,kind="call",patch="skip",bytes={232,121,229,1,0}, target=0x0046AA20},
-    {name="resourceSpeech",address=0x0047198B,kind="call",patch="skip",bytes={232,144,144,255,255}, target=0x0046AA20},
-    {name="audioLaunch",address=0x0047A327,kind="call",patch="skip",bytes={232,244,6,255,255}, target=0x0046AA20},
-    {name="battleMusic1",address=0x0047AFD6,kind="call",patch="skip",bytes={232,69,250,254,255}, target=0x0046AA20},
-    {name="battleMusic2",address=0x0047B02C,kind="call",patch="skip",bytes={232,239,249,254,255}, target=0x0046AA20},
-    {name="ambientMusic",address=0x0047C015,kind="call",patch="skip",bytes={232,6,234,254,255}, target=0x0046AA20},
-    {name="moodMusic1",address=0x0047A51A,kind="call",patch="skip",bytes={232,1,5,255,255}, target=0x0046AA20},
-    {name="moodMusic2",address=0x0047A580,kind="call",patch="skip",bytes={232,155,4,255,255}, target=0x0046AA20},
-    {name="moodMusic3",address=0x0047A59F,kind="call",patch="skip",bytes={232,124,4,255,255}, target=0x0046AA20},
-    {name="moodMusic4",address=0x0047A5C3,kind="call",patch="skip",bytes={232,88,4,255,255}, target=0x0046AA20},
-    {name="moodMusic5",address=0x0047A5F2,kind="call",patch="skip",bytes={232,41,4,255,255}, target=0x0046AA20},
-    {name="moodMusic6",address=0x0047A616,kind="call",patch="skip",bytes={232,5,4,255,255}, target=0x0046AA20},
-    {name="moodMusic7",address=0x0047A65E,kind="call",patch="skip",bytes={232,189,3,255,255}, target=0x0046AA20},
-    {name="dustRNG",address=0x004FC823,kind="call",patch="skip",bytes={232,200,225,246,255}, target=0x0046A9F0},
-    {name="dustEntity",address=0x004FC9A7,kind="call",patch="cleanup",bytes={232,68,129,240,255}, target=0x00404AF0},
-    {name="motherSound",address=0x005478C3,kind="call",patch="skip",bytes={232,40,49,242,255}, target=0x0046A9F0},
-    {name="music1",address=0x0047AAA5,kind="call",patch="skip",bytes={232,118,255,254,255}, target=0x0046AA20},
-    {name="music2",address=0x0047AA3B,kind="call",patch="skip",bytes={232,224,255,254,255}, target=0x0046AA20},
-    {name="music3",address=0x0047C518,kind="call",patch="skip",bytes={232,3,229,254,255}, target=0x0046AA20},
-    {name="pause",address=0x0045D10F,kind="branch",patch="fallthrough",bytes={117,45,161,84,213,167,2}, target=0x0045D13E, condition=133},
-    {name="pausedCamera",address=0x0045D03D,kind="raw",patch="equalFlags",bytes={131,61,168,175,167,2,8}},
-    {name="mothers",address=0x0045851D,kind="branch",patch="taken",bytes={117,43,131,60,16,0}, target=0x0045854A, condition=133},
-    {name="seed",address=0x0046A96A,kind="seed",patch="seed",bytes={131,196,4,137,70,4}},
-  },
-}
+-- Replay scope keeps native simulation RNG separate from presentation-only
+-- callers. Use the original calls outside scope; do not add an RNG or timer.
+local M={}
+local binding,guards,seedSite
+local dustPattern='83 EC 08 53 8B 5C 24 34 83 FB 2B 56 8B F1 89 74 24 0C C7 44 24 08 00 00 00 00 7E 05 83 FB 5B 7C 05 83 FB 5E 7E 0A 5E 33 C0 5B 83 C4 08 C2 2C 00'
+function M.resolve(seed)
+  local check=require('code/hook-check')
+  local rng=require('code/rng-bindings').resolve()
+  if not binding then
+    local result,g={},{}
+    local commands=require('code/native-command').bind({}).commands
+    local state=require('code/engine-state-sites').resolve()
+    local owners={mode=commands.handler+0x618,player=commands.localPlayer,tick=commands.tick,gameCore=state.gameCore}
+    for _,context in ipairs(require('code/scoped-contexts')) do
+      local guard=check.resolve(context.pattern,'Recorder replay scope '..context.name)
+      g[context.name]=guard
+      for _,field in ipairs(context.rngFields) do
+        assert(core.readInteger(guard.address+field[1])==rng.state+field[2],
+          'Recorder replay scope has a different RNG owner: '..context.name)
+      end
+      for _,field in ipairs(context.ownerFields) do
+        assert(core.readInteger(guard.address+field[1])==owners[field[2]],
+          'Recorder replay scope disagrees with '..field[2]..': '..context.name)
+      end
+      for _,spec in ipairs(context.sites) do
+        local address=guard.address+spec.offset
+        local site={name=spec.name,address=address,bytes=core.readBytes(address,spec.size),guard=guard,
+          kind=spec.kind,patch=spec.patch,condition=spec.condition}
+        if spec.kind=='call' or spec.kind=='tail' then
+          site.target=address+5+core.readInteger(address+1)
+          if spec.stream then
+            assert(site.target==rng.streams[spec.stream].address,
+              'Recorder replay scope calls a different RNG stream: '..spec.name)
+          else
+            assert(spec.name=='dustEntity','Unknown replay scope native callee')
+            g.dustCallee=check.context(site.target,dustPattern,'Recorder native dust allocation ABI')
+          end
+        elseif spec.kind=='branch' then
+          local distance=site.bytes[2]
+          site.target=address+2+(distance>=128 and distance-256 or distance)
+        end
+        result[#result+1]=site
+      end
+    end
+    for name,control in pairs(require('code/engine-state-sites').controls()) do
+      local site={name=name}
+      for key,value in pairs(control) do site[key]=value end
+      result[#result+1]=site;g[name]=control.guard
+    end
+    binding=result;guards=g
+  end
+  if seed~=nil and not seedSite then
+    local guard=require('code/rng-bindings').seed()
+    seedSite={name='seed',address=guard.address+10,bytes=core.readBytes(guard.address+10,6),
+      guard=guard,kind='seed',patch='seed'}
+    binding[#binding+1]=seedSite
+  end
+  return binding
+end
+function M.verify(seed)
+  local result=M.resolve(seed)
+  for name,guard in pairs(guards) do
+    require('code/hook-check').verify(guard,'Recorder simulation context conflicts at '..name)
+  end
+  if seed~=nil then require('code/hook-check').verify(seedSite.guard,'Recorder simulation hook conflicts at seed') end
+  return result
+end
+return M

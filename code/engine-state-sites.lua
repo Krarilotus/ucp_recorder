@@ -10,7 +10,7 @@ local patterns={
   calendar='8B 54 24 08 33 C0 89 81 ? ? ? ? 89 81 ? ? ? ? 89 81 ? ? ? ? 89 81 ? ? ? ? 8B 44 24 04 89 81 ? ? ? ? B8 64 00 00 00 89 91 ? ? ? ?',
 }
 local M={}
-local binding,guards
+local binding,guards,controls
 function M.resolve()
   if binding then return binding end
   local check=require('code/hook-check')
@@ -77,8 +77,16 @@ function M.resolve()
     navigationCountdown=countdown,menuText=menuText}
   binding.tickEntry.kind='raw';binding.tickEntry.patch='return'
   binding.calendar.value=phases.gameState+month
+  controls={pause=site(g.pause,7,7),pausedCamera=site(g.clock,23,7)}
+  controls.pause.kind='branch';controls.pause.patch='fallthrough'
+  controls.pause.target=g.pause.address+54;controls.pause.condition=133
+  controls.pausedCamera.kind='raw';controls.pausedCamera.patch='equalFlags'
   guards=g
   return binding
+end
+function M.controls()
+  M.resolve()
+  return controls
 end
 function M.bind(sites)
   local result={}

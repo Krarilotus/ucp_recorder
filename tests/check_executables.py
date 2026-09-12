@@ -68,7 +68,7 @@ def check(folder):
         assert reader(menu, 1) == b'\x68'
         assert struct.unpack('<I', reader(menu+1, 4))[0] == native.addr(0x5e9848)
         for profile_file in ('engine-sites.lua','ui-sites.lua','scoped-sites.lua','network-sites.lua','offline-sites.lua'):
-            source=root/('tests/fixtures' if profile_file in ('ui-sites.lua','network-sites.lua','engine-sites.lua','offline-sites.lua') else 'code')/profile_file
+            source=root/'tests/fixtures'/profile_file
             sites=lua.execute(source.read_text())[name]
             for site_name,site in sites.items():
                 if hasattr(site, 'items'):
@@ -84,7 +84,7 @@ def check(folder):
             if instruction.bytes[0]==0xe8 and len(instruction.bytes)==5:
                 target=instruction.address+5+struct.unpack('<i',instruction.bytes[1:])[0]
                 if target==rng_call: calls.add(instruction.address)
-        scoped=lua.execute((root/'code/scoped-sites.lua').read_text())[name]
+        scoped=lua.execute((root/'tests/fixtures/scoped-sites.lua').read_text())[name]
         guards={site['address'] for site in scoped.values() if site['name'].startswith('moodMusic')}
         assert len(calls)==7 and calls==guards, f'{name}: incomplete mood-music RNG guards'
         # Entire audited audio functions, ending before their trailing jump tables.

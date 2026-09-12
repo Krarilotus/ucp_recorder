@@ -90,7 +90,7 @@ modules={protocol={getNativeCommandInterface=function() return commandFixture en
                 machine.mem_write(site['address'], bytes(emitter.jump(site['address'], target, len(site['bytes'])).values()))
             # Use the production view/pause gates too. The refresh routine
             # below still executes; it must not permit an unclocked world step.
-            scoped = lua.execute((root / 'code/scoped-sites.lua').read_text())[variant]
+            scoped = lua.execute((root / 'tests/fixtures/scoped-sites.lua').read_text())[variant]
             for index, site in enumerate(s for s in scoped.values() if s['name'] in ('pause', 'pausedCamera')):
                 target = 0x3e05000 + index * 0x1000
                 machine.mem_write(target, bytes(emitter.build(site, scope, sync + 0x618, None,

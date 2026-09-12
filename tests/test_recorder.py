@@ -94,6 +94,12 @@ package.loaded['code/engine-command-sites']={bind=function(sites) return sites e
 package.loaded['code/history-sites']={resolve=function()
  return require('tests/fixtures/history-sites')[realNative.profile.name or 'SHC'] end}
 package.loaded['code/history-sites'].verify=package.loaded['code/history-sites'].resolve
+package.loaded['code/scoped-sites']={verify=function(seed)
+ local sites=require('tests/fixtures/scoped-sites')[realNative.profile.name or 'SHC']
+ for _,site in ipairs(sites) do
+  if site.kind~='seed' or seed~=nil then require('code/hook-check').verify(site,'Recorder simulation hook conflicts at '..site.name) end
+ end
+ return sites end}
 for _,name in ipairs({'network-sites','world-hash-sites','maintenance-sites'}) do
  local fixture=require('tests/fixtures/'..name)
  fixture.resolve=function() return fixture[realNative.profile.name or 'SHC'] end
@@ -168,7 +174,7 @@ require('code/ui-sites').resolve=function()
  result.window={value=b[3]+b[4]*256+b[5]*65536+b[6]*16777216-0x5c}
  return result
 end
-for _,site in ipairs(require('code/scoped-sites').SHC) do core.writeBytes(site.address,site.bytes) end
+for _,site in ipairs(require('tests/fixtures/scoped-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 for _,site in pairs(require('code/network-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 local history=require('tests/fixtures/history-sites').SHC
 for _,name in ipairs({'prepareList','prepare','action','frame','helpText'}) do local s=history[name]; core.writeBytes(s.address,s.bytes) end
