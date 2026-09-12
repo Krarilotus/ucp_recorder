@@ -3,6 +3,6 @@
   "required": ["definition.yml", "options.yml", "init.lua", "README.md", "CHANGELOG.md"],
   "trees": [["code", "*.lua"], ["docs", "*.md"], ["docs/images", "*.jpg"], ["locale", "*.yml"], ["locale", "*.md"]],
   "optional": ["tools/compare_multiplayer.py", "tools/inspect_replay.py"],
-  "diagnosticFiles": ["code/rng-attribution.lua", "code/rng-observer.lua", "code/rng-fire-context.lua", "code/rng-spawn-context.lua", "tools/compare_multiplayer.py", "tools/inspect_replay.py"],
+  "diagnosticFiles": ["code/rng-attribution.lua", "code/rng-observer.lua", "code/rng-fire-context.lua", "code/rng-spawn-context.lua", "code/attribution-patterns.lua", "tools/compare_multiplayer.py", "tools/inspect_replay.py"],
   "diagnosticOptions": ["singleplayerRngDiagnostics", "multiplayerDiagnostics", "multiplayerDiagnosticsStartTick", "multiplayerDiagnosticsEndTick"]
 }

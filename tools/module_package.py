@@ -16,6 +16,7 @@ class ModulePackage:
 
 DIAGNOSTIC_MODULES = frozenset({
     'rng-attribution.lua', 'rng-observer.lua', 'rng-fire-context.lua', 'rng-spawn-context.lua',
+    'attribution-patterns.lua',
 })
 
 # Frozen fallback for publishing older PR stages that predate the shared manifest.
