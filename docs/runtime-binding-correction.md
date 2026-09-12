@@ -522,3 +522,31 @@ The native dispatch harness also uses these production engine bindings for
 History and scoped/offline/optional RNG bindings and the temporary executable
 identity gate still need correction. This is component evidence, not an
 installed-game, whole-world save/replay or physical multiplayer acceptance.
+
+## Native battle-history bindings
+
+Recorder 0.50.23 replaces the history profile with two unique framework AoB
+contexts: preparation and rendering. The adjacent action handler, native sorter,
+row and hover contexts are validated before their field operands are decoded.
+All ten native index/record references must agree with the result-storage owner;
+count, scroll, sort and saved-mode references are checked across preparation,
+actions, sorting and rendering. Full action control-flow displacements retain
+their native meaning. No additional hook, renderer, list store or polling is added.
+
+UI 1.0.2 at af31ceb was inspected again: `manager.lookupMenu` owns menu item
+lookup and reallocation, and `UI.MenuView` constructs views. Neither exposes
+native history preparation/actions or their private catalogue operands. Recorder
+therefore keeps its existing history data-source adapter, UI menu/overlay APIs,
+and native rendering/actions. It reuses `result-sites` for stored records and
+statistics, Protocol for mode, and the existing UI entry for results/return.
+The obsolete fixed history table is now only a test fixture.
+
+512 portable tests pass (one existing skip). Both Lua runtimes exercise relocated contexts, repeated owner fields, absence,
+ambiguity and pre-/post-resolution conflicts. All six local/official EFIGS/Polish
+SHC 1.41 and Extreme 1.41.1-E fixtures pass 22 bindings and 28 rejection checks
+each. Disassembly of the entire native action/renderer confirms all data-source
+references are covered. Original packer, score and date-copy instructions execute
+with writes confined to the temporary entry and stack; only Windows GetLocalTime
+is substituted. These checks do not establish installed GUI interaction or live
+save/replay acceptance. Scoped/offline/optional RNG bindings and the temporary
+identity gate remain unfinished.

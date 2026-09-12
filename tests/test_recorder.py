@@ -91,6 +91,9 @@ package.loaded['code/load-sites']={bind=function(sites)
  return result end,verify=function() end}
 package.loaded['code/engine-state-sites']={bind=function(sites) return sites end,verify=function() end}
 package.loaded['code/engine-command-sites']={bind=function(sites) return sites end,verify=function() end}
+package.loaded['code/history-sites']={resolve=function()
+ return require('tests/fixtures/history-sites')[realNative.profile.name or 'SHC'] end}
+package.loaded['code/history-sites'].verify=package.loaded['code/history-sites'].resolve
 for _,name in ipairs({'network-sites','world-hash-sites','maintenance-sites'}) do
  local fixture=require('tests/fixtures/'..name)
  fixture.resolve=function() return fixture[realNative.profile.name or 'SHC'] end
@@ -167,7 +170,7 @@ require('code/ui-sites').resolve=function()
 end
 for _,site in ipairs(require('code/scoped-sites').SHC) do core.writeBytes(site.address,site.bytes) end
 for _,site in pairs(require('code/network-sites').SHC) do core.writeBytes(site.address,site.bytes) end
-local history=require('code/history-sites').SHC
+local history=require('tests/fixtures/history-sites').SHC
 for _,name in ipairs({'prepareList','prepare','action','frame','helpText'}) do local s=history[name]; core.writeBytes(s.address,s.bytes) end
 for _,s in ipairs(history.operands) do core.writeBytes(s.address,s.bytes) end
 core.writeBytes(0x4d1700,{139,68,36,4,163,88,86,223,0}); core.writeBytes(0x4d172a,{232})
