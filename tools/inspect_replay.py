@@ -6,15 +6,11 @@ import struct
 from pathlib import Path
 
 
-WORLD_TABLES = {
-    'SHC': ('0d29f28ecf7ea55c4f1598a78b2a7e30796c8534f0a48a3f5d0313b682773450', 13776465),
-    'Extreme': ('b82cc2d084a6e1afa2ee3e38630561a8783e3952c6073add339bc4bb79f3eeab', 25168385),
-}
 WORLD_HEADER_FIELDS = [('description',1008),('timeAndHash',8),('players',28),('scenario',1017),('skirmish',80)]
 
 
 def world_capture(folder, capture=None):
-    """Verify each section against the original descriptor table and its hash."""
+    """Verify bounded recorded descriptors and payload integrity; never dereference addresses."""
     folder = Path(folder)
     if capture is None:
         capture = json.loads((folder / 'capture.json').read_text(encoding='utf-8'))
@@ -29,11 +25,13 @@ def world_capture(folder, capture=None):
             or world.get('status') != 'complete' or world.get('tick') != capture.get('startTick')
             or any(world.get(k) != capture.get(k) for k in ('variant', 'executable'))):
         raise ValueError('World manifest identity differs')
-    expected_hash, total = WORLD_TABLES[world['variant']]
+    total=world.get('bytes')
+    if world['variant'] not in ('SHC','Extreme') or type(total) is not int or not 0<total<=32*1024*1024:
+        raise ValueError('Native world data length differs')
     table = (folder / 'world-layout.bin').read_bytes()
-    if len(table) != 1968 or hashlib.sha256(table).hexdigest() != expected_hash or world.get('tableHash') != expected_hash:
+    if len(table) != 1968 or hashlib.sha256(table).hexdigest() != world.get('tableHash') or table[-16:] != bytes(16):
         raise ValueError('Native world layout differs')
-    if world.get('bytes') != total or (folder / 'world.bin').stat().st_size != total:
+    if (folder / 'world.bin').stat().st_size != total:
         raise ValueError('Native world data length differs')
     entries = world.get('sections')
     if not isinstance(entries, list) or len(entries) != 122:
@@ -42,13 +40,17 @@ def world_capture(folder, capture=None):
     with (folder / 'world.bin').open('rb') as source:
         for i, entry in enumerate(entries):
             address, skip, size, compressed, section = struct.unpack_from('<IIIHH', table, i * 16)
-            if skip or any(entry.get(k) != v for k, v in dict(address=address, size=size,
-                    compressed=compressed, section=section, offset=offset).items()):
+            if (skip or not 0x400000<=address<address+size<0x80000000
+                    or size>32*1024*1024 or offset+size>total or compressed not in (0,1)
+                    or not isinstance(entry,dict) or any(entry.get(k) != v for k, v in dict(address=address, size=size,
+                    compressed=compressed, section=section, offset=offset).items())):
                 raise ValueError('Native world section descriptor differs')
             data = source.read(size)
             if len(data) != size or hashlib.sha256(data).hexdigest() != entry.get('sha256'):
                 raise ValueError(f'Native world section {section} is damaged')
             offset += size
+        if offset!=total or source.read(1):
+            raise ValueError('Native world data length differs')
     header = world.get('header')
     if bool(header) != bool(descriptor.get('header')):
         raise ValueError('Native header presence differs')
