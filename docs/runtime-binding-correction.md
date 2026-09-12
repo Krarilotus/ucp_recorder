@@ -34,3 +34,34 @@ RPS and CFFI DLLs: unsigned clocks, process identity, no repeated resolution,
 binary copy boundaries and native SHA-256 self-tests. The old standalone resolver
 override was removed, so this check executes `platform.stdcall` itself. No game
 was launched for these tests.
+
+## Window input
+
+WinProc Handler 1.0.0 at 5f85672 exports `cinterface()`, supplying RegisterProc,
+CallNextProc and GetMainProc. Its `dllmain.cpp` owns the ordered callback map,
+collision-adjusted registration priority and final native WindowProc dispatch.
+Inspected its callers in Custom Hotkeys `code/native/chain.lua` as well; Recorder
+uses the published Lua interface rather than opening the same DLL again.
+
+`code/input-chain.lua` replaces Recorder's direct game WindowProc hook. The
+private RPS callback has five stdcall stack arguments, using the existing
+thiscall bridge with an unused ECX argument. It forwards the incoming priority
+and all message arguments unchanged. Recorder registers at 100000, retaining
+its previous position after ordinary remapping/graphics processing; priority
+collisions use the owner's actual result. Replay speed buttons continue from
+that assigned priority without re-entering Recorder's overlay or posting input.
+Callbacks and their bridge stay alive for the process: the owner has no unregister.
+
+WinProc Handler 1.0.0 is now an explicit dependency. The old test installation
+contained 0.2.0, which lacks the Lua interface; it cannot satisfy this dependency.
+Legacy, WinProc Handler and Hotkeys source are unchanged.
+
+Native console acceptance uses the actual 1.0.0 DLL (SHA-256
+`af831149cc71ff621be7eee55ad74ce74703598d2e37798eca1c817921222414`), installed
+Lua/RPS, and private allocations only. It passes priority collisions, normal
+forwarding/return values, consumed input, tail dispatch, contained callback
+errors and 1000 repetitions. The host must call RPS_setLuaState as UCP does;
+luaopen_RPS alone does not initialize native callback state. This test does not
+establish live-game keyboard/graphics/Hotkeys composition acceptance.
+The full portable suite passes 481 tests with one existing skip. The init fixture
+now includes the declared input owner and the framework code-size operation.

@@ -8,6 +8,7 @@ function M.verify()
   -- the cached entry still points to the wrapper and retains both modules' UI.
   assert(modules and modules.ui,'Recorder menus require UI 1.0.1 and its dependencies')
   modules.ui:access()
+  require('code/input-chain').interface()
   local sites=assert(profiles[native.profile.name])
   for name,site in pairs(sites) do
     require('code/hook-check').verify(site,'Recorder UI conflicts at '..name)
@@ -344,29 +345,29 @@ function M:installViewRender()
 end
 
 function M:installInput(singlePlayer,handler)
-  local original
-  -- WindowProc is stdcall with four stack arguments. UCP's thiscall bridge with
-  -- an unused ECX argument has the same stack cleanup (ret 16); native code
-  -- never reads incoming ECX. No global game text buffer is borrowed.
-  original=core.hookCode(function(unused,window,message,key,data)
+  assert(not self.inputChain,'Recorder input is already installed')
+  local chain=require('code/input-chain')
+  self.inputChain=chain.install(chain.interface(),function(window,message,key)
     self.inputWindow=window
     if singlePlayer() and self.dialogs[self:activeDialog()]
       and (message==0x100 or message==0x101 or message==0x102) then
       local ok,reason=pcall(handler,message,key)
       if not ok then self.onError(reason) end
-      return 0
+      return true,0
     end
     if self.onNativeKey then
       local ok,handled=pcall(self.onNativeKey,message,key)
-      if not ok then self.onError(handled) elseif handled then return 0 end
+      if not ok then self.onError(handled) elseif handled then return true,0 end
     end
-    return original(unused,window,message,key,data)
-  end,self.sites.windowProc.address,5,1,#self.sites.windowProc.bytes)
+    return false
+  end,self.onError)
   self.nativeSpeedKey=function(direction)
     assert(self.inputWindow,'Native game window is unavailable')
-    -- Call the preceding WndProc exactly once. No queued OS input or generated
-    -- WM_CHAR: native/UCP keyboard code supplies the speed arithmetic and limits.
-    return original(0,self.inputWindow,0x100,direction==1 and 107 or 109,0)
+    assert(direction==1 or direction==-1,'Invalid replay speed direction')
+    -- Continue after our registered handler without re-entering the overlay or
+    -- posting OS input. Native/UCP keyboard code retains speed arithmetic.
+    return self.inputChain.nextProc(self.inputChain.priority,self.inputWindow,
+      0x100,direction==1 and 107 or 109,0)
   end
 end
 
