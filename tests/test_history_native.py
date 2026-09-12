@@ -35,7 +35,7 @@ core.hookCode=function(callback,address)
 end
 ui={activeDialog=function() return -1 end,
  attachOverlay=function(_,ids,items) assert(#ids==1 and ids[1]==58); controls=items end}
-recorder={mode='none',engine={base=0x191d768}}
+recorder={mode='none',engine={base=0x191d768,sites={gameCore=0x1fe7d10}}}
 history=require('code/history-native').new(ui,recorder,{},function() renamed=true end)
 ''')
 

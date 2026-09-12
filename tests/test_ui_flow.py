@@ -73,7 +73,7 @@ package.loaded['code/history-native']={new=function(_,_,browser,rename)
  return {advance=function() browser:advancePreparation() end}
 end}
 recorder.playbackActive=1234
-recorder.engine={base=0x191d768,singlePlayer=function() return true end,isPaused=function() return false end,
+recorder.engine={base=0x191d768,sites={gameCore=0x32000000},singlePlayer=function() return true end,isPaused=function() return false end,
  localSession=function(self) return self:singlePlayer() end,
  presentationSpeed=function() return 90 end,
  isLogicallyPaused=function(self) return self:isPaused() end}
@@ -85,6 +85,7 @@ recorder.preparePlayback=function(_,id,worlds,progress)
 end
 menu=require('code/ui')
 menu.createButtons(recorder,{reportPause={address=123,bytes={0,0,0,0,0,0,0}}})
+assert(ui.currentView==0x3200000c)
 function click(label)
  for _,item in ipairs(assert(dialogs[shown])) do
   local text=type(item.label)=='function' and item.label() or item.label

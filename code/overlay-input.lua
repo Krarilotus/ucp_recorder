@@ -1,6 +1,5 @@
 -- The complete native menu-input step owns HUD hit testing and gesture capture.
 -- Retain native button callbacks; never rewrite physical mouse or game state.
-local native=require('code/native')
 local M={}
 
 function M.install(ui)
@@ -8,7 +7,7 @@ function M.install(ui)
   local original,dispatching,captured
   original=core.hookCode(function(menu)
     if dispatching then return original(menu) end
-    local root=ui.inputOverlays[core.readInteger(native.addr(0x1fe7d1c))]
+    local root=ui.inputOverlays[core.readInteger(ui.currentView)]
     local overlay=root and ui:updateOverlay(root,0)
     local blocked=false
     if overlay then

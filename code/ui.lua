@@ -1,4 +1,3 @@
-local native=require('code/native')
 local NativeUI=require('code/native-ui')
 local Browser=require('code/browser')
 local tr=require('code/locale').text
@@ -19,13 +18,14 @@ function M.createButtons(recorder,sites)
     browser.message=short(reason)
     print('Replay menu: '..tostring(reason))
   end)
+  ui.currentView=recorder.engine.sites.gameCore+0xc
   M.browser=browser
   local view=require('code/replay-view').new(recorder)
   M.view=view
   M.hud=require('code/replay-hud').new(recorder,view)
   M.hud:install(ui)
   ui.renderScope=function(callback)
-    local screen=core.readInteger(native.addr(0x1fe7d1c))
+    local screen=core.readInteger(ui.currentView)
     if ui:activeDialog()~=-1 or (screen~=14 and screen~=16) then return callback() end
     local ok,result=pcall(view.render,view,callback)
     if not ok then browser.message=short(result); print('Replay view: '..tostring(result)) end

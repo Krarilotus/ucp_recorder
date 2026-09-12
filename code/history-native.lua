@@ -18,7 +18,7 @@ end
 function M.new(ui,recorder,browser,rename)
   local sites=require('code/history-sites')[native.profile.name]
   local o=setmetatable({ui=ui,recorder=recorder,browser=browser,sites=sites,
-    model=require('code/battle-history').new(sites)},{__index=M})
+    currentView=recorder.engine.sites.gameCore+0xc,model=require('code/battle-history').new(sites)},{__index=M})
   -- Our catalogue owns sorting/filtering. Retain native resource preparation,
   -- but remove its list-sort call: it rewrites stored trail names and uses the
   -- fixed 250-entry index. Hook only the following position-independent prologue;
@@ -92,11 +92,11 @@ function M.new(ui,recorder,browser,rename)
       render=function(x,y) ui:border(x,y,730,47) end}
   end
   ui:attachOverlay({58},items,function()
-    local view=core.readInteger(native.addr(0x1fe7d1c))
+    local view=core.readInteger(o.currentView)
     return visible() and view==58
   end)
   ui.onNativeKey=function(message,key)
-    local view=core.readInteger(native.addr(0x1fe7d1c))
+    local view=core.readInteger(o.currentView)
     if visible() and view==58 and message==0x100 and key==113 then
       renameAction(); return true
     end
@@ -160,7 +160,7 @@ end
 function M:advance()
   if self.pendingStatistics then
     local pending=self.pendingStatistics
-    local screen=core.readInteger(native.addr(0x1fe7d1c))
+    local screen=core.readInteger(self.currentView)
     if pending.stage=='leaving' and self.recorder.mode=='none' and screen==20 then
       pending.stage='history'
       modules.ui:switchToMenu(58,0)
@@ -180,7 +180,7 @@ function M:advance()
     return
   end
   if not self.browser.preparation then return end
-  if core.readInteger(native.addr(0x1fe7d1c))~=58 then self.browser:cancelPreparation() end
+  if core.readInteger(self.currentView)~=58 then self.browser:cancelPreparation() end
   if self.browser:advancePreparation(function()
     -- Native snapshot loading needs the lobby mode, but preparation does not.
     -- Leave history only once verification succeeds and playback is committed.

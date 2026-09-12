@@ -10,7 +10,7 @@ class OverlayInputTests(unittest.TestCase):
         self.check('''
 local hook; local over=false; local visible=true; local maps,updates,completed=0,0,0
 local mouse=9000; local overlay={menu=7000}
-local ui={sites={mouse={value=mouse},menuHit={value=9500},updateMenu={address=5000,bytes={1,2,3,4,5,6}}},
+local ui={currentView=0x31000000,sites={mouse={value=mouse},menuHit={value=9500},updateMenu={address=5000,bytes={1,2,3,4,5,6}}},
  inputOverlays={[14]=6000,[16]=6000},updateOverlay=function(_,root,action)
   assert(root==6000 and action==0); return visible and overlay or nil end}
 setmetatable(ui,{__index=require('code/native-ui')})
@@ -28,7 +28,7 @@ core.hookCode=function(fn,address,count,convention,length)
 end
 ui.onMenuUpdated=function() assert(not inNative); completed=completed+1 end
 require('code/overlay-input').install(ui)
-memory[0x1fe7d1c]=14
+memory[0x31000000]=14
 hook(7100); assert(maps==1 and updates==1)
 over=true; memory[mouse+0x40]=1; hook(7100); assert(maps==1)
 over=false; hook(7100); assert(maps==1 and updates==2) -- no redispatch after native seek/load
@@ -36,5 +36,5 @@ memory[mouse+0x40]=0; hook(7100); assert(maps==1 and updates==2) -- release stil
 hook(7100); assert(maps==2) -- next ordinary input is preserved
 over=true; hook(7100); assert(maps==2) -- hover also protects controls from map input
 visible=false; hook(7100); assert(maps==3) -- Escape dialog keeps native behavior
-memory[0x1fe7d1c]=58; hook(7100); assert(maps==4 and completed==8)
+memory[0x31000000]=58; hook(7100); assert(maps==4 and completed==8)
 ''')

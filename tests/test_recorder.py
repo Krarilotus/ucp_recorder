@@ -76,6 +76,7 @@ end
 commandOwner={getNativeCommandInterface=commandFixture}
 modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
 package.loaded['code/engine-sites']=require('tests/fixtures/engine-sites')
+package.loaded['code/engine-state-sites']={bind=function(sites) return sites end,verify=function() end}
 package.loaded['code/engine-command-sites']={bind=function(sites) return sites end,verify=function() end}
 for _,name in ipairs({'network-sites','world-hash-sites','maintenance-sites'}) do
  local fixture=require('tests/fixtures/'..name)
