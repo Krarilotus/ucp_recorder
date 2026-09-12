@@ -677,3 +677,26 @@ performance remain outstanding.
 The complete portable suite passes: 519 tests, one existing skip and 6411
 subtests. Unsupported framework versions, failed file reads and malformed
 digests clear any previous identity before hook installation.
+
+## Shared main-executable uniqueness
+
+Recorder 0.50.28 prefers the existing `core.AOBScanUnique` capability when
+available. Framework PR149 at 1d78391 owns the cache/API; RPS PR16 at e958409 owns
+main-image executable-page selection, bounds and overlapping-match detection.
+This addresses the other worker's measured full-process ambiguity-scan cost
+without adding a Recorder scanner, PE parser or guessed address range.
+
+Stock UCP 3.0.7 retains the existing framework AoB/second-scan path. If the new
+API exists but rejects a context, that rejection is final; no weaker retry is
+performed. Current-byte/operand/ABI guards are unchanged. Both paths remain
+initialization-only, with no simulation scan. No unpublished runtime is required
+merely to install the module; the new framework/RPS owners remain unmerged.
+
+The actual new core/cache resolves 56 Recorder contexts on all six local and
+official EFIGS/Polish SHC/Extreme images with an overlapping main-code PE oracle.
+These cover state/command/load/results/history/offline/scoped/optional RNG and UI
+contexts. Lua 5.4/LuaJIT tests verify owner selection, conflict checks and final
+rejection without fallback. Actual game startup/performance is still required;
+private-image timings are not an installed-runtime benchmark.
+
+The full suite passes 520 portable tests (one existing skip, 6413 subtests).
