@@ -337,3 +337,36 @@ observer pairs covering all player slots, all 14 subtotal stores, skip/send
 branches and unchanged registers/writes. Transport, memory helpers, the test
 command handler, hash callee and UCP callback bridge are stand-ins; physical
 transport and live gameplay remain separate acceptance gates.
+
+## Native maintenance/replay phases
+
+Recorder 0.50.18 derives the game-state pointer and coordinator entry from the
+original main-loop call between Protocol's command-processing and receive
+calls. The surrounding handler operands must match Protocol. Maintenance and
+world phases are validated inside that resolved function, with repeated tile
+operands checked and the world-update callee decoded and verified. The two
+existing hooks retain their five/seven-byte spans. Both phase guards, caller
+and world callee are rechecked before allocating/installing the phase runner.
+
+Reuse inspection: framework `hooks.lua` at 02a7a6b exposes `afterInit`, not the
+maintenance-only/unclocked-world phases. Protocol 175d7a9 owns commands rather
+than those phases. Existing Recorder `maintenance-native.runner` and
+`scoped-code` therefore remain the execution owners; they still enter the
+original coordinator and its existing subsystem calls. No Lua timer, added
+polling, duplicated game update or new hook is introduced.
+
+The maintenance-call sequence alone was not unique in the executable. Its
+binding instead comes from the uniquely verified main-loop caller and decoded
+coordinator, with full phase context at the confirmed instruction offsets.
+This requires two discovery calls including the uniqueness check, once per
+initialization. Both variants have the same coordinator instruction layout;
+their distinct world-state fields remain inside the original native callee.
+
+Validation: 502 portable tests pass (one existing skip). Both Lua runtimes
+exercise relocated caller/coordinator/callee addresses and strict failure
+before writes. All six local/official SHC 1.41 and Extreme 1.41.1-E images pass
+four bindings and 15 negative cases each. Each also executes 77 original
+coordinator cases through the production phase binding, covering passive
+recording, viewer pause, halt, maintenance-only and unclocked world replay,
+native navigation countdown/reset, unchanged match clock and restored pause.
+Other subsystem callees are observable stand-ins; this is not a full match.

@@ -102,7 +102,7 @@ assert(not ok and tostring(reason):find('found [01 ?? ??]',1,true))
         self.check('''
 nativeSites=require('code/engine-sites').SHC
 for _,key in ipairs({'maintenance','world'}) do
- local site=require('code/maintenance-native').profiles.SHC[key]
+ local site=require('tests/fixtures/maintenance-sites').SHC[key]
  core.writeBytes(site.address,site.bytes)
 end
 for _,site in pairs(nativeSites) do

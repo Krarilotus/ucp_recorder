@@ -24,6 +24,9 @@ function M.resolve(pattern,label)
   assert(ok and type(address)=='number' and address>0,label..': native context not found')
   local second=core.scanForAOB(pattern,address+1)
   assert(second==nil or second==0,label..': ambiguous native context')
+  return M.context(address,pattern,label)
+end
+function M.context(address,pattern,label)
   local tokens={}
   for token in pattern:gmatch('%S+') do tokens[#tokens+1]=token end
   local bytes=core.readBytes(address,#tokens)

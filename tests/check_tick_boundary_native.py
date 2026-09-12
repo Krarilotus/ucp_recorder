@@ -5,6 +5,9 @@ and navigation countdown paths. This checks phase admission, their native writes
 and the stack contract, not a complete world update or the outer loop.
 """
 import struct
+import re
+import pefile
+from native_command_fixture import native_command_fixture
 
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
@@ -20,6 +23,23 @@ def check_tick_boundary(path, lua, root, variant):
     lua.execute("package.path=source_root..'/?.lua;'..package.path")
     fixes = lua.eval("require('code/fixes')")
     maintenance = lua.eval("require('code/maintenance-native')")
+    image=pefile.PE(data=path.read_bytes()).get_memory_mapped_image()
+    scans=[]
+    def scan(pattern,start=None):
+        scans.append((pattern,start))
+        expression=b''.join(b'.' if t=='?' else re.escape(bytes([int(t,16)])) for t in pattern.split())
+        offset=(start or 0x400000)-0x400000
+        found=re.search(expression,image[offset:],re.DOTALL)
+        return 0x400000+offset+found.start() if found else 0
+    lua.globals().scan=scan
+    lua.globals().read_bytes=lambda a,n:lua.table_from(image[a-0x400000:a-0x400000+n])
+    lua.globals().read_int=lambda a:struct.unpack_from('<i',image,a-0x400000)[0]
+    lua.globals().commandFixture=lua.table_from(native_command_fixture(variant))
+    lua.execute('''
+core={AOBScan=scan,scanForAOB=scan,readBytes=read_bytes,readInteger=read_int}
+modules={protocol={getNativeCommandInterface=function() return commandFixture end}}
+''')
+    phase_profile=maintenance.verify()
     entry, clock, ending = (sites[key] for key in ('tickEntry', 'tick', 'tickExit'))
     extreme = variant == 'Extreme'
     sync = 0x23547d8 if extreme else 0x191d768
@@ -116,7 +136,7 @@ def check_tick_boundary(path, lua, root, variant):
         if extra_work:
             passes, logical_pause = extra_work
             start = 0x3e08000
-            code = maintenance.runner(sites, maintenance.profiles[variant], 0x3e00120, start)
+            code = maintenance.runner(sites, phase_profile, 0x3e00120, start)
             machine.mem_write(start, bytes(code.values()))
             put(stack + 4, passes); put(stack + 8, logical_pause)
             machine.reg_write(reg.UC_X86_REG_EBX, 0x11223344)
@@ -200,4 +220,5 @@ def check_tick_boundary(path, lua, root, variant):
                     extra_work=(3, logical_pause))
                 assert halted == ([], 17, viewer_pause & 0xffffffff, 1), halted
                 count += 1
+    assert len(scans)==2,'Maintenance replay repeated binding discovery'
     print(f'PASS: {variant} tick entry/endpoint halt and passive control flow ({count} cases)')

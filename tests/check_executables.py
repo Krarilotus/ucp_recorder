@@ -40,7 +40,7 @@ def check(folder):
         native = lua.execute((root/'code/native.lua').read_text())
         profile = native.verify()
         assert profile['name'] == name
-        phases = lua.eval("require('code/maintenance-native')").profiles[name]
+        phases = lua.eval("require('tests/fixtures/maintenance-sites')")[name]
         for key in ('maintenance', 'world'):
             site = phases[key]
             expected = bytes(site['bytes'].values())
