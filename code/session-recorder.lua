@@ -9,6 +9,7 @@ local Session = setmetatable({}, {__index=Base})
 function Session:new(engine,config)
   local o=Base:new({name='unused'})
   o.engine=engine
+  o.input=require('code/input-state').new(o)
   o.halt=core.allocate(4,true)
   -- Native tick admission: viewing pause must freeze maintenance too. Loading
   -- still needs native preparation calls, so arm only after restoration.
@@ -23,10 +24,14 @@ function Session:new(engine,config)
 end
 
 -- Called only after the native lobby accepted Start, before its RNG seed call.
-function Session:beginMatch()
+local function beginMatch(self)
   if self.engine.loading or not self.engine:singlePlayer() or self.mode=='play' then return end
   if self.mode=='record' and self.status~='armed' then self:reset() end
   if self.autoRecord and self.mode=='none' then self:startRecording() end
+end
+
+function Session:beginMatch()
+  return self.input:transition(function() beginMatch(self) end)
 end
 
 function Session:onMenuView(view)
@@ -162,7 +167,7 @@ function Session:preparePlayback(id,prepared,progress)
   return require('code/replay-preparation').prepare(id,self.engine,prepared,progress)
 end
 
-function Session:startPlayback(id,prepared,ready,cached)
+local function startPlayback(self,id,prepared,ready,cached)
   assert(self.mode=='none','A replay session is already active')
   assert(self.engine:singlePlayer(),'Replay playback is single-player only')
   if not id then
@@ -224,6 +229,10 @@ function Session:startPlayback(id,prepared,ready,cached)
   if self.rngTrace then self.rngTrace:observe('begin',self.manifest,'play') end
   self:playbackResult('playing')
   print('Playing '..id)
+end
+
+function Session:startPlayback(id,prepared,ready,cached)
+  return self.input:transition(function() startPlayback(self,id,prepared,ready,cached) end)
 end
 
 function Session:onExecutedCommand(command)
@@ -397,7 +406,7 @@ function Session:checkResources(expected,phase)
   end
 end
 
-function Session:reset()
+local function reset(self)
   if self.snapshots then self.snapshots:close(); self.snapshots=nil end
   if self.phaseNative then self.phaseNative:stop() end
   self.nextWork=nil; self.workEnded=nil
@@ -443,6 +452,10 @@ function Session:reset()
   if self.boundary then self.boundary:clear() end
   core.writeInteger(self.halt,0)
   assert(reportOk,reportError)
+end
+
+function Session:reset()
+  return self.input:transition(function() reset(self) end)
 end
 
 function Session:reconcileMode()

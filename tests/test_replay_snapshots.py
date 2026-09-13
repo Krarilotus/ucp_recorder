@@ -37,6 +37,7 @@ local engine={calendarMonth=function() return month end,tick=function() return t
 r={bookmark=function() return {} end,mode='play',active=true,status='playing',halt=5000,engine=engine,
  manifest={id='test',startTick=100,lastTick=1000,snapshotOriginMonth=12000}}
 ready={manifest=r.manifest}
+r.input=require('code/input-state').new(r)
 Snapshots=require('code/replay-snapshots')
 s=Snapshots.new(r,ready); r.snapshots=s
 ''')

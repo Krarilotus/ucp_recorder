@@ -12,11 +12,17 @@ end
 
 function M:cancel()
   self.pending=false; self.worldRead=false
+  if self.inputTransition then
+    self.inputTransition=false
+    self.recorder.input:finish(true)
+  end
 end
 
 function M:begin()
   if self.recorder.engine.loading then return end -- recorder's own snapshot restore
   self:cancel()
+  self.recorder.input:begin()
+  self.inputTransition=true
   self.recorder:reset() -- seal the previous world from its last observed boundary
   self.pending=true
 end
