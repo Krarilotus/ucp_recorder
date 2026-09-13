@@ -14,7 +14,7 @@ function M.verify()
   local adapter=require('code/automarket-replay')
   if adapter.version('protocol') then
     assert(core.readByte(sites.execute.address+8)==0xE9,
-      'Enable recorder after protocol in the UCP extension order')
+      'Protocol dispatch hook is unavailable after initialization')
   end
   for name, site in pairs(sites) do
     if type(site)=='table' then

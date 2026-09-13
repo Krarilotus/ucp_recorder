@@ -9,10 +9,12 @@ playback restores the saved RNG state rather than relying on a repeated seed.
 
 ## Startup and extension order
 
-Enable recorder after the other native modules in the launcher. In particular,
-Automarket's protocol and save handlers must exist before recorder checks them.
-UCP's module proxies can exist before their modules are enabled, so presence alone
-is not evidence that a shared hook or protocol has been initialized.
+Recorder checks integrations and installs hooks at UCP's `afterInit` event,
+after all module enable calls. A proxy's existence alone is not readiness:
+Automarket's protocol registration must be complete at this later boundary.
+No dependency on Automarket, Ascension, Legacy, Hotkeys or AI Toolkit is added.
+Recorder preserves author settings during module loading, before other modules
+transform their options, and performs the normal checks later.
 
 The executable's PE header selects the Crusader or Extreme address layout. Each
 component then verifies the native bytes it uses, before recorder installs hooks.
@@ -42,7 +44,7 @@ address: modules also locate code through AOB patterns and compute patch offsets
 | Modules / path | Replay consideration |
 | --- | --- |
 | Automarket 1.1.0, protocol 1.0.0, map-extensions 1.0.0 | The inspected store sources have one external custom-protocol/save-section consumer: Automarket. Its reviewed adapter validates the discriminator, payload size, player and fee. Single-player saves call the wrapped save entry; multiplayer starting-world evidence captures its separate state. Unknown versions/layouts are not silently accepted. |
-| `ui`, `luajit`, `cffi` | Optional shared infrastructure. Recorder uses native game menus directly. When `ui` is active, its lazy callable entries are resolved before recorder wraps activation. Its existing dependency chain must remain installed. |
+| `ui`, `luajit`, `cffi` | Required menu infrastructure: Recorder declares UI; UI declares its own LuaJIT/CFFI dependencies. Recorder resolves its callable entries before wrapping activation. These are actual runtime uses, not optional gameplay integrations. |
 | `ucp-autoclick` | Produces mouse input; native command capture is the intended boundary. Playback input isolation still needs a live check with autoclick enabled. No second click recorder should be added. |
 | UCP2 Legacy seed option | Reads a live seed file and has private cache state. Keep the same option profile; recorder does not enable or overwrite this option. A file outside the captured settings remains an external input to investigate. |
 | UCP2 Legacy `o_onlyai` | Changes player identity and the native load path. Recorder's current player validation does not establish spectator-slot-zero compatibility. A separate restore/identity implementation is required; do not disable ownership checks to accept it. |

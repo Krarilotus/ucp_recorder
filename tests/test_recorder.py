@@ -21,6 +21,7 @@ memory, bytes, callbacks, files, handles, scheduled = {}, {}, {}, {}, {}, 0
 local nextAddress = 0x10000000
 core = {
   allocate = function(size) local a=nextAddress; nextAddress=a+size+16; return a end,
+  readByte = function(a) return bytes[a] or 0 end,
   readInteger = function(a) return memory[a] or 0 end,
   writeInteger = function(a,v) memory[a]=v end,
   readSmallInteger = function(a) return memory[a] or 0 end,
@@ -37,7 +38,15 @@ core = {
   allocateCode = function() nextAddress=nextAddress+128; return nextAddress end,
   exposeCode = function() return function() scheduled=scheduled+1 end end,
 }
+configFinal={}
 utils = {createLuaFunctionWrapper=function() return 0 end}
+afterInitCallbacks={}
+hooks = {registerHookCallback=function(name,callback)
+ assert(name=='afterInit'); afterInitCallbacks[#afterInitCallbacks+1]=callback
+end}
+function fireAfterInit()
+ for _,callback in ipairs(afterInitCallbacks) do callback() end
+end
 json = {encode=function(_,value) return value end, decode=function(_,value) return value end}
 io.open = function(path,mode)
   mode=mode:gsub('b','')
@@ -129,6 +138,7 @@ modules={ui={access=function() return {manager={lookupMenu=function(id) return 0
  cffi={cffi=function() return {tonumber=tonumber,cast=function(_,v) return v end} end}}
 local module=dofile(source_root..'/init.lua')
 module:enable({rngLogMethod='trace',useFixedSeed=true,fixedSeed=123})
+fireAfterInit()
 assert(core.readInteger(module.recorder.engine.scope)==0)
 assert(callbacks[0x46a74a]==nil) -- seed changes live inside the native scope gate
 -- Session playback keeps the native single-player identity path intact.
@@ -138,7 +148,9 @@ assert(callbacks[0x47eaf0]==nil)
     def test_native_verification_fails_before_installing_hooks(self):
         self.check('''
 local module=dofile(source_root..'/init.lua')
-assert(module:enable({}).status=='disabled')
+assert(module:enable({}).status=='waiting')
+fireAfterInit()
+assert(module.startup.status=='disabled')
 assert(next(callbacks)==nil)
 ''')
 

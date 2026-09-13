@@ -6,10 +6,11 @@ local work=require('code/maintenance-journal')
 local verification=require('code/replay-verification')
 local Session = setmetatable({}, {__index=Base})
 
-function Session:new(engine,config)
+function Session:new(engine,config,input)
   local o=Base:new({name='unused'})
   o.engine=engine
-  o.input=require('code/input-state').new(o)
+  o.input=input or require('code/input-state').new(o)
+  o.input.session=o
   o.halt=core.allocate(4,true)
   -- Native tick admission: viewing pause must freeze maintenance too. Loading
   -- still needs native preparation calls, so arm only after restoration.

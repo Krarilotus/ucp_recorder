@@ -404,7 +404,7 @@ for _,site in pairs(engine.sites) do
 end
 allActiveExtensions={{name='protocol',version='1.0.0'}}
 local ok,reason=pcall(Engine.verify)
-assert(not ok and tostring(reason):find('after protocol',1,true))
+assert(not ok and tostring(reason):find('Protocol dispatch hook is unavailable after initialization',1,true))
 bytes[engine.sites.execute.address+8]=0xE9; assert(Engine.verify())
 ''')
 

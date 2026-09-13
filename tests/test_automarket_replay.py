@@ -34,6 +34,16 @@ allActiveExtensions={}; assert(not adapter.compatible(manifest.automarket))
 assert(adapter.compatible(nil))
 ''')
 
+    def test_missing_registration_reports_the_actual_nil_value(self):
+        self.check('''
+modules.protocol.getProtocolNumber=function() return nil end
+local ok,reason=pcall(adapter.current)
+assert(not ok and tostring(reason):find("Invalid replay Automarket protocol number 'nil'",1,true))
+local ok,reason=pcall(validation.integer,129,130,2147483647,'Automarket protocol number')
+assert(not ok and tostring(reason):find("'129'",1,true))
+assert(validation.integer(130,130,2147483647,'Automarket protocol number')==130)
+''')
+
     def test_unknown_custom_protocol_invalid_actor_fee_flags_and_sizes_fail(self):
         self.check('''
 for _,change in ipairs({{1,132},{5,2},{269,101},{272,255},{9,2},{17,2},{66,2}}) do

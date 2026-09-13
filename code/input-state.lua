@@ -13,6 +13,9 @@ end
 
 function M:read()
   local s=self.session
+  if not s then
+    return {version=M.VERSION,generation=self.generation,blocked=true,mode='none',status='initializing'}
+  end
   return {version=M.VERSION,generation=self.generation,
     blocked=self.failed or self.depth>0 or s.mode=='play' or s.engine.loading==true
       or s.engine.offline~=nil and s.engine.offline~=false,

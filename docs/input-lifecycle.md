@@ -4,8 +4,10 @@ Recorder exposes `inputStateVersion == 1`, `getInputState()` and
 `observeInputTransitions(callback)` to other modules. This interface does not
 change the replay format or submit any commands.
 
-`getInputState()` is synchronous and read-only. It returns nil until startup is
-ready, otherwise `{version=1, generation=integer, blocked=boolean, mode, status}`.
+`getInputState()` is synchronous and read-only. It returns
+`{version=1, generation=integer, blocked=boolean, mode, status}`. Before startup
+completes it is blocked; observers may subscribe during module enable without
+forcing a load order. It remains blocked on disabled or failed startup.
 Consumers must recheck immediately before native dispatch, reject unavailable or
 unrecognized data, and cancel pending gestures when generation changes.
 

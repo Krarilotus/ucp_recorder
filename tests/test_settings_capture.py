@@ -17,14 +17,14 @@ io.open=function(path,mode)
 end
 configFinal={['recorder-0.3.0']={fixedSeed=123}}
 allActiveExtensions={{name='recorder',version='0.3.0',type=function() return 'ModuleLoader' end}}
-store.captureSettings()
+store.captureSettings(configFinal)
 local m=recording(); store.finish(m)
 store.write(CONFIG_FILE,'settings for next launch')
 assert(store.compatible(m))
-store.captureSettings()
+store.captureSettings(configFinal)
 assert(store.compatible(m)) -- raw formatting/content is not the loaded effective configuration
 configFinal['recorder-0.3.0'].fixedSeed=124
-store.captureSettings(); assert(not store.compatible(m))
+store.captureSettings(configFinal); assert(not store.compatible(m))
 ''')
 
     def test_resolved_extension_version_change_requires_matching_environment(self):
@@ -36,7 +36,7 @@ io.open=function(path,mode)
 end
 configFinal={}
 allActiveExtensions={{name='other-module',version='1.0.0',type=function() return 'ModuleLoader' end}}
-store.captureSettings(); local m=recording(); store.finish(m)
+store.captureSettings(configFinal); local m=recording(); store.finish(m)
 allActiveExtensions[1].version='1.0.1'
-store.captureSettings(); assert(not store.compatible(m))
+store.captureSettings(configFinal); assert(not store.compatible(m))
 ''')

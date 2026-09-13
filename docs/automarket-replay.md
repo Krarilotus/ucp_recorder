@@ -1,6 +1,6 @@
 # Automarket replay adapter (0.7.0)
 
-This adapter targets Automarket 1.1.0, protocol 1.0.0 and map-extensions 1.0.0. Recorder must load after protocol: its post-dispatch observer changes bytes used by protocol's original signature scan. Startup checks that protocol's dispatch hook is already present before installing recorder hooks. Other extension versions are not silently assumed compatible.
+This adapter targets Automarket 1.1.0, protocol 1.0.0 and map-extensions 1.0.0. Recorder initializes through UCP's `afterInit` event, after Protocol and Automarket have completed module enable. Its post-dispatch observer changes bytes used by Protocol's original signature scan, so verification and Recorder hook installation both happen at that later boundary. Startup still checks that Protocol's dispatch hook is present. Other extension versions are not silently assumed compatible.
 
 ## Commands and ownership
 
