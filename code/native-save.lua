@@ -3,13 +3,18 @@ local M={}
 function M.interface()
   local owner=modules and modules['map-extensions']
   assert(owner and type(owner.getNativeSaveInterface)=='function',
-    'Recorder requires Map Extensions 1.1.1 native save interface')
+    'Recorder requires Map Extensions 1.1.4 native save interface')
   local value=owner:getNativeSaveInterface()
-  assert(value and value.version==1 and value.sectionCount==122 and value.descriptorSize==16,
+  assert(value and value.version==1 and value.sectionCount==122 and value.descriptorSize==16
+    and value.readContext==1,
     'Recorder does not support this native save interface layout')
   for _,key in ipairs({'packager','sections','readWorld','writeWorld'}) do
     require('code/validation').integer(value[key],0x10000,0x7fffffff,'Map Extensions '..key)
   end
+  require('code/validation').integer(value.resources,0x10000,0x7fffffff-0x7c000,'Map Extensions resources')
+  require('code/validation').integer(value.resourceFileName,0x10000,0x7fffffff-20,'Map Extensions resourceFileName')
+  assert(type(value.resourceFileNameBytes)=='string' and #value.resourceFileNameBytes==20,
+    'Map Extensions native filename context is missing')
   return value
 end
 

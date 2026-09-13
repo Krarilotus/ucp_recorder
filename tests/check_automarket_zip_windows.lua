@@ -7,10 +7,12 @@ core={openLibraryHandle=function(path)
   return {require=function(_,name) assert(name=='luamemzip'); return library end}
 end}
 allActiveExtensions={{name='automarket',version='1.1.0'},
-  {name='protocol',version='1.1.2'},{name='map-extensions',version='1.1.1'}}
+  {name='protocol',version='1.1.2'},{name='map-extensions',version='1.1.4'}}
 modules={protocol={getProtocolNumber=function() return 130 end},['map-extensions']={
   getNativeSaveInterface=function()
-    return {version=1,sectionCount=122,descriptorSize=16,packager=0x10000000,
+    return {version=1,sectionCount=122,descriptorSize=16,readContext=1,
+      resources=0x20000000,resourceFileName=0x10040000,resourceFileNameBytes=string.rep('x',20),
+      packager=0x10000000,
       sections=0x10010000,readWorld=0x10020000,writeWorld=0x10030000}
   end}}
 local chunks={'\2\0\0\0'}

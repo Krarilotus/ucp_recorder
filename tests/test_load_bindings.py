@@ -23,10 +23,13 @@ assert(patterns)
         for a,n in ((0x14000000,61),(0x19000000,60)):
             for i in range(n):self.memory[a+i]=0x90
         addresses={'prepare':0x1400003d,'load':0x15000000,'begin':0x15000287,'done':0x15000724,
-                   'reset':0x16000000,'readFile':0x13000044,'fileName':0x18000000,
+                   'reset':0x16000000,
                    'mapName':0x17000000,'readComplete':0x13000700}
         for key,a in addresses.items():
             for i,t in enumerate(g.patterns[key].split()):self.memory[a+i]=0 if t=='?' else int(t,16)
+        filename=bytes.fromhex('8B 81 C4 0B 00 00 69 C0 E9 03 00 00 8D 84 08 E0 AE 07 00 C3')
+        for i,b in enumerate(filename):self.memory[0x18000000+i]=b
+        g.filename=filename
         def word(a,v):
             for i,b in enumerate(struct.pack('<I',v&0xffffffff)):self.memory[a+i]=b
         self.word=word
@@ -37,7 +40,6 @@ assert(patterns)
                     (0x1600003b,0x24000000-0x1600003f),(0x1500072a,0x24000000-0x1500072e),
                     (0x1600000f,0x21000000),(0x16000019,0x22000000),
                     (0x16000014,0x19000000-0x16000018),
-                    (0x13000047,0x25000000),(0x1300004c,0x18000000-0x13000050),
                     (0x13000708,0x21002370),(0x1300070e,0x2100236c)):word(a,v)
         def scan(pattern,start=None):
             self.scans.append((pattern,start))
@@ -58,7 +60,8 @@ menu={version=1,entry=0x19000000,gameCore=0x21000000,
 modules={protocol={getNativeCommandInterface=function() return commands end},
  ui={getNativeMenuInterface=function() return menu end},
  ['map-extensions']={getNativeSaveInterface=function() return {version=1,sectionCount=122,
- descriptorSize=16,readWorld=0x13000000,writeWorld=0x26000000,sections=0x27000000,packager=0x28000000} end}}
+ descriptorSize=16,readContext=1,resources=0x25000000,resourceFileName=0x18000000,
+ resourceFileNameBytes=filename,readWorld=0x13000000,writeWorld=0x26000000,sections=0x27000000,packager=0x28000000} end}}
 ''')
 
     def test_resolves_all_hooks_through_relocated_owners_without_repeated_scans(self):

@@ -196,7 +196,7 @@ for variant,sites in pairs(require('tests/fixtures/engine-sites')) do
  assert(sites.save==nil and sites.readWorld==nil) -- no mutation of static profiles
  modules={}
  local ok,reason=pcall(Engine.verify)
- assert(not ok and tostring(reason):find('Map Extensions 1.1.1',1,true))
+ assert(not ok and tostring(reason):find('Map Extensions 1.1.4',1,true))
  modules={['map-extensions']=mapSaveOwner,protocol=commandOwner}
 end
 ''')

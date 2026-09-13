@@ -60,7 +60,9 @@ realNative = require('code/native')
 realNative.profile={addresses=setmetatable({}, {__index=function(_,a) return a end})}
 function mapSaveFixture()
  local extreme=realNative.profile.name=='Extreme'
- return {version=1,sectionCount=122,descriptorSize=16,
+ return {version=1,sectionCount=122,descriptorSize=16,readContext=1,
+  resources=extreme and 0x1293c20 or 0x11bf130,
+  resourceFileName=extreme and 0x46c520 or 0x46c300,resourceFileNameBytes=string.rep('x',20),
   sections=extreme and 0xb92be8 or 0xb92a58,packager=extreme and 0xf2b850 or 0xf2b3d0,
   readWorld=extreme and 0x474c50 or 0x474a20,writeWorld=extreme and 0x4746b0 or 0x474480}
 end

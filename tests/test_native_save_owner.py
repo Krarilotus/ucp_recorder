@@ -12,7 +12,7 @@ class NativeSaveOwnerTests(unittest.TestCase):
 
     def test_required_capture_uses_the_actual_map_api_after_package_updates(self):
         path=Path(os.environ.get('UCP_MAP_TEST_ROOT',
-            Path(__file__).resolve().parents[2]/'aic-tactics-map-native-interface'))
+            Path(__file__).resolve().parents[2]/'aic-tactics-map-required-failure'))
         self.lua.globals().map_root=path.as_posix()
         self.check('''
 package.path=map_root..'/?.lua;'..package.path
@@ -47,7 +47,7 @@ assert(not pcall(required.capture,{}))
 
     def test_relocated_map_entries_retain_both_wrappers_and_custom_sections(self):
         path=Path(os.environ.get('UCP_MAP_TEST_ROOT',
-            Path(__file__).resolve().parents[2]/'aic-tactics-map-native-interface'))
+            Path(__file__).resolve().parents[2]/'aic-tactics-map-required-failure'))
         self.lua.globals().map_root=path.as_posix()
         self.check('''
 package.path=map_root..'/?.lua;'..package.path
@@ -67,6 +67,10 @@ core.hookCode=function(callback,address,count,convention,size)
 end
 core.detourCode=function(_,_,size) assert(size==7) end
 CallingConvention={THISCALL=1}
+package.loaded['mapextensions.readcontext']={resolve=function()
+ return {resources=0x40000000,resourceFileName=0x30000000,
+ resourceFileNameBytes=string.rep('x',20)},function() return {kind='map'} end
+end}
 local game=require('mapextensions.game')
 local before,after=0,0
 game.registerReadWriteSavHooks(0x50000000,1337,{
@@ -96,7 +100,7 @@ assert(before==2 and after==2 and callCount==2 and scanCount==scans)
     def test_missing_incompatible_or_invalid_owner_never_returns_a_fixed_fallback(self):
         self.check('''
 local binding=require('code/native-save')
-for _,key in ipairs({'version','sectionCount','descriptorSize','packager','sections','readWorld','writeWorld'}) do
+for _,key in ipairs({'version','sectionCount','descriptorSize','packager','sections','readWorld','writeWorld','readContext','resources','resourceFileName','resourceFileNameBytes'}) do
  local value=mapSaveFixture();value[key]=0
  modules['map-extensions']={getNativeSaveInterface=function() return value end}
  assert(not pcall(binding.bind,{}),key)
