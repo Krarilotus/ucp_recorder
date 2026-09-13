@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.51.0 (public completed-tick observers)
+
+- Expose registration/removal of diagnostic callbacks through UCP's public module interface.
+- Dispatch copied recording context from the existing native tick-return hook; isolate failing listeners and perform no state reads when none are registered.
+
 ## 0.50.3 (recording boundary efficiency)
 
 - Leave the replay bar's unfilled interior transparent while retaining its native
