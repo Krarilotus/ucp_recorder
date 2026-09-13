@@ -3,7 +3,7 @@
 local M={REPORT='ucp/recorder-startup.txt'}
 
 ---@class RecorderStartupResult
----@field status 'ready'|'disabled'
+---@field status 'waiting'|'initializing'|'ready'|'disabled'|'failed'
 ---@field stage string
 ---@field reason string|nil
 
@@ -69,5 +69,28 @@ function M.run(callback,clock)
     return {status='disabled',stage=stage,reason=tostring(result)}
   end
   return {status='ready',stage=stage}
+end
+-- Use the framework lifecycle, not module-list order or another native hook.
+-- The returned object keeps its identity for callers observing readiness.
+function M.defer(callback,settled)
+  local state={status='waiting',stage='afterInit'}
+  hooks.registerHookCallback('afterInit',function()
+    if state.status~='waiting' then return end
+    state.status='initializing'
+    local ok,result=pcall(M.run,callback)
+    if ok then
+      state.status,state.stage,state.reason=result.status,result.stage,result.reason
+    else
+      state.status,state.reason='failed',tostring(result)
+    end
+    local notified,reason=true
+    if settled then notified,reason=pcall(settled,state) end
+    if not ok then error(result,0) end
+    if not notified then
+      state.status,state.reason='failed',tostring(reason)
+      error(reason,0)
+    end
+  end)
+  return state
 end
 return M

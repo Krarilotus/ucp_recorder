@@ -98,6 +98,91 @@ local ok,reason=pcall(require('code/hook-check').verify,
 assert(not ok and tostring(reason):find('found [01 ?? ??]',1,true))
 ''')
 
+    def test_deferred_startup_waits_and_installs_only_once(self):
+        self.check('''
+local installs,notifications=0,0
+local state=startup.defer(function(stage,install)
+ stage('optional extension',function() assert(optionalReady) end)
+ install(function() installs=installs+1 end)
+end,function(result) assert(result.status=='ready'); notifications=notifications+1 end)
+assert(state.status=='waiting' and installs==0 and report==nil)
+optionalReady=true
+fireAfterInit(); fireAfterInit()
+assert(state.status=='ready' and installs==1 and notifications==1)
+''')
+
+    def test_deferred_partial_install_failure_remains_failed_and_never_retries(self):
+        self.check('''
+local installs=0
+local state=startup.defer(function(_,install)
+ install(function() installs=installs+1;error('partial patch') end)
+end)
+assert(not pcall(fireAfterInit))
+assert(state.status=='failed' and state.reason:find('partial patch',1,true))
+assert(report:find('FAILED:',1,true) and not report:find('DISABLED:',1,true))
+fireAfterInit(); assert(installs==1)
+''')
+
+    def test_disable_before_after_init_cancels_installation_and_blocks_input(self):
+        self.prepare_enable()
+        self.check('''
+local module=require('init')
+local notifications=0
+local cancel=module:observeInputTransitions(function() notifications=notifications+1 end)
+assert(module:getInputState().blocked)
+local result=module:enable({autoRecord=false})
+assert(module:enable({autoRecord=true})==result and #afterInitCallbacks==1)
+module:disable(); fireAfterInit()
+assert(result.status=='disabled' and module:getInputState().blocked and report==nil)
+cancel(); assert(notifications==0)
+''')
+
+    def test_ready_notification_failure_cannot_mask_a_partial_install_failure(self):
+        self.check('''
+local state=startup.defer(function(_,install)
+ install(function() error('original partial patch') end)
+end,function() error('subscriber failed') end)
+local ok,reason=pcall(fireAfterInit)
+assert(not ok and tostring(reason):find('original partial patch',1,true))
+assert(state.status=='failed' and state.reason:find('original partial patch',1,true))
+local state=startup.defer(function(_,install) install(function() end) end,
+ function() error('subscriber failed') end)
+local ok,reason=pcall(fireAfterInit)
+assert(not ok and tostring(reason):find('subscriber failed',1,true))
+assert(state.status=='failed')
+''')
+
+    def test_automarket_registration_order_does_not_control_recorder_activation(self):
+        for order in ('before', 'after', 'absent'):
+            with self.subTest(order=order):
+                self.setUp()
+                self.prepare_enable()
+                self.lua.globals().order = order
+                self.check('''
+if order~='absent' then
+ for _,item in ipairs({{'automarket','1.1.0'},{'protocol','1.0.0'}}) do
+  allActiveExtensions[#allActiveExtensions+1]={name=item[1],version=item[2]}
+ end
+ bytes[nativeSites.execute.address+8]=0xe9
+ modules.protocol={getProtocolNumber=function(_,name,command)
+  assert(name=='automarket' and command=='commitSingle'); return registered
+ end}
+end
+if order=='before' then registered=131 end
+local module=require('init'); local observed=0
+module:observeInputTransitions(function() observed=observed+1 end)
+local result=module:enable({autoRecord=false})
+assert(result.status=='waiting' and report==nil and not module.recorder)
+assert(module:getInputState().blocked)
+if order=='after' then registered=131 end
+fireAfterInit()
+-- The deliberate later settings failure proves optional checks completed,
+-- without allocating or patching native game memory in this fixture.
+assert(result.status=='disabled' and result.reason:find('settings sentinel',1,true))
+assert(report:find('OK: Automarket compatibility',1,true) and observed==1)
+assert(module:getInputState().blocked)
+''')
+
     def prepare_enable(self):
         self.check('''
 nativeSites=require('code/engine-sites').SHC
@@ -126,6 +211,7 @@ core.allocate=noMutation; core.allocateCode=noMutation; core.writeCode=noMutatio
 core.detourCode=noMutation; core.hookCode=noMutation; core.exposeCode=noMutation
 function launch(diagnostics)
  local result=require('init'):enable({multiplayerDiagnostics=diagnostics,autoRecord=false})
+ fireAfterInit()
  assert(require('init').startup==result)
  return result
 end
@@ -146,6 +232,7 @@ assert(result.status=='disabled' and report:find('diagnostic checks',1,true))
 assert(report:find('conflicts',1,true) and not result.reason:find('unexpected recorder mutation',1,true))
 assert(not report:find('settings sentinel',1,true))
 -- Disabled diagnostics do not impose these optional byte requirements.
+package.loaded.init=nil
 result=launch(false)
 assert(result.status=='disabled' and result.reason:find('settings sentinel',1,true))
 ''')
@@ -165,6 +252,7 @@ assert(not result.reason:find('unexpected recorder mutation',1,true))
         self.check('''
 bytes[0x46a7d0]=0xcc
 local result=require('init'):enable({singleplayerRngDiagnostics=true})
+fireAfterInit()
 assert(result.status=='disabled' and report:find('DISABLED: RNG diagnostic checks',1,true))
 assert(not result.reason:find('unexpected recorder mutation',1,true))
 assert(not result.reason:find('settings sentinel',1,true))
@@ -177,6 +265,7 @@ package.loaded['code/build-profile']={diagnostics=false}
 bytes[0x46a7d0]=0xcc
 local config={autoRecord=false,multiplayerDiagnostics=true,singleplayerRngDiagnostics=true}
 local result=require('init'):enable(config)
+fireAfterInit()
 assert(result.status=='disabled' and result.reason:find('settings sentinel',1,true))
 assert(config.multiplayerDiagnostics and config.singleplayerRngDiagnostics)
 ''')

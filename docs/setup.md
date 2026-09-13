@@ -9,7 +9,7 @@ equivalence is still being verified.
 
 ## Download and install
 
-When **UCP-Recorder 0.49.4** is available in the UCP3 `3.0.7` extension store,
+When **UCP-Recorder 0.51.0** is available in the UCP3 `3.0.7` extension store,
 install it there together with its dependencies. Store publication signs the
 package through UCP's normal pipeline; the unsigned-PR instructions below are
 only for manual preview downloads. If using UCP2-Legacy, select **2.15.2** as
@@ -62,6 +62,13 @@ to imitate a release. Each release identifies its source commit.
 
 ## Ascension and Automarket
 
+Ascension Multiplayer 1.0.11 contains a non-finite (`.nan`) Knight count in its
+Crusader starting troops. Version 1.0.12 sets it to 0. Update/select that preset,
+restart the GUI to reload its metadata, then reapply. A custom exported config
+can retain the old value; correct that exact Knight option to 0. Recorder rejects
+non-finite settings rather than inventing a replacement during capture.
+
+
 Install Ascension and its dependencies through the store/launcher as usual.
 Recorder does not bundle or install them. The combination under investigation is:
 
@@ -95,10 +102,11 @@ different UI version is not automatically the cause of a startup failure.
 Other custom protocols are not supported for replay. See the
 [source audit and compatibility boundaries](extension-compatibility.md).
 
-Keep dependencies before consumers. In the resolved extension order,
-**protocol, map-extensions, ui and automarket must be enabled before recorder**.
-Putting recorder after Ascension and its dependencies is the simple arrangement.
-Check the startup report's ordered list; installing the ZIPs alone is insufficient.
+UCP resolves Recorder's UI dependency. Recorder checks optional integrations and
+installs its hooks at the framework's `afterInit` event, after module enable has
+completed. Do not rearrange Recorder around Ascension or Automarket to satisfy
+a registration race. Automarket retains its own Protocol/Map dependencies;
+installing a module without activating it does not enable that integration.
 
 Automarket's weekly trades run as simulation work. Recorder captures its settings
 commits and custom starting-save section; it must not inject weekly trades twice.
@@ -184,11 +192,11 @@ when using Ascension. Crusader and Extreme both need this live check.
 | `Recorder session hook conflicts at save` with 0.17.0 | Install this PR's ZIP and select its version. 0.17.0 rejected map-extensions 1.0.0's CALL save wrapper; 0.18.0 fixed it on both variants. Switching executables does not update the module. |
 | `Native hashing requires binary string writes` with 0.43.1 | Install 0.43.2 or newer and select that version. Older UCP 3.0.7 runtimes truncate binary string writes; the recorder now uses the compatible byte API. Restart before recording. |
 | `Asset file escaped its parent` with 0.43.2 and configured UCP aliases | Install 0.43.3 or newer and restart. UCP returns versioned directory entries for unversioned or wildcard aliases; recorder now resolves the parent through the same API. |
-| `DISABLED` in the startup report | Recorder failed a check before installing its hooks. UCP displays a message and lets the game continue **without recording**. Correct the reported conflict/order and restart. |
+| `DISABLED` in the startup report | Recorder failed a check before installing its hooks. UCP displays a message and lets the game continue **without recording**. Correct the reported conflict and restart. |
 | A hook conflict with the current version | Preserve the guard. Send the startup report and `ucp3.log`; addresses and expected/found bytes help identify a different patch. Do not NOP the check or remove map-extensions from an Automarket game. |
 | Recorder missing from the list | Check `ucp/modules`, the exact `recorder-<version>.zip` name and root-level `definition.yml`. Reload the list and use the published asset. |
 | `Could not find a matching extension` | Install the named version, or update the active preset's requirement. `Replay-Ascension-Test` is a separate local preset, not a recorder dependency; it is unnecessary for this manual setup. |
-| `Enable recorder after protocol` or unavailable Automarket protocol | Correct the active order so the adapter's dependencies and Automarket are enabled first. |
+| Unavailable Automarket protocol | On older Recorder builds, initialization order can cause this. Use this compatibility build; if it still reports a missing registration after `afterInit`, retain the startup report and Automarket/Protocol errors. The invalid value is included, such as `'nil'`. |
 | `Replay option requires a finite number` | The message names the option path. Replace NaN/infinity with a deliberate valid value in the test configuration; recorder does not choose gameplay values for you. |
 | `UCP cannot restore these replay option values without changes` | Preserve the configuration and report it. The installed framework would change an option's type/value on reload, so recorder refuses an inaccurate restore. |
 | `FAILED: hook and menu installation` | Installation had already started. The game must not continue with partial patches; correct the error and restart. |

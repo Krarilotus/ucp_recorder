@@ -1,7 +1,24 @@
+-- Preserve author settings before any module enable() transforms shared options.
+local launchOK,launchConfig=pcall(require('code/recorded-settings').snapshot,configFinal)
 local native=require('code/native')
 local Engine=require('code/engine')
 local Session=require('code/session-recorder')
-local module={}
+local module={inputStateVersion=1,tickObserverApiVersion=1}
+local tickObservers=require('code/tick-observers').new()
+local input=require('code/input-state').new()
+
+function module:getInputState()
+  local state=input:read()
+  if not self.startup or self.startup.status~='ready' then
+    state.blocked=true
+    state.status=self.startup and self.startup.status or 'initializing'
+  end
+  return state
+end
+
+function module:observeInputTransitions(callback)
+  return input:observe(callback)
+end
 
 local function enable(self,config,stage,install)
   local multiplayerCapture=config.autoRecord~=false
@@ -31,7 +48,10 @@ local function enable(self,config,stage,install)
   if config.multiplayerDiagnostics or config.singleplayerRngDiagnostics then
     stage('RNG diagnostic checks',require('code/rng-observer').verify)
   end
-  stage('recorded settings',require('code/sessions').captureSettings)
+  stage('recorded settings',function()
+    assert(launchOK,launchConfig)
+    require('code/sessions').captureSettings(launchConfig)
+  end)
   install(function()
     local engine=Engine.new(sites)
     engine.battle=require('code/battle-statistics').new(engine,battleLayout)
@@ -45,7 +65,7 @@ local function enable(self,config,stage,install)
     local rngReturnAddresses=fixes.install(simulation,engine.scope,engine.base+0x618,seed)
     fixes.install(controls,engine.scope,engine.base+0x618,nil,engine.offlineFlag)
     if engine.trace then engine.trace.rngReturnAddresses=rngReturnAddresses end
-    local recorder=Session:new(engine,config)
+    local recorder=Session:new(engine,config,input)
     recorder.phaseNative=maintenance.new(engine,maintenanceSites,function()
       recorder:guard(function() recorder:onUnclockedWorld() end)
     end)
@@ -76,6 +96,7 @@ local function enable(self,config,stage,install)
           recorder:reconcileMode()
           callback(registers)
         end)
+        if not recorder.active or recorder.status~='recording' then tickObservers:dispatch(recorder) end
         return registers
       end,address,size)
     end
@@ -119,12 +140,14 @@ local function enable(self,config,stage,install)
       if recorder.active and recorder.mode=='play' and recorder.afterTick then
         recorder:guard(function() recorder:afterTick() end)
       end
+      tickObservers:dispatch(recorder)
       return registers
     end,sites.tickReturned.address,#sites.tickReturned.bytes)
   end)
 end
 
 function module:enable(config)
+  if self.startup then return self.startup end
   if not require('code/build-profile').diagnostics then
     -- Preserve the caller's configuration, but never install attribution hooks
     -- from a stale developer preset when the release artifact lacks them.
@@ -134,11 +157,27 @@ function module:enable(config)
     production.singleplayerRngDiagnostics=false
     config=production
   end
-  self.startup=require('code/startup').run(function(stage,install) enable(self,config,stage,install) end)
+  -- All modules have completed enable() before the game's afterInit event.
+  -- Keep checks and installation together: optional owners must be ready before
+  -- preflight, and a rejected adapter must not leave partial Recorder hooks.
+  self.startup=require('code/startup').defer(function(stage,install)
+    enable(self,config,stage,install)
+  end,function(result)
+    if result.status~='ready' then input.failed=true end
+    input:notify()
+  end)
   return self.startup
 end
 
 function module:disable()
+  if self.startup then self.startup.status='disabled' end
+  input.failed=true
   if self.recorder then self.recorder:reset() end
+  if self.recorder then tickObservers:dispatch(self.recorder) end
 end
-return module
+function module:registerTickObserver(callback) return tickObservers:register(callback) end
+function module:unregisterTickObserver(token) tickObservers:remove(token) end
+-- Copied scalar snapshots may cross the UCP proxy; mutable owners stay private.
+return module,{public={'inputStateVersion','getInputState','observeInputTransitions',
+  'tickObserverApiVersion','registerTickObserver','unregisterTickObserver'},
+  proxy={ignored={'getInputState'}}}

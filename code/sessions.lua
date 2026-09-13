@@ -34,8 +34,8 @@ local function canonical(value)
   return '{'..table.concat(entries,',')..'}'
 end
 
-function M.captureSettings()
-  local restartSettings,resolved=require('code/recorded-settings').capture(allActiveExtensions,configFinal)
+function M.captureSettings(launchConfig)
+  local restartSettings,resolved=require('code/recorded-settings').capture(allActiveExtensions,launchConfig)
   local extensions={}
   for i,extension in ipairs(allActiveExtensions or {}) do
     extensions[i]={name=extension.name,version=extension.version}

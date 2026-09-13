@@ -11,7 +11,7 @@ that execute once the window opens. A session reset requires a new simulation
 callback. Missing a requested boundary during actual gameplay still produces
 an incomplete result, rather than moving the window to hide the omission.
 
-1. Use the same test build on both peers, with the usual multiplayer extensions and Graphics API Replacer where required. Enable `multiplayerDiagnostics: true` in recorder's UCP configuration (the option defaults to false). Keep recorder after protocol in extension order.
+1. Use the same test build on both peers, with the usual multiplayer extensions and Graphics API Replacer where required. Enable `multiplayerDiagnostics: true` in recorder's UCP configuration (the option defaults to false). Recorder initializes through UCP afterInit, after protocol registration.
 2. For a comparable bounded test, configure the same `multiplayerDiagnosticsStartTick: 1024` and `multiplayerDiagnosticsEndTick: 8192` on both peers. These are absolute simulation ticks, not wall-clock seconds; both must be multiples of 64 and the end must be at least 64 ticks after the start. Play through the end tick with commands from both players and AIs in the match. Each trace seals automatically while gameplay continues. With the default end tick of zero, logging remains continuous until normal mission exit; a peer departure can mark that continuous trace incomplete.
 3. Each game writes `ucp/replay-diagnostics/TIMESTAMP-NNNN/commands.jsonl`. Copy the two files into separately named peer-A and peer-B folders to preserve their identity.
 4. Extract `tools/compare_multiplayer.py` from the module ZIP and run `python compare_multiplayer.py peer-A/commands.jsonl peer-B/commands.jsonl` with Python 3.10 or newer.

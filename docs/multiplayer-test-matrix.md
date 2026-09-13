@@ -10,9 +10,10 @@ live acceptance gates. Playback never requires a multiplayer session.
 
 Use isolated game directories, the same exact published recorder build and
 identical resolved UCP settings on both peers. Keep Graphics API Replacer where
-needed. Automarket requires protocol 1.0.0, map-extensions 1.0.0 and recorder
-after protocol; its menu dependency needs the UI 1.0.1 bounds fix when testing
-the known UI 1.0.0 startup crash. Preserve both configurations, executable/module
+needed. The reviewed Automarket adapter uses Protocol 1.0.0 and Map Extensions
+1.0.0. Recorder checks their initialization through UCP afterInit; no manual
+Recorder ordering is needed. Its UI dependency includes the 1.0.1 bounds fix
+for the known UI 1.0.0 startup crash. Preserve both configurations, executable/module
 hashes, logs and trace folders.
 
 Use two human slots plus two AIs, with enough separation and alliances to let

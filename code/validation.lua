@@ -2,8 +2,10 @@
 local M = {MAX_PAYLOAD = 1260}
 
 function M.integer(value, minimum, maximum, label)
-  assert(type(value) == "number" and value == math.floor(value)
-    and value >= minimum and value <= maximum, "Invalid replay " .. label)
+  if not (type(value) == "number" and value == math.floor(value)
+    and value >= minimum and value <= maximum) then
+    error("Invalid replay " .. label .. " '" .. tostring(value) .. "'",2)
+  end
   return value
 end
 

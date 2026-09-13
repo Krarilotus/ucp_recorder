@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.51.0 (optional-module compatibility)
+
+- Initialize through UCP `afterInit`, after optional modules register protocols
+  and save hooks. Automarket/Legacy/Hotkeys/AI Toolkit remain optional; the
+  required dependency set is unchanged: UCP >=3.0.7 and UI ^1.0.1.
+- Combine the Hotkeys input transition API with the AI Toolkit tick observer API;
+  accept early subscriptions while input stays blocked until startup is ready.
+- Freeze author settings before other modules transform them; reject invalid
+  numbers and include the received value in integer-validation errors.
+- Ascension's non-finite Knight count is corrected by Ascension Multiplayer
+  1.0.12, not by silently changing recorded options.
+
+
+- Expose registration/removal of diagnostic callbacks through UCP's public module interface.
+- Dispatch copied recording context from the existing native tick-return hook; isolate failing listeners and perform no state reads when none are registered.
+
 ## 0.50.3 (recording boundary efficiency)
 
 - Leave the replay bar's unfilled interior transparent while retaining its native
