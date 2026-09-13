@@ -15,6 +15,13 @@ local function equal(a,b)
   for key in pairs(b) do if a[key]==nil then return false end end
   return true
 end
+function M.snapshot(config)
+  assert(type(config)=='table','Resolved UCP options are unavailable for replay settings')
+  finiteOptions(config,'config')
+  local copy=json:decode(json:encode(config))
+  assert(equal(config,copy),'Replay settings cannot preserve these option values')
+  return copy
+end
 function M.capture(extensions,config)
   assert(type(extensions)=='table' and #extensions>0,'Loaded extensions are unavailable for replay settings')
   assert(type(config)=='table','Resolved UCP options are unavailable for replay settings')

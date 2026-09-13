@@ -18,6 +18,7 @@ package.path = source_root .. '/?.lua;' .. package.path
 printed={}; print=function(...) printed[#printed+1]={...} end
 ERROR=-2; log=function(...) print(...) end
 memory, bytes, callbacks, files, handles, scheduled = {}, {}, {}, {}, {}, 0
+configFinal={}
 local nextAddress = 0x10000000
 core = {
   allocate = function(size) local a=nextAddress; nextAddress=a+size+16; return a end,

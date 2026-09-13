@@ -1,9 +1,9 @@
 # Install a recorder test release
 
-The current binding-correction branch is source version **0.50.28**. It requires
-Protocol **1.1.4**, Map Extensions **1.1.1**, Files **1.4.0**, UI **1.0.2** and
-WinProc Handler **1.0.0**. Its dependency PRs and native/live acceptance are still
-in progress; this branch has not published a new test ZIP.
+This branch is **0.50.33**. Its minimum module dependencies are Protocol **1.1.7**,
+Map Extensions **1.1.4**, Files **1.4.0**, UI **1.0.2** and WinProc Handler
+**1.0.1**, on stock UCP **3.0.7**. Use the exact versions supplied with your
+PR's test bundle; the AIC bundle includes Files **1.4.1** and UI **1.0.4**.
 
 Use a separate copy of your installed game and a working UCP3 installation.
 Keep your usual game and replays. This build targets original Crusader HD 1.41
@@ -14,12 +14,10 @@ equivalence is still being verified.
 
 ## Download and install
 
-When **UCP-Recorder 0.49.4** is available in the UCP3 `3.0.7` extension store,
-install it there together with its dependencies. Store publication signs the
-package through UCP's normal pipeline; the unsigned-PR instructions below are
-only for manual preview downloads. If using UCP2-Legacy, select **2.15.2** as
-described below. That older release requires UI **1.0.1**; the current source
-branch requires UI **1.0.2**, as listed above.
+Use the download linked by the PR being tested. After publication to the UCP3
+`3.0.7` store, install through the launcher with its dependencies. Signed test
+bundles use the same UCP signing pipeline and work with normal module security.
+If using UCP2-Legacy, select **2.15.2** as described below.
 
 Store integration is a testing rollout, not a claim of complete multiplayer
 recovery support. Archive identities can differ between store and PR builds;
@@ -47,9 +45,9 @@ Install one build at a time and retain its artifact with your recordings.
 5. Reload the extension list, enable **UCP-Recorder**, and select **the downloaded version**.
    Older packages may remain for old replays, but the active configuration must
    select the intended version once. Update any preset requiring an older recorder.
-6. PR builds are unsigned development packages. Use the launcher's **Disable
-   Security** option for this isolated test configuration if UCP rejects the
-   package as unsigned. Do not alter Windows security or antivirus settings.
+6. For a signed bundle, copy the supplied `.zip.sig` files beside their module
+   ZIPs and keep module security enabled. Some separate development releases are
+   unsigned; follow the specific release's instructions for those builds.
 7. Keep your working graphics configuration, including **graphicsApiReplacer**
    and its dependencies if needed. Recorder does not replace a graphics wrapper.
 8. Launch through UCP. Check the console/log says
@@ -76,10 +74,10 @@ Recorder does not bundle or install them. The combination under investigation is
 | recorder | The selected PR release version |
 | Ascension-Multiplayer | 1.0.11 |
 | automarket | 1.1.0; the adapter checks this exact wire format |
-| protocol | 1.1.4 or compatible; required native command owner |
-| map-extensions | 1.1.1 or compatible; required native save owner |
+| protocol | 1.1.7 or compatible; required native command owner |
+| map-extensions | 1.1.4 or compatible; required native save owner |
 | files | 1.4.0 or compatible; required asset traversal owner |
-| winProcHandler | 1.0.0 or compatible; required input owner |
+| winProcHandler | 1.0.1 or compatible; required input owner |
 | ucp2-legacy | 2.15.2 with saved simulation state and its dependencies |
 | ui | 1.0.2 or compatible; required native menu owner |
 | steam-multiplayer | 1.2.3 in the prepared test setup |
