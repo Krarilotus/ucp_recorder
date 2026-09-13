@@ -137,6 +137,21 @@ assert(result.status=='disabled' and module:getInputState().blocked and report==
 cancel(); assert(notifications==0)
 ''')
 
+    def test_ready_notification_failure_cannot_mask_a_partial_install_failure(self):
+        self.check('''
+local state=startup.defer(function(_,install)
+ install(function() error('original partial patch') end)
+end,function() error('subscriber failed') end)
+local ok,reason=pcall(fireAfterInit)
+assert(not ok and tostring(reason):find('original partial patch',1,true))
+assert(state.status=='failed' and state.reason:find('original partial patch',1,true))
+local state=startup.defer(function(_,install) install(function() end) end,
+ function() error('subscriber failed') end)
+local ok,reason=pcall(fireAfterInit)
+assert(not ok and tostring(reason):find('subscriber failed',1,true))
+assert(state.status=='failed')
+''')
+
     def test_automarket_registration_order_does_not_control_recorder_activation(self):
         for order in ('before', 'after', 'absent'):
             with self.subTest(order=order):

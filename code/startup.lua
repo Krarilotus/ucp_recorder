@@ -83,8 +83,13 @@ function M.defer(callback,settled)
     else
       state.status,state.reason='failed',tostring(result)
     end
-    if settled then settled(state) end
+    local notified,reason=true
+    if settled then notified,reason=pcall(settled,state) end
     if not ok then error(result,0) end
+    if not notified then
+      state.status,state.reason='failed',tostring(reason)
+      error(reason,0)
+    end
   end)
   return state
 end
