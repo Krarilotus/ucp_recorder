@@ -1,3 +1,6 @@
+-- Stock UCP loads every module before enabling any of them. Keep the normalized
+-- author options now: owners such as AI Swapper transform shared tables in enable.
+local launchOK,launchConfig=pcall(require('code/recorded-settings').snapshot,configFinal)
 local native=require('code/native')
 local Engine=require('code/engine')
 local Session=require('code/session-recorder')
@@ -31,7 +34,10 @@ local function enable(self,config,stage,install)
   if config.multiplayerDiagnostics or config.singleplayerRngDiagnostics then
     stage('RNG diagnostic checks',require('code/rng-observer').verify)
   end
-  stage('recorded settings',require('code/sessions').captureSettings)
+  stage('recorded settings',function()
+    assert(launchOK,launchConfig)
+    require('code/sessions').captureSettings(launchConfig)
+  end)
   install(function()
     local engine=Engine.new(sites)
     engine.battle=require('code/battle-statistics').new(engine,battleLayout)

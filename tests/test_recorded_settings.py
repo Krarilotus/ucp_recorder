@@ -24,7 +24,7 @@ allActiveExtensions={
 }
 configFinal={['recorder-0.25.0']={autoRecord=true,enabled=false,speed=200,
  literal={contents={value='this is option data'},nested={1,2,3}}},['Test-Plugin-1.2.3']={}}
-store.captureSettings()
+store.captureSettings(configFinal)
 ''')
 
     def test_launch_profile_pins_order_types_and_normalized_values(self):
@@ -40,6 +40,55 @@ store.captureSettings()
         self.assertIs(options['enabled'],False)
         self.assertEqual(options['speed'],200)
         self.assertEqual(options['literal'],dict(contents=dict(value='this is option data'),nested=[1,2,3]))
+
+    def test_init_freezes_author_settings_before_dependency_enable_mutates_them(self):
+        self.prepare()
+        self.lua.execute('''
+allActiveExtensions[4]={name='aiSwapper',version='1.1.0',type=function() return 'ModuleLoader' end}
+configFinal['aiSwapper-1.1.0']={ai={wolf={aic={active=true,name='Test Wolf',root='ucp/plugins/Test/AI/'}}}}
+local author=require('code/recorded-settings').snapshot(configFinal)
+-- Keep actual Recorder init/capture code; the native stages are outside this
+-- lifecycle regression. UCP runs all module loads before the enable loop.
+for _,name in ipairs({'native','engine','session-recorder',
+ 'simulation-compatibility','maintenance-native','native-ui','history-native',
+ 'battle-statistics','match-results','fixes','network-observer','world-hash-observer'}) do
+ package.loaded['code/'..name]={}
+end
+package.loaded['code/startup']={run=function(run)
+ run(function(name,callback) if name=='recorded settings' then return callback() end end,function() end)
+ return {status='ready'}
+end}
+local module=dofile(source_root..'/init.lua')
+-- AI Swapper's enable replaces each author setting with runtime array entries.
+configFinal['aiSwapper-1.1.0'].ai.wolf={{name='Test Wolf',root='resolved/AI/',control={aic=true}}}
+configFinal['recorder-0.25.0'].literal.nested[1]=999
+assert(module:enable({autoRecord=false}).status=='ready')
+local captured=store.settings()
+local launch=json:decode(captured.restartSettings)['config-full']
+local wolf=launch.modules.aiSwapper.config.contents.value.ai.wolf
+assert(wolf.aic.active and wolf.aic.root=='ucp/plugins/Test/AI/' and wolf[1]==nil)
+assert(launch.modules.recorder.config.contents.value.literal.nested[1]==1)
+local m=recording(); store.finish(m)
+-- A fresh launch with the same author options has the same identity even if
+-- another module transforms the running configuration differently afterward.
+store.captureSettings(author)
+assert(store.settings().environmentHash==captured.environmentHash and store.compatible(m))
+author['aiSwapper-1.1.0'].ai.wolf.aic.root='different/AI/'
+store.captureSettings(author); assert(not store.compatible(m))
+''')
+
+    def test_snapshot_rejects_lossy_values_and_missing_configuration(self):
+        self.prepare()
+        self.lua.execute('''
+local settings=require('code/recorded-settings')
+assert(not pcall(settings.snapshot,nil))
+assert(not pcall(settings.snapshot,{invalid=0/0}))
+local originalDecode=json.decode
+json.decode=function(self,text)
+ local value=originalDecode(self,text); value.enabled=0; return value
+end
+assert(not pcall(settings.snapshot,{enabled=false}))
+''')
 
     def test_relaunch_profile_is_compatible_despite_different_source_bytes(self):
         self.prepare()
@@ -57,10 +106,10 @@ for _,category in ipairs({'modules','plugins'}) do
  end
 end
 store.write(CONFIG_FILE,settings.restartSettings)
-store.captureSettings()
+store.captureSettings(configFinal)
 assert(store.settings().hash~=m.settingsHash and store.compatible(m))
 allActiveExtensions[1],allActiveExtensions[2]=allActiveExtensions[2],allActiveExtensions[1]
-store.captureSettings(); assert(not store.compatible(m))
+store.captureSettings(configFinal); assert(not store.compatible(m))
 ''')
 
     def test_recorded_copy_preserves_launch_profile_and_rejects_corruption(self):
@@ -90,7 +139,7 @@ assert(store.read(path..'/replay-config.yml')==store.settings().restartSettings)
                     'unloaded config': 'configFinal.unloaded={}',
                     'missing extensions': 'allActiveExtensions=nil',
                 }
-                self.lua.execute(scripts[failure]+"; assert(not pcall(store.captureSettings))")
+                self.lua.execute(scripts[failure]+"; assert(not pcall(store.captureSettings,configFinal))")
 
     def test_unknown_or_half_declared_settings_profile_cannot_load(self):
         self.prepare()
@@ -114,7 +163,7 @@ yaml.eval=function(text)
  parsed['config-full'].modules.recorder.config.contents.value.enabled=0
  return parsed
 end
-assert(not pcall(store.captureSettings))
+assert(not pcall(store.captureSettings,configFinal))
 ''')
 
     def test_nonfinite_option_reports_its_path_before_json_can_drop_it(self):
@@ -122,7 +171,7 @@ assert(not pcall(store.captureSettings))
         self.lua.execute('''
 for _,number in ipairs({0/0,math.huge,-math.huge}) do
  configFinal['recorder-0.25.0'].troops={Knight=number}
- local ok,reason=pcall(store.captureSettings)
+ local ok,reason=pcall(store.captureSettings,configFinal)
  assert(not ok and reason:find('recorder-0.25.0/troops/Knight',1,true))
 end
 ''')
