@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Krarilotus/ucp-extension-map-extensions
-          ref: 9d35dfb2495c277f199c0b38d3443742046010ff
+          ref: 795d32b4ab60ff43dd9bd2f23d821d7ce7cfa5db
           path: map-reference
           persist-credentials: false
       - uses: actions/checkout@v4

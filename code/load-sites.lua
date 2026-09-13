@@ -6,8 +6,6 @@ local patterns={
   begin='8B 0D ? ? ? ? 8B 15 ? ? ? ? 56 57 53 8D 34 0A 83 CF FF 57 B9 ? ? ? ? 89 1D ? ? ? ? E8 ? ? ? ? A1 ? ? ? ? 83 F8 2F 75 59 8B 04 B5 ? ? ? ? 50',
   done='B9 ? ? ? ? E8 ? ? ? ? 5D 8B 8C 24 F4 03 00 00 5B 33 CC E8 ? ? ? ? 81 C4 F4 03 00 00 C3',
   reset='83 F8 2F 0F 85 FF 01 00 00 33 DB 53 6A 1D B9 ? ? ? ? E8 ? ? ? ? B9 ? ? ? ? E8 ? ? ? ? 5F 5E 89 1D ? ? ? ? B9 ? ? ? ? 5B E9 ? ? ? ? B9 ? ? ? ? E8 ? ? ? ? 33 DB 53 6A FF B9 ? ? ? ? 89 1D ? ? ? ? E8 ? ? ? ? 53 6A FF B9 ? ? ? ? E8 ? ? ? ? 53',
-  readFile='55 57 B9 ? ? ? ? E8 ? ? ? ? 53 68 00 80 00 00 50 E8 ? ? ? ? 8B F8 83 CD FF 83 C4 0C 3B FD',
-  fileName='8B 81 C4 0B 00 00 69 C0 E9 03 00 00 8D 84 08 E0 AE 07 00 C3',
   mapName='8B 44 24 04 3D F4 01 00 00 7C 05 33 C0 C2 04 00 69 C0 E9 03 00 00 8D 84 08 C8 0B 00 00 C2 04 00',
   readComplete='FF 15 ? ? ? ? 2B 05 ? ? ? ? 5F A3 ? ? ? ? 89 1D ? ? ? ? 5D 5E 5B 83 C4 0C C2 04 00',
 }
@@ -50,10 +48,9 @@ function M.resolve()
     and core.readInteger(g.reset.address+25)==state.menuText
     and relative(g.reset.address+19)==menu.entry,
     'Recorder load/reset finalization owners disagree')
-  g.readFile=check.context(save.readWorld+0x44,patterns.readFile,'Map native filename call')
-  local resources=core.readInteger(g.readFile.address+3)
-  require('code/validation').integer(resources,0x10000,0x7fffffff-0x7c000,'Native resource manager')
-  g.fileName=check.context(relative(g.readFile.address+7),patterns.fileName,'Recorder resource filename')
+  local resources=save.resources
+  g.fileName={address=save.resourceFileName,bytes={save.resourceFileNameBytes:byte(1,20)}}
+  check.verify(g.fileName,'Map native filename entry changed')
   g.mapName=check.resolve(patterns.mapName,'Recorder map filename')
   g.readComplete=check.resolve(patterns.readComplete,'Recorder completed world read')
   local r=g.readComplete.address
