@@ -3,7 +3,7 @@
 package.path=sourceRoot..'/?.lua;'..package.path
 local library=assert(package.loadlib(testRoot..'/luamemzip.dll','luaopen_luamemzip'))()
 core={openLibraryHandle=function(path)
-  assert(path=='ucp/modules/map-extensions-1.0.0/luamemzip.dll')
+  assert(path=='ucp/modules/map-extensions-'..allActiveExtensions[3].version..'/luamemzip.dll')
   return {require=function(_,name) assert(name=='luamemzip'); return library end}
 end}
 allActiveExtensions={{name='automarket',version='1.1.0'},

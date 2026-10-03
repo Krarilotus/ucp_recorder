@@ -6,6 +6,9 @@
   two save functions with the same five-byte hook and keep the ZIP section format.
   Before, a newer 1.x stopped Recorder at startup ("session hook conflicts at
   readWorld") and the Automarket replay adapter refused it. 2.x is still refused.
+- Load map-extensions' ZIP library from the installed version's folder. The path was
+  fixed to map-extensions-1.0.0, so with any other version restore points were switched
+  off and multiplayer start worlds could not be captured.
 
 ## 0.51.1 (launcher settings)
 

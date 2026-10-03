@@ -4,7 +4,11 @@ local M={MAX_BYTES=1024*1024}
 local library
 function M.encode(entries)
   if not library then
-    local handle,reason=core.openLibraryHandle('ucp/modules/map-extensions-1.0.0/luamemzip.dll')
+    -- The ZIP library ships inside map-extensions: load it from the installed version.
+    local adapter=require('code/automarket-replay')
+    local version=adapter.version('map-extensions')
+    assert(adapter.mapExtensionsSupported(version),'Extension state requires map-extensions 1.x')
+    local handle,reason=core.openLibraryHandle('ucp/modules/map-extensions-'..version..'/luamemzip.dll')
     assert(handle,reason); library=handle:require('luamemzip')
   end
   local zip=library:MemoryZip(nil,nil,'w')

@@ -14,7 +14,8 @@ allActiveExtensions={{name='automarket',version='1.1.0'},
 modules={protocol={getProtocolNumber=function() return 130 end},['map-extensions']={}}
 closed=0; calls={}; data='\\2\\0\\0\\0'..string.rep('x',2412)
 core.openLibraryHandle=function(path)
- assert(path=='ucp/modules/map-extensions-1.0.0/luamemzip.dll')
+ assert(path=='ucp/modules/map-extensions-'..allActiveExtensions[3].version..'/luamemzip.dll')
+ opened=path
  return {require=function(_,name)
   assert(name=='luamemzip')
   return {MemoryZip=function(_,input,compression,mode)
@@ -38,6 +39,14 @@ descriptor={version='1.1.0',protocol=130}
         self.check('''
 assert(marketContainer.encode(data,descriptor)=='zip bytes')
 assert(closed==1 and #calls==1 and calls[1]=='automarket/automarketplayerdata.bin')
+''')
+
+    def test_zip_library_comes_from_the_installed_map_extensions(self):
+        self.prepare()
+        self.check('''
+allActiveExtensions[3].version='1.2.0'
+assert(marketContainer.encode(data,descriptor)=='zip bytes')
+assert(opened=='ucp/modules/map-extensions-1.2.0/luamemzip.dll')
 ''')
 
     def test_zip_failure_closes_handle(self):
