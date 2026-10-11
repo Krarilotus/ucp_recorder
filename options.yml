@@ -5,7 +5,8 @@ options:
   header: "{{rng_header}}"
   text: "{{rng_text}}"
   hasHeader: true
-  display:
+  display: UCP2Switch
+  category: ["{{recorder_category}}", "{{diagnostics_category}}"]
   contents:
     type: boolean
     value: false
@@ -13,7 +14,8 @@ options:
   header: "{{auto_header}}"
   text: "{{auto_text}}"
   hasHeader: true
-  display:
+  display: UCP2Switch
+  category: ["{{recorder_category}}"]
   contents:
     type: boolean
     value: true
@@ -21,40 +23,56 @@ options:
   header: "{{seed_on_header}}"
   text: "{{seed_on_text}}"
   hasHeader: true
-  display:
+  display: UCP2Switch
+  category: ["{{recorder_category}}"]
   contents:
     type: boolean
     value: true
 - url: recorder.fixedSeed
   enabled: recorder.useFixedSeed
   header: "{{seed_header}}"
-  text: "{{seed_text}}"
+  text: "{{seed_header}}"
+  tooltip: "{{seed_text}}"
   hasHeader: true
-  display:
+  display: Number
+  category: ["{{recorder_category}}"]
   contents:
     type: integer
     value: 1
+    min: -2147483648
+    max: 2147483647
 - url: recorder.multiplayerDiagnostics
   header: "{{mp_header}}"
   text: "{{mp_text}}"
   hasHeader: true
-  display:
+  display: UCP2Switch
+  category: ["{{recorder_category}}", "{{diagnostics_category}}"]
   contents:
     type: boolean
     value: false
 - url: recorder.multiplayerDiagnosticsStartTick
+  enabled: recorder.multiplayerDiagnostics
   header: "{{start_header}}"
-  text: "{{start_text}}"
+  text: "{{start_header}}"
+  tooltip: "{{start_text}}"
   hasHeader: true
-  display:
+  display: Number
+  category: ["{{recorder_category}}", "{{diagnostics_category}}"]
   contents:
     type: integer
     value: 64
+    min: 64
+    max: 2147483520
 - url: recorder.multiplayerDiagnosticsEndTick
+  enabled: recorder.multiplayerDiagnostics
   header: "{{end_header}}"
-  text: "{{end_text}}"
+  text: "{{end_header}}"
+  tooltip: "{{end_text}}"
   hasHeader: true
-  display:
+  display: Number
+  category: ["{{recorder_category}}", "{{diagnostics_category}}"]
   contents:
     type: integer
     value: 0
+    min: 0
+    max: 2147483584
