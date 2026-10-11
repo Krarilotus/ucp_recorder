@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.51.1 (launcher settings)
+
+- Show the three release settings under a translated Recorder category with
+  working switches and a bounded seed input, instead of blank rows in General.
+- Shorten option descriptions in all nine launcher languages. Numeric fields
+  use short labels and explanatory tooltips; diagnostic settings are grouped
+  separately in diagnostic builds.
+- Preserve the recording defaults and runtime behavior of Store version 0.51.0.
+
 ## 0.51.0 (optional-module compatibility)
 
 - Initialize through UCP `afterInit`, after optional modules register protocols
