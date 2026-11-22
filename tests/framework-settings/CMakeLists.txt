@@ -22,6 +22,12 @@ set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
 set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(framework lua_source yaml_source)
+# yaml-cpp 0.7.0 uses uint16_t/uint32_t in emitterutils.cpp without <cstdint>;
+# GCC 15's libstdc++ (ubuntu-latest since 26.04) no longer provides it indirectly.
+# Keep the framework's exact pin and supply the header.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(yaml-cpp PRIVATE -include cstdint)
+endif()
 file(GLOB lua_files "${lua_source_SOURCE_DIR}/*.c")
 list(FILTER lua_files EXCLUDE REGEX "/(lua|luac|onelua|ltests)\\.c$")
 add_library(settings_lua STATIC ${lua_files})
