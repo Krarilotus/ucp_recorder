@@ -34,6 +34,9 @@ end
 
 function M:loadSnapshot(path)
   assert(#path<500 and self:singlePlayer(), 'Snapshot requires a single-player game')
+  local map = modules and modules['map-extensions']
+  local tracksRefusal = map and type(map.takeLoadRefusal)=='function'
+  if tracksRefusal then map:takeLoadRefusal() end
   local state=self.sites.menuText
   local old={}
   for _,offset in ipairs({0x58,0x7c,0x80,0x884}) do old[offset]=core.readInteger(state+offset) end
@@ -46,13 +49,18 @@ function M:loadSnapshot(path)
   self.loading=true
   core.writeInteger(self.pathOverride,1)
   local view=core.readInteger(self.sites.gameCore+0xc)
-  local loaded=false
+  local loaded,refused=false,false
   -- Recovery transitions originate in a running replay. Use the same browser
   -- context as its first load: prepareMap's negative pause sentinel otherwise
   -- permits an unclocked simulation update when the current view is in-game.
   core.writeInteger(self.sites.gameCore+0xc,20)
   temporarily(function()
     self.loadNative(0)
+    if tracksRefusal then
+      local provider = map:takeLoadRefusal()
+      refused = provider ~= nil
+      assert(not refused, 'Save requires module '..tostring(provider))
+    end
     -- The outer loader builds navigation/rendering caches, but prepareMap also
     -- resets saved simulation fields (e.g. section 1024's tick load balancer).
     -- Reapply the snapshot through the same extension-aware native reader once
@@ -67,7 +75,7 @@ function M:loadSnapshot(path)
     core.writeInteger(self.pathOverride,0)
     self.loading=false
     self.overridePath=nil
-    if not loaded then core.writeInteger(self.sites.gameCore+0xc,view) end
+    if not loaded and not refused then core.writeInteger(self.sites.gameCore+0xc,view) end
     -- These four fields belong to the load dialog; preserve the game's menu transition.
     for offset,value in pairs(old) do core.writeInteger(state+offset,value) end
   end)

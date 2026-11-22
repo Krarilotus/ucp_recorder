@@ -119,6 +119,17 @@ assert(#capturedExtensions['ucp2-legacy/ladder-destinations.bin']==120000)
         self.assertTrue(descriptor['ucp2'])
         self.assertEqual(descriptor['sha256'], hashlib.sha256((self.root/'extensions.zip').read_bytes()).hexdigest())
 
+    def test_map_owner_archive_is_kept_as_the_restorable_section(self):
+        self.lua.execute(r'''
+modules={['map-extensions']={captureSaveSection=function() return 'archive with module\0data' end},
+ ['ucp2-legacy']={serializeSimulationState=function() error('legacy adapter must not run') end}}
+allActiveExtensions={{name='map-extensions',version='1.2.0'}}
+''')
+        capture = self.capture()
+        self.assertTrue(capture['world']['extensions'])
+        self.assertEqual((self.root/'extensions.zip').read_bytes(), b'archive with module\0data')
+        self.assertIsNone(self.lua.globals().capturedExtensions)
+
     def test_exact_binary_sections_and_copy_never_call_native_writes(self):
         capture = self.capture()
         self.assertEqual(capture['world']['status'], 'complete')

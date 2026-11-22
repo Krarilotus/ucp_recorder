@@ -12,12 +12,27 @@ end
 function M.verify()
   local sites = assert(allSites[native.profile.name])
   local adapter=require('code/automarket-replay')
+  local owner=modules and modules['map-extensions']
+  local interface=owner and type(owner.getNativeSaveInterface)=='function' and owner:getNativeSaveInterface()
+  if interface then
+    assert(interface.version==1 and interface.sectionCount==122 and interface.descriptorSize==16,
+      'Unsupported Map Extensions native save interface')
+    for _,key in ipairs({'packager','sections','readWorld','writeWorld'}) do
+      require('code/validation').integer(interface[key],0x10000,0x7fffffff,'Map Extensions '..key)
+    end
+    local bound={}
+    for key,value in pairs(sites) do bound[key]=value end
+    bound.packager,bound.sections=interface.packager,interface.sections
+    bound.save={address=interface.writeWorld,bytes={}}
+    bound.readWorld={address=interface.readWorld,bytes={}}
+    sites=bound
+  end
   if adapter.version('protocol') then
     assert(core.readByte(sites.execute.address+8)==0xE9,
       'Protocol dispatch hook is unavailable after initialization')
   end
   for name, site in pairs(sites) do
-    if type(site)=='table' then
+    if type(site)=='table' and #site.bytes>0 then
       local actual=core.readBytes(site.address, #site.bytes)
       -- map-extensions wraps this callable entry to include extension save data.
       -- We call that entry, never bypass or overwrite its five-byte hook.

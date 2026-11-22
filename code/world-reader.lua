@@ -65,7 +65,7 @@ function M.open(path)
   local extensions
   assert((manifest.extensions~=nil)==(summary.extensions==true),'Extension world presence differs')
   if manifest.extensions then
-    extensions=read(path..'/extensions.zip',require('code/extension-container').MAX_BYTES)
+    extensions=read(path..'/extensions.zip',require('code/world-codec').MAX_SECTION)
     assert(#extensions==manifest.extensions.bytes and sha.sha256(extensions)==manifest.extensions.sha256,
       'Extension starting state is damaged')
   end

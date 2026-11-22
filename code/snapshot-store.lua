@@ -18,6 +18,7 @@ function M.validateState(point,manifest)
   validation.hash(point.worldHash,'snapshot world hash')
   validation.hash(point.rngHash,'snapshot RNG hash')
   validation.hash(point.stateHash,'snapshot state hash')
+  assert(point.sectionCapture==nil or point.sectionCapture==1,'Unsupported restore point section capture')
   return point
 end
 
@@ -63,6 +64,11 @@ end
 
 function M.prepare(manifest,point,path)
   M.validate(point,manifest)
+  local owner=modules and modules['map-extensions']
+  if point.sectionCapture==nil and owner and type(owner.requiredStateContracts)=='function' then
+    assert(next(owner:requiredStateContracts())==nil,
+      'Restore point predates complete required extension capture')
+  end
   local base=store.path(manifest.id)
   local paths={commandsFile='/stream-commands.json',rngFile='/stream-rng-sync.json',infoFile='/stream-infself.json',
     tickFile='/ticks.bin',phaseFile='/'..require('code/maintenance-journal').FILE}

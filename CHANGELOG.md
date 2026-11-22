@@ -2,6 +2,10 @@
 
 ## 0.52.0 (complete restore points)
 
+- Use the installed Map Extensions save archive API for complete restore points.
+  Restore uses the same module callbacks as an ordinary load. Compatible older
+  points still load. If an old point predates capture of an active required
+  provider, replay seeking starts from its native starting save.
 - Accept every Map Extensions 1.x, not only 1.0.0. All 1.x versions wrap the same
   two save functions with the same five-byte hook and keep the ZIP section format.
   Before, a newer 1.x stopped Recorder at startup ("session hook conflicts at

@@ -88,6 +88,7 @@ function M.write(filename,reader,progress)
   local capacity=40512
   if not reader.precompressed then
     for _,entry in ipairs(reader.entries) do capacity=math.max(capacity,entry.size) end
+    if reader.extensions then capacity=math.max(capacity,#reader.extensions) end
   end
   return require('code/world-codec').withBuffers(capacity,function(codec)
     local prefix=header(reader,codec)
