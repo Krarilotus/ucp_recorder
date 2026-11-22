@@ -67,7 +67,9 @@ multiplayer tick frame, so unpausing cannot leave an unmatched pending frame.
 
 Periodic snapshots in both singleplayer and multiplayer use `world-capture.freeze`:
 it copies the checked 122-section world and registered extension state at one
-simulation boundary. `codec-worker` runs the original PKWARE compressor in one
+simulation boundary. With Map Extensions' save archive API, the extension state
+is that owner's complete archive of every registered section; with 1.0.0 it is
+Recorder's Automarket/UCP2-Legacy adapter (see [0.52.0 compatibility](compatibility-0.52.0.md)). `codec-worker` runs the original PKWARE compressor in one
 native thread against those private buffers. It never calls Lua, reads live game
 state, or invokes native save/transport routines. `snapshot-jobs` polls completion
 without waiting, then publishes the native container and RNG sidecar. Capture

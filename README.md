@@ -51,8 +51,8 @@ and [menu controls](docs/replay-menus.md).
 See the [in-game previews](docs/replay-menus.md#in-game-previews) for native history,
 player portraits and playback information.
 
-The `3.0.7` extension-store integration is being prepared for wider testing. Once
-published there, choose **UCP-Recorder 0.51.0** through the store; the store build
+Recorder is in the `3.0.7` extension store. Choose **UCP-Recorder 0.52.0** through
+the store; the store build
 uses the same release file selection and includes all nine UCP languages. Its
 signed ZIP may have a different archive fingerprint from a PR download. Keep the
 exact package used for each recording; do not substitute it during playback.

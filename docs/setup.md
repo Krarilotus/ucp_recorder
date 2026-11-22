@@ -9,11 +9,13 @@ equivalence is still being verified.
 
 ## Download and install
 
-When **UCP-Recorder 0.51.0** is available in the UCP3 `3.0.7` extension store,
-install it there together with its dependencies. Store publication signs the
-package through UCP's normal pipeline; the unsigned-PR instructions below are
-only for manual preview downloads. If using UCP2-Legacy, select **2.15.2** as
-described below. UI **1.0.1** is a required dependency for this release.
+Install **UCP-Recorder 0.52.0** from the UCP3 `3.0.7` extension store together
+with its dependencies. Store publication signs the package through UCP's normal
+pipeline; the unsigned-PR instructions below are only for manual preview
+downloads. If using UCP2-Legacy, select **2.15.2** as described below. UI
+**1.0.1** is a required dependency for this release. See
+[0.52.0 compatibility](compatibility-0.52.0.md) for Map Extensions and other
+stateful modules.
 
 Store integration is a testing rollout, not a claim of complete multiplayer
 recovery support. Archive identities can differ between store and PR builds;
@@ -78,15 +80,13 @@ Recorder does not bundle or install them. The combination under investigation is
 | Ascension-Multiplayer | 1.0.11 |
 | automarket | 1.1.0; the adapter checks this exact wire format |
 | protocol | 1.0.0 for the Automarket adapter |
-| map-extensions | 1.0.0 for Automarket and UCP2 custom save sections |
+| map-extensions | 1.0.0, or a 1.x with the save archive API (see [0.52.0 compatibility](compatibility-0.52.0.md)) |
 | ucp2-legacy | 2.15.2 with saved simulation state and its dependencies |
 | ui | 1.0.1 in the prepared Ascension test setup |
 | steam-multiplayer | 1.2.3 in the prepared test setup |
 
-If the store still offers UCP2-Legacy 2.15.1, use the saved-state
-[2.15.2 test release](https://github.com/Krarilotus/extension-ucp2-legacy/releases/tag/test-fbb634bb2331)
-from [its PR](https://github.com/UnofficialCrusaderPatch/extension-ucp2-legacy/pull/6).
-Likewise, if UI 1.0.1 is absent from the store, install the
+UCP2-Legacy 2.15.2 is in the 3.0.7 store; Vanilla Retraced and UCP2-Legacy
+Defaults accept it. If UI 1.0.1 is absent from the store, install the
 [UI 1.0.1 test release](https://github.com/Krarilotus/ucp-extension-ui/releases/tag/test-d3a807cfee70)
 from [the menu-array fix](https://github.com/gynt/ucp-extension-ui/pull/6).
 
