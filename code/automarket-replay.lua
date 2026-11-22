@@ -11,8 +11,14 @@ function M.version(name)
   end
 end
 
+-- Every map-extensions 1.x wraps the same two save functions with the same five-byte
+-- hook and keeps its ZIP section format; 1.0.0 is not the only such version.
+function M.mapExtensionsSupported(version)
+  return type(version)=='string' and version:match('^1%.%d+%.%d+$')~=nil
+end
+
 function M.saveHookAvailable()
-  return M.version('map-extensions')=='1.0.0' and modules and modules['map-extensions']~=nil
+  return M.mapExtensionsSupported(M.version('map-extensions')) and modules and modules['map-extensions']~=nil
 end
 
 function M.current()
@@ -20,8 +26,8 @@ function M.current()
   for _,extension in ipairs(allActiveExtensions or {}) do versions[extension.name]=extension.version end
   if not versions.automarket then return nil end
   assert(versions.automarket=='1.1.0','Replay adapter requires Automarket 1.1.0')
-  assert(versions.protocol=='1.0.0' and versions['map-extensions']=='1.0.0',
-    'Automarket replay adapter requires protocol and map-extensions 1.0.0')
+  assert(versions.protocol=='1.0.0' and M.mapExtensionsSupported(versions['map-extensions']),
+    'Automarket replay adapter requires protocol 1.0.0 and map-extensions 1.x')
   local protocol=assert(modules and modules.protocol,'Automarket replay protocol is unavailable')
   local id=protocol:getProtocolNumber('automarket','commitSingle')
   integer(id,130,2147483647,'Automarket protocol number')

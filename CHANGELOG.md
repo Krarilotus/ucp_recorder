@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.52.0 (complete restore points)
+
+- Accept every Map Extensions 1.x, not only 1.0.0. All 1.x versions wrap the same
+  two save functions with the same five-byte hook and keep the ZIP section format.
+  Before, a newer 1.x stopped Recorder at startup ("session hook conflicts at
+  readWorld") and the Automarket replay adapter refused it. 2.x is still refused.
+
 ## 0.51.1 (launcher settings)
 
 - Show the three release settings under a translated Recorder category with
