@@ -9,24 +9,35 @@ local unpackResource=string.unpack or function(_,data,offset)
   return value>=2147483648 and value-4294967296 or value
 end
 
+-- Map Extensions 1.2+ reports the save functions it resolved and wrapped. When it
+-- names exactly the functions of this verified profile, its own wrapper replaces
+-- Recorder's byte check there (its hook form may change). Anything else (no API,
+-- an error, another interface version, other addresses) keeps the checked static
+-- sites below, as with Map Extensions 1.0.0.
+local function ownerSites(sites)
+  local owner=modules and modules['map-extensions']
+  if not (owner and type(owner.getNativeSaveInterface)=='function') then return nil end
+  local ok,interface=pcall(owner.getNativeSaveInterface,owner)
+  local matches=ok and type(interface)=='table' and interface.version==1 and interface.sectionCount==122
+    and interface.descriptorSize==16 and interface.readWorld==sites.readWorld.address
+    and interface.writeWorld==sites.save.address and interface.packager==sites.packager
+    and interface.sections==sites.sections
+  if not matches then
+    print('[recorder] Map Extensions save interface not used: '..
+      (ok and 'it does not match this game profile' or tostring(interface)))
+    return nil
+  end
+  local bound={}
+  for key,value in pairs(sites) do bound[key]=value end
+  bound.save={address=sites.save.address,bytes={}}
+  bound.readWorld={address=sites.readWorld.address,bytes={}}
+  return bound
+end
+
 function M.verify()
   local sites = assert(allSites[native.profile.name])
   local adapter=require('code/automarket-replay')
-  local owner=modules and modules['map-extensions']
-  local interface=owner and type(owner.getNativeSaveInterface)=='function' and owner:getNativeSaveInterface()
-  if interface then
-    assert(interface.version==1 and interface.sectionCount==122 and interface.descriptorSize==16,
-      'Unsupported Map Extensions native save interface')
-    for _,key in ipairs({'packager','sections','readWorld','writeWorld'}) do
-      require('code/validation').integer(interface[key],0x10000,0x7fffffff,'Map Extensions '..key)
-    end
-    local bound={}
-    for key,value in pairs(sites) do bound[key]=value end
-    bound.packager,bound.sections=interface.packager,interface.sections
-    bound.save={address=interface.writeWorld,bytes={}}
-    bound.readWorld={address=interface.readWorld,bytes={}}
-    sites=bound
-  end
+  sites=ownerSites(sites) or sites
   if adapter.version('protocol') then
     assert(core.readByte(sites.execute.address+8)==0xE9,
       'Protocol dispatch hook is unavailable after initialization')

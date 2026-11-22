@@ -57,6 +57,8 @@ function M:loadSnapshot(path)
   temporarily(function()
     self.loadNative(0)
     if tracksRefusal then
+      -- Map Extensions refused before its world reader ran and has already asked
+      -- the UI owner for the main menu. A second read would reach its fatal path.
       local provider = map:takeLoadRefusal()
       refused = provider ~= nil
       assert(not refused, 'Save requires module '..tostring(provider))
@@ -75,6 +77,8 @@ function M:loadSnapshot(path)
     core.writeInteger(self.pathOverride,0)
     self.loading=false
     self.overridePath=nil
+    -- After a refusal the menu switch Map Extensions requested owns the view;
+    -- restoring the in-game view would contradict it.
     if not loaded and not refused then core.writeInteger(self.sites.gameCore+0xc,view) end
     -- These four fields belong to the load dialog; preserve the game's menu transition.
     for offset,value in pairs(old) do core.writeInteger(state+offset,value) end

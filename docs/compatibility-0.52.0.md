@@ -21,9 +21,24 @@ Map Extensions. With the archive API, Recorder uses those registrations and
 reads neither Automarket's data pointer nor Legacy's export. The adapter is
 only the fallback for Map Extensions 1.0.0.
 
-With the archive API, Recorder also uses the save functions that Map Extensions
-resolved and verified (`getNativeSaveInterface()`), so both modules call the
-same game functions.
+With the archive API, Recorder also checks the save functions that Map
+Extensions resolved (`getNativeSaveInterface()`). When they are exactly the
+functions of Recorder's verified game profile, Map Extensions' own wrapper
+replaces Recorder's byte check at those two functions. If the interface is
+missing, fails, has another version or names other functions, Recorder keeps
+its checked static addresses, as with 1.0.0.
+
+## Limits
+
+- An extension section of up to 32 MiB is accepted at capture. A restore point
+  must still fit Recorder's native container (6,000,000 stored bytes for the
+  world plus the section) and the 7 MiB restore point limit. A larger world
+  fails safely when it is written: that restore point is skipped and seeking
+  replays from the starting save.
+- With Map Extensions 1.0.0, Recorder's adapter loads Map Extensions' ZIP
+  library from `ucp/modules/map-extensions-<version>/`, the folder of an
+  installed Store package. Map Extensions has no API for its ZIP library; the
+  archive API replaces this path with 1.2.
 
 ## UCP2-Legacy
 

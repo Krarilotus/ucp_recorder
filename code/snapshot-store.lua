@@ -66,8 +66,10 @@ function M.prepare(manifest,point,path)
   M.validate(point,manifest)
   local owner=modules and modules['map-extensions']
   if point.sectionCapture==nil and owner and type(owner.requiredStateContracts)=='function' then
-    assert(next(owner:requiredStateContracts())==nil,
-      'Restore point predates complete required extension capture')
+    -- pairs, not next: a framework table proxy is empty to next() but iterates its contents.
+    for _ in pairs(owner:requiredStateContracts()) do
+      error('Restore point predates complete required extension capture')
+    end
   end
   local base=store.path(manifest.id)
   local paths={commandsFile='/stream-commands.json',rngFile='/stream-rng-sync.json',infoFile='/stream-infself.json',

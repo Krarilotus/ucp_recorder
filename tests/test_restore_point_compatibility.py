@@ -8,6 +8,7 @@ import struct
 import unittest
 
 import test_world_capture as world_fixture
+import test_world_container as container_fixture
 import test_recorder as recorder_fixture
 
 MARKET = struct.pack('<I', 2) + bytes(i % 256 for i in range(2412))
@@ -115,6 +116,37 @@ assert(legacyCalls==1)
             self.assertEqual(capture['world']['status'], 'failed')
 
 
+class OwnerArchiveContainerTests(unittest.TestCase):
+    setUp = world_fixture.WorldCaptureTests.setUp
+    capture = world_fixture.WorldCaptureTests.capture
+    prepare = container_fixture.WorldContainerTests.prepare
+
+    def test_large_owner_archive_sizes_buffers_and_survives_preparation(self):
+        # 1.5 MiB: larger than every native section (70,001 bytes here) and over
+        # the 1 MiB limit of the earlier Automarket/Legacy-only container.
+        archive = bytes(i % 251 for i in range(1536 * 1024))
+        self.lua.globals().owner_archive = archive.decode('latin-1')
+        self.lua.execute("""
+modules={['map-extensions']={captureSaveSection=function() return owner_archive end}}
+allActiveExtensions={{name='map-extensions',version='1.2.0'}}
+""")
+        self.lua.execute("realMaxSection=require('code/world-codec').MAX_SECTION")
+        self.prepare()
+        self.lua.execute("""
+local fake=package.loaded['code/world-codec']
+fake.MAX_SECTION=realMaxSection -- the fixture's fake codec omits the real limit
+local wrapped=fake.withBuffers
+package.loaded['code/world-codec'].withBuffers=function(capacity,callback)
+ bufferCapacity=capacity
+ return wrapped(capacity,callback)
+end
+prepared=container.prepare(virtual_path,engine)
+""")
+        self.assertEqual(self.lua.globals().bufferCapacity, len(archive))
+        data = (self.root/'world-native.sav').read_bytes()
+        self.assertEqual(data[-len(archive):], archive)
+
+
 class SnapshotMarkerTests(unittest.TestCase):
     check = recorder_fixture.RecorderTests.check
     setUp = recorder_fixture.RecorderTests.setUp
@@ -142,40 +174,157 @@ class EngineOwnerInterfaceTests(unittest.TestCase):
     check = recorder_fixture.RecorderTests.check
     setUp = recorder_fixture.RecorderTests.setUp
 
-    def test_owner_interface_replaces_static_save_sites_and_is_validated(self):
-        self.check('''
+    def test_matching_owner_interface_replaces_only_the_wrapped_byte_checks(self):
+        self.check("""
 Engine=require('code/engine')
 realNative=require('code/native'); realNative.profile.name='SHC'
 local sites=require('code/engine-sites').SHC
 for _,site in pairs(sites) do
  if type(site)=='table' then core.writeBytes(site.address,site.bytes) end
 end
-local interface={version=1,sectionCount=122,descriptorSize=16,
- packager=0x1100000,sections=0x1200000,readWorld=0x1300000,writeWorld=0x1400000}
+local interface={version=1,sectionCount=122,descriptorSize=16,packager=sites.packager,
+ sections=sites.sections,readWorld=sites.readWorld.address,writeWorld=sites.save.address}
 allActiveExtensions={{name='map-extensions',version='1.2.0'}}
-modules={['map-extensions']={getNativeSaveInterface=function() return interface end}}
--- The owner has resolved and verified its own patch sites; Recorder must not
--- require its static bytes there (even a changed sixth byte, which the 1.x
--- hook acceptance alone would refuse), but still checks every other site.
+local owner={getNativeSaveInterface=function() return interface end}
+modules={['map-extensions']=owner}
+-- The owner wraps these two functions; a changed sixth byte, which Recorder's
+-- own 1.x hook acceptance refuses, is the owner's business when it confirms them.
 bytes[sites.save.address]=0xE9; bytes[sites.readWorld.address]=0xE9
 bytes[sites.save.address+5]=0
 local bound=assert(Engine.verify())
-assert(bound.save.address==0x1400000 and bound.readWorld.address==0x1300000)
-assert(bound.packager==0x1100000 and bound.sections==0x1200000)
-for key,bad in pairs({version=2,sectionCount=121,descriptorSize=20,packager=0,readWorld=0x80000000}) do
+assert(#bound.save.bytes==0 and #bound.readWorld.bytes==0)
+assert(bound.save.address==sites.save.address and bound.readWorld.address==sites.readWorld.address)
+assert(bound.packager==sites.packager and bound.sections==sites.sections and bound.load==sites.load)
+-- Every other site is still checked.
+bytes[sites.load.address]=(sites.load.bytes[1]+1)%256
+assert(not pcall(Engine.verify))
+core.writeBytes(sites.load.address,sites.load.bytes)
+-- Unknown version, other functions, a broken table or a throwing owner: Recorder
+-- keeps its checked static sites instead of turning itself off.
+local function falls_back(label)
+ printed={}
+ local ok=pcall(Engine.verify)
+ assert(not ok,label..': static sixth-byte check must apply again')
+ local logged=false
+ for _,line in ipairs(printed) do
+  if tostring(line[1]):find('save interface not used',1,true) then logged=true end
+ end
+ assert(logged,label)
+end
+for key,bad in pairs({version=2,sectionCount=121,descriptorSize=20,packager=sites.packager+4,
+  sections=0,readWorld=sites.readWorld.address+1,writeWorld=0x1400000}) do
  local saved=interface[key]; interface[key]=bad
- assert(not pcall(Engine.verify),key)
+ falls_back(key)
  interface[key]=saved
 end
--- Without the interface (Map Extensions 1.0.0), the static sites stay checked:
--- its five-byte wrapper is accepted, a changed sixth byte is not.
-modules={['map-extensions']={}}
-allActiveExtensions={{name='map-extensions',version='1.0.0'}}
-assert(not pcall(Engine.verify))
+owner.getNativeSaveInterface=function() error('hooks not installed') end; falls_back('error')
+owner.getNativeSaveInterface=function() return 42 end; falls_back('type')
 bytes[sites.save.address+5]=sites.save.bytes[6]
 local static=assert(Engine.verify())
-assert(static.save.address==sites.save.address and static.packager==sites.packager)
-''')
+assert(#static.save.bytes>0 and static.save.address==sites.save.address)
+-- Map Extensions 1.0.0 has no interface: the static sites, as in 0.51.1.
+modules={['map-extensions']={}}
+allActiveExtensions={{name='map-extensions',version='1.0.0'}}
+static=assert(Engine.verify())
+assert(#static.save.bytes>0)
+bytes[sites.save.address+5]=0
+assert(not pcall(Engine.verify))
+""")
+
+
+class OldPointProxyTests(unittest.TestCase):
+    # The game runs Lua 5.4, where the framework's table proxies iterate through
+    # __pairs while next() sees an empty table. LuaJIT ignores __pairs.
+    def setUp(self):
+        import lupa.lua54
+        import test_snapshot_store
+        original = test_snapshot_store.LuaRuntime
+        test_snapshot_store.LuaRuntime = lupa.lua54.LuaRuntime
+        try:
+            test_snapshot_store.SnapshotStoreTests.setUp(self)
+        finally:
+            test_snapshot_store.LuaRuntime = original
+
+    def test_required_contracts_behind_a_proxy_still_refuse_old_points(self):
+        self.lua.execute("""
+point=assert(createPoint())
+local contracts={module={format='module-1'}}
+local proxy=setmetatable({},{__index=contracts,__pairs=function() return next,contracts,nil end})
+assert(next(proxy)==nil)
+modules={['map-extensions']={requiredStateContracts=function() return proxy end}}
+local ok,reason=pcall(snapshot.prepare,manifest,point,path)
+assert(not ok and reason:find('predates complete',1,true))
+contracts.module=nil
+assert(snapshot.prepare(manifest,point,path))
+""")
+
+
+class LoadRefusalTests(unittest.TestCase):
+    check = recorder_fixture.RecorderTests.check
+    setUp = recorder_fixture.RecorderTests.setUp
+
+    def run_load(self, refusals):
+        self.check("""
+core.writeString=function(a,s) for i=1,#s do bytes[a+i-1]=s:byte(i) end end
+local snapshots=require('code/native-snapshots')
+calls={load=0,read=0,reset=0}
+queue={%s}
+modules={['map-extensions']={takeLoadRefusal=function()
+ calls.taken=(calls.taken or 0)+1
+ return table.remove(queue,1)
+end}}
+menu=0x5000000; gameCore=0x5100000; packager=0x5200000
+for _,o in ipairs({0x58,0x7c,0x80,0x884}) do memory[menu+o]=o end
+memory[gameCore+0xc]=7; memory[packager+0x20]=0x493690
+state=setmetatable({sites={menuText=menu,gameCore=gameCore,packager=packager,sections=0x5300000},
+ pathBuffer=0x5400000,pathOverride=0x5500000,
+ singlePlayer=function() return true end,
+ loadNative=function() calls.load=calls.load+1; calls.viewDuringLoad=memory[gameCore+0xc] end,
+ readWorldNative=function() calls.read=calls.read+1; calls.progressDuringRead=memory[packager+0x20] end,
+ resetCommands=function() calls.reset=calls.reset+1 end},{__index=snapshots})
+ok,reason=pcall(state.loadSnapshot,state,'ucp/replays/x.sav')
+""" % refusals)
+
+    def test_refused_snapshot_stops_before_the_second_world_read(self):
+        # The first value is a stale refusal from an earlier menu Load; it is drained.
+        self.run_load("'old-provider','improved-tunnelers'")
+        self.check("""
+assert(not ok and reason:find('Save requires module improved-tunnelers',1,true))
+assert(calls.taken==2 and calls.load==1 and calls.read==0 and calls.reset==0)
+assert(memory[state.pathOverride]==0 and state.loading==false and state.overridePath==nil)
+for _,o in ipairs({0x58,0x7c,0x80,0x884}) do assert(memory[menu+o]==o) end
+-- Map Extensions requested the main menu; the in-game view is not restored.
+assert(memory[gameCore+0xc]==20)
+""")
+
+    def test_stale_refusal_does_not_stop_an_admitted_snapshot(self):
+        self.run_load("'old-provider'")
+        self.check("""
+assert(ok,reason)
+assert(calls.load==1 and calls.read==1 and calls.reset==1 and calls.viewDuringLoad==20)
+assert(calls.progressDuringRead==0 and memory[packager+0x20]==0x493690)
+assert(memory[state.pathOverride]==0 and state.loading==false)
+""")
+
+    def test_released_map_extensions_without_refusal_api_loads_as_before(self):
+        self.run_load("")
+        self.check("""
+modules={['map-extensions']={}}
+calls={load=0,read=0,reset=0}
+ok,reason=pcall(state.loadSnapshot,state,'ucp/replays/x.sav')
+assert(ok,reason)
+assert(calls.load==1 and calls.read==1 and calls.reset==1)
+""")
+
+    def test_failed_native_load_restores_the_previous_view(self):
+        self.run_load("")
+        self.check("""
+memory[gameCore+0xc]=7
+state.loadNative=function() error('native load failed') end
+ok,reason=pcall(state.loadSnapshot,state,'ucp/replays/x.sav')
+assert(not ok and reason:find('native load failed',1,true))
+assert(memory[gameCore+0xc]==7 and memory[state.pathOverride]==0)
+""")
 
 
 class LegacyBaselineTests(unittest.TestCase):

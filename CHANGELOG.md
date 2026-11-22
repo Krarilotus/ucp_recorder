@@ -11,6 +11,11 @@
   Extensions there is no extension state. A 1.x without the API (not in the
   Store) writes no restore points, and seeking starts from the starting save.
   See `docs/compatibility-0.52.0.md`.
+- Use Map Extensions' reported save functions only when they are exactly those
+  of the verified game profile; otherwise (missing, failing, another interface
+  version) keep the checked static sites instead of turning Recorder off. A
+  refused restore point stops before the second world read and leaves the menu
+  switch to Map Extensions.
 - Unchanged: dependencies (UCP >=3.0.7, UI ^1.0.1), replay and restore point
   formats, and the UCP2-Legacy 2.15.2 requirement when Legacy is active.
 - Accept every Map Extensions 1.x, not only 1.0.0. All 1.x versions wrap the same
