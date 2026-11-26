@@ -23,7 +23,7 @@ local function ownerSites(sites)
     and interface.writeWorld==sites.save.address and interface.packager==sites.packager
     and interface.sections==sites.sections
   if not matches then
-    log(INFO,'[recorder] Map Extensions save interface not used: '..
+    log(INFO,'Map Extensions save interface not used: '..
       (ok and 'it does not match this game profile' or tostring(interface)))
     return nil
   end
