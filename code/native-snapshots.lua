@@ -59,9 +59,11 @@ function M:loadSnapshot(path)
     if tracksRefusal then
       -- Map Extensions refused before its world reader ran and has already asked
       -- the UI owner for the main menu. A second read would reach its fatal path.
+      -- It names the missing module, or itself when it could not read the file.
       local provider = map:takeLoadRefusal()
       refused = provider ~= nil
-      assert(not refused, 'Save requires module '..tostring(provider))
+      assert(not refused, provider == 'map-extensions' and 'Map Extensions could not read this restore point'
+        or 'Save requires module '..tostring(provider))
     end
     -- The outer loader builds navigation/rendering caches, but prepareMap also
     -- resets saved simulation fields (e.g. section 1024's tick load balancer).
