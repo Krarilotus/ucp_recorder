@@ -5,19 +5,30 @@ local store=require('code/sessions')
 local digest=require('code/native-hash')
 local M={CHUNK=65536}
 
-function M.layout()
+function M.layout(address)
   local profile=assert(sections[native.profile.name],'Unsupported world capture executable')
-  local raw=core.readString(profile.address,profile.bytes)
+  local raw=core.readString(address or profile.address,profile.bytes)
   local entries=require('code/world-layout').decode(raw,native.profile.name)
   return entries,profile,raw
 end
 
 function M.extensionState()
   local market,marketInfo,extensionData,extensionInfo
+  local legacy=modules and modules['ucp2-legacy']
+  local owner=modules and modules['map-extensions']
+  if owner and type(owner.captureSaveSection)=='function' then
+    local raw=owner:captureSaveSection()
+    assert(type(raw)=='string' and #raw>0 and #raw<=require('code/world-codec').MAX_SECTION,
+      'Map Extensions save section exceeds Recorder capacity')
+    return nil,nil,raw,{bytes=#raw,sha256=sha.sha256(raw),ucp2=legacy~=nil,complete=true}
+  end
+  -- The existing 1.0.0 path preserves previously supported profiles.
+  local adapter=require('code/automarket-replay')
+  local version=adapter.version('map-extensions')
+  assert(not version or version=='1.0.0','Map Extensions must expose captureSaveSection for restore points')
   -- Automarket exposes this pointer as part of its enabled module object.
   -- Reading its exact save payload avoids calling map-extensions callbacks,
   -- which would update custom native section memory and write cache files.
-  local adapter=require('code/automarket-replay')
   local descriptor=adapter.current()
   local custom={}
   if descriptor then
@@ -30,7 +41,6 @@ function M.extensionState()
       format=2,bytes=#data,sha256=sha.sha256(data)}
     custom['automarket/automarketplayerdata.bin']=data
   end
-  local legacy=modules and modules['ucp2-legacy']
   if legacy then
     assert(type(legacy.serializeSimulationState)=='function','UCP2 requires read-only simulation state export')
     legacy:serializeSimulationState({put=function(_,name,data)
@@ -48,7 +58,7 @@ end
 
 function M.capture(path,engine)
   digest.prepare()
-  local entries,profile,raw=M.layout()
+  local entries,profile,raw=M.layout(engine.sites and engine.sites.sections)
   local manifest={format=1,kind='native-world-evidence',variant=native.profile.name,
     executable=native.profile.sha256,tick=engine:tick(),status='writing',playable=false,
     tableHash=profile.hash,bytes=profile.total,sections=entries,
@@ -90,15 +100,15 @@ end
 -- This is the same checked section/header/extension source used by MP capture.
 function M.freeze(engine)
   assert(not engine.executing and not engine:commandsPending(),'Snapshot requires an idle command boundary')
-  local entries,profile=M.layout()
+  local entries,profile=M.layout(engine.sites and engine.sites.sections)
   local header,descriptor=require('code/world-header').read()
-  local _,_,extensions=M.extensionState()
+  local _,_,extensions,extensionInfo=M.extensionState()
   local bytes=profile.total+(extensions and #extensions or 0)
   assert(bytes<=require('code/codec-worker').MAX_BYTES,'Frozen world exceeds memory budget')
   local memory=core.allocate(bytes+1,true) -- a binary bridge may append a trailing NUL
   assert(memory and memory~=0,'Cannot allocate frozen world')
   local reader={entries=entries,header=header,manifest={header=descriptor},extensions=extensions,
-    precompressed=true,memory=memory}
+    completeExtensionState=extensionInfo and extensionInfo.complete,precompressed=true,memory=memory}
   local ok,reason=pcall(function()
     local inputs,offset={},0
     for _,entry in ipairs(entries) do

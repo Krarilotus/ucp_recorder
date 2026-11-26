@@ -26,6 +26,10 @@ manifest={player=1,variant='SHC',automarket=adapter.current()}
         self.check('''
 assert(pcall(validation.sessionCommand,marketCommand(),manifest))
 assert(adapter.compatible(manifest.automarket))
+-- Any map-extensions 1.x: a recording made with 1.0.0 stays compatible.
+allActiveExtensions[3].version='1.2.0'; assert(adapter.compatible(manifest.automarket))
+allActiveExtensions[3].version='2.0.0'; assert(not pcall(adapter.current))
+allActiveExtensions[3].version='1.0.0'
 modules.protocol.getProtocolNumber=function() return 132 end
 assert(not adapter.compatible(manifest.automarket))
 allActiveExtensions[1].version='1.0.0'

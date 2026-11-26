@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.52.0 (complete restore points)
+
+- Use the installed Map Extensions save archive API for complete restore points.
+  Restore uses the same module callbacks as an ordinary load. Compatible older
+  points still load. If an old point predates capture of an active required
+  provider, replay seeking starts from its native starting save.
+- Without that API, keep the 0.51.1 behaviour: with Map Extensions 1.0.0, the
+  Automarket and UCP2-Legacy adapter fills restore points; without Map
+  Extensions there is no extension state. A 1.x without the API (not in the
+  Store) writes no restore points, and seeking starts from the starting save.
+  See `docs/compatibility-0.52.0.md`.
+- Use Map Extensions' reported save functions only when they are exactly those
+  of the verified game profile; otherwise (missing, failing, another interface
+  version) keep the checked static sites instead of turning Recorder off. A
+  refused restore point stops before the second world read and leaves the menu
+  switch to Map Extensions.
+- Unchanged: dependencies (UCP >=3.0.7, UI ^1.0.1), replay and restore point
+  formats, and the UCP2-Legacy 2.15.2 requirement when Legacy is active.
+- Accept every Map Extensions 1.x, not only 1.0.0. All 1.x versions wrap the same
+  two save functions with the same five-byte hook and keep the ZIP section format.
+  Before, a newer 1.x stopped Recorder at startup ("session hook conflicts at
+  readWorld") and the Automarket replay adapter refused it. 2.x is still refused.
+- The Automarket replay adapter accepts every Protocol 1.x. Their custom protocol
+  transport is unchanged since 1.0.0; Protocol 2.x is refused.
+- Load map-extensions' ZIP library from the installed version's folder. The path was
+  fixed to map-extensions-1.0.0, so with any other version restore points were switched
+  off and multiplayer start worlds could not be captured.
+
 ## 0.51.1 (launcher settings)
 
 - Show the three release settings under a translated Recorder category with

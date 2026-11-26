@@ -392,6 +392,11 @@ assert(Engine.verify())
 bytes[engine.sites.save.address]=0xE8; assert(Engine.verify())
 modules={}; assert(not pcall(Engine.verify))
 modules={['map-extensions']={}}; assert(Engine.verify())
+for _,version in ipairs({'1.1.6','1.2.0'}) do
+ allActiveExtensions={{name='map-extensions',version=version}}; assert(Engine.verify())
+end
+allActiveExtensions={{name='map-extensions',version='2.0.0'}}; assert(not pcall(Engine.verify))
+allActiveExtensions={{name='map-extensions',version='1.0.0'}}
 bytes[engine.sites.save.address+5]=0
 assert(not pcall(Engine.verify))
 ''')

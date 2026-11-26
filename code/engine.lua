@@ -9,15 +9,41 @@ local unpackResource=string.unpack or function(_,data,offset)
   return value>=2147483648 and value-4294967296 or value
 end
 
+-- Map Extensions 1.2+ reports the save functions it resolved and wrapped. When it
+-- names exactly the functions of this verified profile, its own wrapper replaces
+-- Recorder's byte check there (its hook form may change). Anything else (no API,
+-- an error, another interface version, other addresses) keeps the checked static
+-- sites below, as with Map Extensions 1.0.0.
+local function ownerSites(sites)
+  local owner=modules and modules['map-extensions']
+  if not (owner and type(owner.getNativeSaveInterface)=='function') then return nil end
+  local ok,interface=pcall(owner.getNativeSaveInterface,owner)
+  local matches=ok and type(interface)=='table' and interface.version==1 and interface.sectionCount==122
+    and interface.descriptorSize==16 and interface.readWorld==sites.readWorld.address
+    and interface.writeWorld==sites.save.address and interface.packager==sites.packager
+    and interface.sections==sites.sections
+  if not matches then
+    log(INFO,'Map Extensions save interface not used: '..
+      (ok and 'it does not match this game profile' or tostring(interface)))
+    return nil
+  end
+  local bound={}
+  for key,value in pairs(sites) do bound[key]=value end
+  bound.save={address=sites.save.address,bytes={}}
+  bound.readWorld={address=sites.readWorld.address,bytes={}}
+  return bound
+end
+
 function M.verify()
   local sites = assert(allSites[native.profile.name])
   local adapter=require('code/automarket-replay')
+  sites=ownerSites(sites) or sites
   if adapter.version('protocol') then
     assert(core.readByte(sites.execute.address+8)==0xE9,
       'Protocol dispatch hook is unavailable after initialization')
   end
   for name, site in pairs(sites) do
-    if type(site)=='table' then
+    if type(site)=='table' and #site.bytes>0 then
       local actual=core.readBytes(site.address, #site.bytes)
       -- map-extensions wraps this callable entry to include extension save data.
       -- We call that entry, never bypass or overwrite its five-byte hook.

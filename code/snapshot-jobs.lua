@@ -16,6 +16,7 @@ function M.start(engine,path,month,commands,bookmark,complete)
   local ok,reader=pcall(require('code/world-capture').freeze,engine)
   local unchanged=engine:tick()==tick and engine:rngData()==random and engine:resourceData()==resources
   if not ok then assert(unchanged,'Snapshot capture changed simulation state'); return nil,tostring(reader) end
+  if reader.completeExtensionState then point.sectionCapture=1 end
   active=setmetatable({reader=reader,path=path,point=point,random=random,complete=complete,
     started=started,freezeMilliseconds=(platform.milliseconds()-started)%4294967296},{__index=Job})
   if not unchanged then active:cancel(); error('Snapshot capture changed simulation state') end

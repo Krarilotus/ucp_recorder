@@ -78,6 +78,19 @@ point.bookmark.positions.commandsFile=999
 assert(not pcall(snapshot.prepare,manifest,point,path))
 ''')
 
+    def test_old_point_is_skipped_only_when_required_state_could_be_missing(self):
+        self.lua.execute('''
+point=assert(createPoint())
+local contracts={}
+modules={['map-extensions']={requiredStateContracts=function() return contracts end}}
+assert(snapshot.prepare(manifest,point,path))
+contracts.module={format='module-1'}
+local ok,reason=pcall(snapshot.prepare,manifest,point,path)
+assert(not ok and reason:find('predates complete',1,true))
+point.sectionCapture=1
+assert(snapshot.prepare(manifest,point,path))
+''')
+
     def test_missing_optional_restore_point_does_not_prevent_named_replay_copy(self):
         self.lua.execute('''
 point=assert(createPoint())
